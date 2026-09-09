@@ -1,0 +1,913 @@
+@{
+    ViewData["Title"] = "Thông tin bộ phận";
+
+    /*
+     * =====================================================================
+     * TODO (khi kết nối DB):
+     *   var layouts = await _layoutService.GetAllWithItemsAsync();
+     *   // Mỗi layout gồm: Id, Name, RowCount, ColumnCount, CellWidth?,
+     *   //   CellHeight?, Gap?, Status, ProductionDepartment.Name,
+     *   //   ProductLayoutItems[] { RowIndex, ColumnIndex, SortOrder,
+     *   //     ProductionMachine { MachineName, MachineCode, Status } }
+     *
+     * Hiện tại: dùng mock JSON bên dưới để render giao diện tĩnh.
+     * Cấu trúc mock hoàn toàn khớp với ProductionDepartmentLayout +
+     * ProductLayoutItem + ProductionMachine.
+     * =====================================================================
+     */
+}
+
+<!-- =====================================================
+     MOCK DATA  (sẽ thay bằng Model từ Controller)
+     Cấu trúc khớp 1-1 với ProductionDepartmentLayout
+     + ProductLayoutItem + ProductionMachine
+     ===================================================== -->
+<script id="mockLayouts" type="application/json">
+[
+  {
+    "id": "a1000000-0000-0000-0000-000000000001",
+    "name": "Layout Bộ phận Cắt",
+    "departmentName": "Bộ phận Cắt",
+    "rowCount": 3,
+    "columnCount": 4,
+    "cellWidth": null,
+    "cellHeight": null,
+    "gap": 10,
+    "status": 1,
+    "items": [
+      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Máy cắt CT-01", "machineCode": "CT-01", "keyword": "Cắt thẳng", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Máy cắt CT-02", "machineCode": "CT-02", "keyword": "Cắt vòng", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 2, "sortOrder": 2, "machineName": "Máy cắt CT-03", "machineCode": "CT-03", "keyword": "Cắt rập", "machineStatus": 2 },
+      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 4, "machineName": "Máy trải vải TV-01", "machineCode": "TV-01", "keyword": "Trải vải", "machineStatus": 1 },
+      { "rowIndex": 1, "columnIndex": 1, "sortOrder": 5, "machineName": "Máy trải vải TV-02", "machineCode": "TV-02", "keyword": "Trải vải", "machineStatus": 1 },
+      { "rowIndex": 2, "columnIndex": 0, "sortOrder": 8, "machineName": "Bàn đánh số ĐS-01", "machineCode": "ĐS-01", "keyword": "Đánh số", "machineStatus": 3 }
+    ]
+  },
+  {
+    "id": "a2000000-0000-0000-0000-000000000002",
+    "name": "Layout Bộ phận May",
+    "departmentName": "Bộ phận May",
+    "rowCount": 2,
+    "columnCount": 5,
+    "cellWidth": null,
+    "cellHeight": null,
+    "gap": 10,
+    "status": 1,
+    "items": [
+      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Máy may 1K-01", "machineCode": "1K-01", "keyword": "Ráp thân", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Máy may 1K-02", "machineCode": "1K-02", "keyword": "Ráp tay", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 2, "sortOrder": 2, "machineName": "Máy may 1K-03", "machineCode": "1K-03", "keyword": "Ráp cổ", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 3, "sortOrder": 3, "machineName": "Máy vắt sổ VS-01", "machineCode": "VS-01", "keyword": "Vắt sổ", "machineStatus": 2 },
+      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 5, "machineName": "Máy đính nút ĐN-01", "machineCode": "ĐN-01", "keyword": "Đính nút", "machineStatus": 1 },
+      { "rowIndex": 1, "columnIndex": 1, "sortOrder": 6, "machineName": "Máy thùa khuy TK-01", "machineCode": "TK-01", "keyword": "Thùa khuy", "machineStatus": 1 },
+      { "rowIndex": 1, "columnIndex": 3, "sortOrder": 8, "machineName": "Máy bo gấu BG-01", "machineCode": "BG-01", "keyword": "Bo gấu", "machineStatus": 3 }
+    ]
+  },
+  {
+    "id": "a3000000-0000-0000-0000-000000000003",
+    "name": "Layout Bộ phận Hoàn thiện",
+    "departmentName": "Bộ phận Hoàn thiện",
+    "rowCount": 2,
+    "columnCount": 3,
+    "cellWidth": null,
+    "cellHeight": null,
+    "gap": 10,
+    "status": 1,
+    "items": [
+      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Bàn ủi hơi UI-01", "machineCode": "UI-01", "keyword": "Ủi thân", "machineStatus": 1 },
+      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Bàn ủi hơi UI-02", "machineCode": "UI-02", "keyword": "Ủi tay", "machineStatus": 1 },
+      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 3, "machineName": "Bàn kiểm phẩm KP-01", "machineCode": "KP-01", "keyword": "Kiểm QC", "machineStatus": 1 },
+      { "rowIndex": 1, "columnIndex": 2, "sortOrder": 5, "machineName": "Bàn đóng gói DG-01", "machineCode": "DG-01", "keyword": "Đóng gói", "machineStatus": 2 }
+    ]
+  }
+]
+</script>
+
+<style>
+    /* ============================================================
+       ATDepartment — Machine Layout View
+       ============================================================ */
+
+    /* Page wrapper */
+    .atd-page { padding: 0; }
+
+    /* ---- Top bar ---- */
+    .atd-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 28px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-surface);
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .atd-topbar-left .atd-breadcrumb {
+        font-size: 12px;
+        color: var(--ink-500);
+        margin-bottom: 4px;
+    }
+
+    .atd-topbar-left .atd-breadcrumb .sep { margin: 0 6px; color: var(--ink-300); }
+    .atd-topbar-left .atd-breadcrumb .cur { color: var(--ink-700-solid); font-weight: 600; }
+
+    .atd-page-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--ink-900);
+        letter-spacing: -.3px;
+        margin: 0;
+    }
+
+    .atd-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    /* ---- Filter bar ---- */
+    .atd-filter {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        padding: 14px 28px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
+
+    .atd-filter-group { display: flex; flex-direction: column; gap: 5px; }
+
+    .atd-filter-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--ink-500);
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+
+    .atd-filter select,
+    .atd-filter input[type="text"] {
+        padding: 8px 12px;
+        border: 1.5px solid var(--border);
+        border-radius: 9px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-900);
+        background: var(--bg-canvas);
+        outline: none;
+        min-width: 160px;
+        transition: border-color .2s, box-shadow .2s;
+        appearance: none;
+    }
+
+    .atd-filter select:focus,
+    .atd-filter input[type="text"]:focus {
+        border-color: var(--accent-navy);
+        box-shadow: 0 0 0 3px var(--accent-navy-soft);
+        background: #fff;
+    }
+
+    .atd-search-wrap { position: relative; }
+    .atd-search-wrap i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-300); font-size: 13px; }
+    .atd-search-wrap input { padding-left: 32px !important; }
+
+    .atd-filter-actions { display: flex; gap: 8px; }
+
+    /* ---- Scroll body ---- */
+    .atd-body {
+        overflow-y: auto;
+        padding: 24px 28px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+    }
+
+    /* ---- Legend ---- */
+    .atd-legend {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+    }
+
+    .atd-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-500);
+    }
+
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+
+    .legend-dot.active      { background: var(--success); }
+    .legend-dot.inactive    { background: var(--danger); }
+    .legend-dot.maintenance { background: var(--accent-gold); }
+    .legend-dot.empty       { background: var(--border); border: 1.5px dashed var(--ink-300); }
+
+    /* ---- Section: one per department layout ---- */
+    .atd-section {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        animation: fadeSlide .4s ease both;
+    }
+
+    .atd-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .atd-section-title-group { display: flex; align-items: center; gap: 12px; }
+
+    .atd-dept-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 16px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(31,58,103,.22);
+    }
+
+    .atd-section-name {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--ink-900);
+        margin: 0;
+        letter-spacing: -.2px;
+    }
+
+    .atd-section-meta {
+        font-size: 12px;
+        color: var(--ink-500);
+        margin-top: 2px;
+        font-weight: 500;
+    }
+
+    .atd-section-stats {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .atd-stat {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1.5px solid;
+    }
+
+    .atd-stat.s-active    { background: #E6F4EF; color: var(--success);    border-color: #B8DDD2; }
+    .atd-stat.s-inactive  { background: #FEF3F2; color: var(--danger);     border-color: #F5C0BC; }
+    .atd-stat.s-maint     { background: var(--accent-gold-soft); color: var(--accent-gold); border-color: #D4B07A; }
+    .atd-stat.s-empty     { background: var(--bg-canvas); color: var(--ink-500); border-color: var(--border); }
+
+    /* ---- Grid container ---- */
+    .atd-grid-wrap {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        overflow-x: auto;
+    }
+
+    .atd-grid {
+        display: grid;
+        /* columns & rows set inline per layout */
+        width: max-content;
+        min-width: 100%;
+    }
+
+    /* ---- Grid cell ---- */
+    .atd-cell {
+        border-radius: 10px;
+        min-width: 130px;
+        min-height: 96px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        transition: transform .2s, box-shadow .2s;
+        overflow: hidden;
+    }
+
+    .atd-cell:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        z-index: 2;
+    }
+
+    /* Empty cell */
+    .atd-cell.empty {
+        background: var(--bg-canvas);
+        border: 2px dashed var(--border);
+    }
+
+    /* Active machine */
+    .atd-cell.active {
+        background: #fff;
+        border: 1.5px solid #C5E4D8;
+        box-shadow: 0 0 0 0 transparent;
+    }
+
+    /* Inactive machine */
+    .atd-cell.inactive {
+        background: #fff;
+        border: 1.5px solid #F5C0BC;
+    }
+
+    /* Maintenance machine */
+    .atd-cell.maintenance {
+        background: #fff;
+        border: 1.5px solid #D4B07A;
+    }
+
+    /* ---- Cell content ---- */
+    .atd-cell-pos {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--ink-300);
+        letter-spacing: .3px;
+    }
+
+    /* Empty inner */
+    .atd-cell.empty .empty-inner {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: var(--ink-300);
+    }
+
+    .atd-cell.empty .empty-inner i { font-size: 18px; }
+    .atd-cell.empty .empty-inner span { font-size: 10.5px; font-weight: 600; }
+
+    /* Machine inner */
+    .atd-cell-inner {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px 9px;
+        gap: 6px;
+        flex: 1;
+    }
+
+    .atd-cell-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .atd-cell-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .atd-cell.active     .atd-cell-icon { background: #E6F4EF; color: var(--success); }
+    .atd-cell.inactive   .atd-cell-icon { background: #FEF3F2; color: var(--danger); }
+    .atd-cell.maintenance .atd-cell-icon { background: var(--accent-gold-soft); color: var(--accent-gold); }
+
+    .atd-cell-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-top: 3px;
+    }
+
+    .atd-cell.active     .atd-cell-status-dot { background: var(--success); }
+    .atd-cell.inactive   .atd-cell-status-dot { background: var(--danger); }
+    .atd-cell.maintenance .atd-cell-status-dot { background: var(--accent-gold); }
+
+    .atd-cell-name {
+        font-size: 12.5px;
+        font-weight: 800;
+        color: var(--ink-900);
+        line-height: 1.35;
+        margin-bottom: 1px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .atd-cell-code {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--ink-300);
+        font-family: 'Courier New', monospace;
+    }
+
+    .atd-cell-kw {
+        font-size: 10.5px;
+        color: var(--ink-500);
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .atd-cell-footer {
+        border-top: 1px solid var(--border-soft);
+        padding: 5px 12px 7px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .atd-cell-status-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .3px;
+        text-transform: uppercase;
+    }
+
+    .atd-cell.active     .atd-cell-status-label { color: var(--success); }
+    .atd-cell.inactive   .atd-cell-status-label { color: var(--danger); }
+    .atd-cell.maintenance .atd-cell-status-label { color: var(--accent-gold); }
+
+    /* ---- Tooltip on cell hover ---- */
+    .atd-cell[data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ink-900);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 20;
+        box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    }
+
+    /* ---- Status bar at bottom of active cell ---- */
+    .atd-cell-bar {
+        height: 3px;
+        width: 100%;
+        flex-shrink: 0;
+    }
+
+    .atd-cell.active     .atd-cell-bar { background: var(--success); }
+    .atd-cell.inactive   .atd-cell-bar { background: var(--danger); }
+    .atd-cell.maintenance .atd-cell-bar { background: var(--accent-gold); }
+
+    /* ---- Empty state (no layouts) ---- */
+    .atd-no-data {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 80px 24px;
+        text-align: center;
+        color: var(--ink-300);
+    }
+
+    .atd-no-data .nd-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: var(--bg-surface);
+        border: 2px dashed var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+    }
+
+    .atd-no-data h3 { font-size: 16px; font-weight: 700; color: var(--ink-500); margin: 0; }
+    .atd-no-data p { font-size: 13px; max-width: 300px; line-height: 1.6; margin: 0; }
+
+    /* ---- Utility buttons ---- */
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition: background .18s, opacity .18s, transform .15s; }
+    .btn-primary { background: linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+    .btn-ghost:hover { background:var(--border-soft); }
+    .btn-sm { padding: 7px 13px; font-size: 12.5px; border-radius: 8px; }
+
+    /* ---- Animations ---- */
+    @@keyframes fadeSlide {
+        from { opacity:0; transform: translateY(10px); }
+        to   { opacity:1; transform: translateY(0); }
+    }
+
+    @@media (max-width: 768px) {
+        .atd-topbar, .atd-filter, .atd-body { padding-left: 16px; padding-right: 16px; }
+        .atd-grid-wrap { padding: 12px; }
+    }
+</style>
+
+<div class="atd-page">
+
+    <!-- =====================================================
+         TOP BAR
+         ===================================================== -->
+    <div class="atd-topbar">
+        <div class="atd-topbar-left">
+            <div class="atd-breadcrumb">Quản lý <span class="sep">/</span><span class="cur">Thông tin bộ phận</span></div>
+            <h1 class="atd-page-title">Thông tin bộ phận</h1>
+        </div>
+        <div class="atd-topbar-right">
+            <button class="btn btn-ghost btn-sm" id="atdRefreshBtn">
+                <i class="fa-solid fa-rotate-right"></i> Làm mới
+            </button>
+            <a asp-controller="MachineLayoutDesigner" asp-action="Index" class="btn btn-ghost btn-sm">
+                <i class="fa-solid fa-pen-ruler"></i> Thiết kế layout
+            </a>
+            <button class="btn btn-primary btn-sm" id="atdExportBtn">
+                <i class="fa-solid fa-file-export"></i> Xuất báo cáo
+            </button>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         FILTER BAR
+         ===================================================== -->
+    <div class="atd-filter">
+        <!-- Tìm kiếm -->
+        <div class="atd-filter-group">
+            <label class="atd-filter-label">Tìm kiếm</label>
+            <div class="atd-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="atdSearch" placeholder="Tên máy, mã máy, từ khóa...">
+            </div>
+        </div>
+
+        <!-- Bộ phận -->
+        <div class="atd-filter-group">
+            <label class="atd-filter-label">Bộ phận</label>
+            <select id="atdDeptFilter">
+                <option value="">Tất cả bộ phận</option>
+                <!-- TODO: render từ DB -->
+            </select>
+        </div>
+
+        <!-- Trạng thái máy -->
+        <div class="atd-filter-group">
+            <label class="atd-filter-label">Trạng thái</label>
+            <select id="atdStatusFilter">
+                <option value="">Tất cả</option>
+                <option value="1">Hoạt động</option>
+                <option value="2">Ngừng hoạt động</option>
+                <option value="3">Bảo trì</option>
+            </select>
+        </div>
+
+        <div class="atd-filter-actions">
+            <button class="btn btn-primary btn-sm" id="atdFilterApply">
+                <i class="fa-solid fa-magnifying-glass"></i> Lọc
+            </button>
+            <button class="btn btn-ghost btn-sm" id="atdFilterReset">
+                <i class="fa-solid fa-arrow-rotate-left"></i> Đặt lại
+            </button>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         BODY: render layout sections
+         ===================================================== -->
+    <div class="atd-body" id="atdBody">
+
+        <!-- Legend -->
+        <div class="atd-legend">
+            <span style="font-size:12px;font-weight:700;color:var(--ink-300);text-transform:uppercase;letter-spacing:.6px;">Chú thích:</span>
+            <div class="atd-legend-item"><div class="legend-dot active"></div>Hoạt động</div>
+            <div class="atd-legend-item"><div class="legend-dot inactive"></div>Ngừng hoạt động</div>
+            <div class="atd-legend-item"><div class="legend-dot maintenance"></div>Bảo trì</div>
+            <div class="atd-legend-item"><div class="legend-dot empty"></div>Ô trống</div>
+        </div>
+
+        <!-- Layouts rendered by JS -->
+        <div id="atdLayoutContainer"></div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    /* =====================================================
+       HELPERS
+       ===================================================== */
+    var STATUS = {
+        1: { cls: 'active',      label: 'Hoạt động',      icon: 'fa-check',  tipFn: function(n){ return n + ' — Đang hoạt động'; } },
+        2: { cls: 'inactive',    label: 'Ngừng hoạt động', icon: 'fa-xmark',  tipFn: function(n){ return n + ' — Ngừng hoạt động'; } },
+        3: { cls: 'maintenance', label: 'Bảo trì',         icon: 'fa-wrench', tipFn: function(n){ return n + ' — Đang bảo trì'; } }
+    };
+
+    function esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* =====================================================
+       LOAD DATA
+       TODO: Thay đoạn này bằng fetch('/ProductionDepartment/GetLayouts')
+             để lấy dữ liệu thực từ DB khi backend sẵn sàng.
+             Cấu trúc JSON trả về phải khớp với mock bên dưới:
+             [{ id, name, departmentName, rowCount, columnCount,
+                cellWidth, cellHeight, gap, status,
+                items: [{ rowIndex, columnIndex, sortOrder,
+                          machineName, machineCode, keyword, machineStatus }] }]
+       ===================================================== */
+    function loadLayouts() {
+        try {
+            var el = document.getElementById('mockLayouts');
+            return el ? JSON.parse(el.textContent) : [];
+        } catch(e) {
+            return [];
+        }
+    }
+
+    /* =====================================================
+       RENDER
+       ===================================================== */
+    function renderAll(layouts, search, deptFilter, statusFilter) {
+        var container = document.getElementById('atdLayoutContainer');
+        container.innerHTML = '';
+
+        // Populate dept dropdown
+        var deptSel = document.getElementById('atdDeptFilter');
+        if (deptSel.options.length <= 1) {
+            layouts.forEach(function(l) {
+                var opt = document.createElement('option');
+                opt.value = l.departmentName;
+                opt.textContent = l.departmentName;
+                deptSel.appendChild(opt);
+            });
+        }
+
+        // Filter layouts
+        var visible = layouts.filter(function(l) {
+            if (deptFilter && l.departmentName !== deptFilter) return false;
+            return true;
+        });
+
+        if (visible.length === 0) {
+            container.innerHTML =
+                '<div class="atd-no-data">' +
+                    '<div class="nd-icon"><i class="fa-solid fa-border-all"></i></div>' +
+                    '<h3>Không có layout nào</h3>' +
+                    '<p>Chưa có layout bộ phận. Hãy vào <strong>Thiết kế layout máy</strong> để tạo mới.</p>' +
+                '</div>';
+            return;
+        }
+
+        visible.forEach(function(layout, idx) {
+            var section = buildSection(layout, search, statusFilter, idx);
+            container.appendChild(section);
+        });
+    }
+
+    function buildSection(layout, search, statusFilter, idx) {
+        var rows = layout.rowCount;
+        var cols = layout.columnCount;
+        var gap  = layout.gap || 10;
+        var gap2 = gap + 'px';
+
+        // Build lookup: "row-col" → item
+        var map = {};
+        (layout.items || []).forEach(function(item) {
+            var key = item.rowIndex + '-' + item.columnIndex;
+            map[key] = item;
+        });
+
+        // Stats
+        var total = rows * cols;
+        var cntActive = 0, cntInactive = 0, cntMaint = 0, cntEmpty = 0;
+        for (var r = 0; r < rows; r++) {
+            for (var c = 0; c < cols; c++) {
+                var it = map[r + '-' + c];
+                if (!it) { cntEmpty++; }
+                else if (it.machineStatus === 1) cntActive++;
+                else if (it.machineStatus === 2) cntInactive++;
+                else if (it.machineStatus === 3) cntMaint++;
+                else cntEmpty++;
+            }
+        }
+
+        // --- Section wrapper ---
+        var sec = document.createElement('div');
+        sec.className = 'atd-section';
+        sec.dataset.dept = layout.departmentName;
+        sec.style.animationDelay = (idx * 0.07) + 's';
+
+        // Section head
+        var deptIcons = { 'Bộ phận Cắt': 'fa-scissors', 'Bộ phận May': 'fa-shirt', 'Bộ phận Hoàn thiện': 'fa-temperature-three-quarters', 'Bộ phận Kiểm tra': 'fa-magnifying-glass-chart', 'Bộ phận Đóng gói': 'fa-box' };
+        var icon = deptIcons[layout.departmentName] || 'fa-gears';
+
+        sec.innerHTML =
+            '<div class="atd-section-head">' +
+                '<div class="atd-section-title-group">' +
+                    '<div class="atd-dept-badge"><i class="fa-solid ' + esc(icon) + '"></i></div>' +
+                    '<div>' +
+                        '<h2 class="atd-section-name">' + esc(layout.departmentName) + '</h2>' +
+                        '<div class="atd-section-meta">' + esc(layout.name) + ' &nbsp;·&nbsp; ' + rows + ' hàng × ' + cols + ' cột &nbsp;·&nbsp; ' + total + ' ô</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="atd-section-stats">' +
+                    (cntActive   ? '<div class="atd-stat s-active"><i class="fa-solid fa-check fa-xs"></i>' + cntActive + ' hoạt động</div>' : '') +
+                    (cntInactive ? '<div class="atd-stat s-inactive"><i class="fa-solid fa-xmark fa-xs"></i>' + cntInactive + ' ngừng</div>' : '') +
+                    (cntMaint    ? '<div class="atd-stat s-maint"><i class="fa-solid fa-wrench fa-xs"></i>' + cntMaint + ' bảo trì</div>' : '') +
+                    (cntEmpty    ? '<div class="atd-stat s-empty"><i class="fa-regular fa-square fa-xs"></i>' + cntEmpty + ' trống</div>' : '') +
+                '</div>' +
+            '</div>';
+
+        // Grid wrapper
+        var gridWrap = document.createElement('div');
+        gridWrap.className = 'atd-grid-wrap';
+
+        var grid = document.createElement('div');
+        grid.className = 'atd-grid';
+
+        // Calculate cell size
+        var cellW = layout.cellWidth  ? layout.cellWidth  + 'px' : '1fr';
+        var cellH = layout.cellHeight ? layout.cellHeight + 'px' : 'auto';
+
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cellW + ')';
+        grid.style.gridTemplateRows    = 'repeat(' + rows + ', ' + cellH + ')';
+        grid.style.gap = gap2;
+
+        // Render cells
+        for (var r = 0; r < rows; r++) {
+            for (var c = 0; c < cols; c++) {
+                var item = map[r + '-' + c] || null;
+                var cell = buildCell(r, c, item, search, statusFilter);
+                grid.appendChild(cell);
+            }
+        }
+
+        gridWrap.appendChild(grid);
+        sec.appendChild(gridWrap);
+        return sec;
+    }
+
+    function buildCell(row, col, item, search, statusFilter) {
+        var cell = document.createElement('div');
+        cell.className = 'atd-cell';
+        var posLabel = 'H' + (row + 1) + '-C' + (col + 1);
+
+        if (!item || item.machineStatus === 0) {
+            cell.classList.add('empty');
+            cell.innerHTML =
+                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                '<div class="empty-inner">' +
+                    '<i class="fa-regular fa-square-dashed"></i>' +
+                    '<span>Ô trống</span>' +
+                '</div>';
+            return cell;
+        }
+
+        // Filter by status
+        var st = STATUS[item.machineStatus] || STATUS[1];
+        if (statusFilter && item.machineStatus !== parseInt(statusFilter)) {
+            cell.classList.add('empty');
+            cell.innerHTML =
+                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                '<div class="empty-inner">' +
+                    '<i class="fa-regular fa-square-dashed"></i>' +
+                    '<span>Ô trống</span>' +
+                '</div>';
+            return cell;
+        }
+
+        // Highlight search
+        var nameDisplay = esc(item.machineName);
+        var codeDisplay = esc(item.machineCode);
+        if (search) {
+            var re = new RegExp('(' + search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            nameDisplay = esc(item.machineName).replace(re, '<mark style="background:var(--accent-gold-soft);border-radius:2px;">$1</mark>');
+            codeDisplay = esc(item.machineCode).replace(re, '<mark style="background:var(--accent-gold-soft);border-radius:2px;">$1</mark>');
+        }
+
+        cell.classList.add(st.cls);
+        cell.setAttribute('data-tip', st.tipFn(item.machineName));
+        cell.style.cursor = 'pointer';
+
+        // Navigate to MachineDetail page
+        var detailUrl = '/ProductionDepartment/MachineDetail'
+            + '?machineId='   + encodeURIComponent(item.machineId   || '')
+            + '&machineName=' + encodeURIComponent(item.machineName  || '')
+            + '&machineCode=' + encodeURIComponent(item.machineCode  || '')
+            + '&dept='        + encodeURIComponent(item.dept         || '');
+
+        cell.innerHTML =
+            '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+            '<div class="atd-cell-inner">' +
+                '<div class="atd-cell-top">' +
+                    '<div class="atd-cell-icon"><i class="fa-solid ' + st.icon + '"></i></div>' +
+                    '<div class="atd-cell-status-dot"></div>' +
+                '</div>' +
+                '<div class="atd-cell-name">' + nameDisplay + '</div>' +
+                '<div class="atd-cell-code">' + codeDisplay + '</div>' +
+                (item.keyword ? '<div class="atd-cell-kw">' + esc(item.keyword) + '</div>' : '') +
+            '</div>' +
+            '<div class="atd-cell-footer">' +
+                '<span class="atd-cell-status-label">' + esc(st.label) + '</span>' +
+                '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;color:var(--ink-300);"></i>' +
+            '</div>' +
+            '<div class="atd-cell-bar"></div>';
+
+        cell.addEventListener('click', function () {
+            window.location.href = detailUrl;
+        });
+
+        return cell;
+    }
+
+    /* =====================================================
+       INIT
+       ===================================================== */
+    var allLayouts = loadLayouts();
+    var currentSearch = '';
+    var currentDept   = '';
+    var currentStatus = '';
+
+    function applyFilters() {
+        renderAll(allLayouts, currentSearch, currentDept, currentStatus);
+    }
+
+    // Initial render
+    renderAll(allLayouts, '', '', '');
+
+    // Filter events
+    document.getElementById('atdFilterApply').addEventListener('click', function () {
+        currentSearch = (document.getElementById('atdSearch').value || '').trim().toLowerCase();
+        currentDept   = document.getElementById('atdDeptFilter').value;
+        currentStatus = document.getElementById('atdStatusFilter').value;
+        applyFilters();
+    });
+
+    document.getElementById('atdFilterReset').addEventListener('click', function () {
+        document.getElementById('atdSearch').value = '';
+        document.getElementById('atdDeptFilter').value = '';
+        document.getElementById('atdStatusFilter').value = '';
+        currentSearch = currentDept = currentStatus = '';
+        applyFilters();
+    });
+
+    // Live search
+    document.getElementById('atdSearch').addEventListener('input', function () {
+        currentSearch = this.value.trim().toLowerCase();
+        applyFilters();
+    });
+
+    // Refresh (future: reload từ API)
+    document.getElementById('atdRefreshBtn').addEventListener('click', function () {
+        /*
+         * TODO: Khi kết nối DB, thay bằng:
+         *   fetch('/ProductionDepartment/GetLayouts')
+         *     .then(r => r.json())
+         *     .then(data => { allLayouts = data; applyFilters(); });
+         */
+        applyFilters();
+        var btn = this;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã làm mới';
+        setTimeout(function() { btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Làm mới'; }, 1500);
+    });
+
+    // Export (stub)
+    document.getElementById('atdExportBtn').addEventListener('click', function () {
+        console.log('[ATDepartment] Export payload:', JSON.stringify(allLayouts, null, 2));
+        var btn = this;
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã xuất!';
+        btn.style.background = 'linear-gradient(135deg,var(--success) 0%,#1e7a57 100%)';
+        setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+    });
+
+})();
+</script>

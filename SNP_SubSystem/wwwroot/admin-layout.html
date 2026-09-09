@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nimbus Admin — Layout Quản Lý</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="/css/main.css" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <button class="burger" id="sidebarToggle" aria-label="Ẩn/mở thanh điều hướng">
+        <span class="bar"><span></span><span></span><span></span></span>
+      </button>
+      <div class="brand">
+        <div class="brand-mark">N</div>
+        <div class="brand-word">Nimbus <em>Admin</em></div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="icon-btn" aria-label="Thông báo">
+        <i class="fa-regular fa-bell"></i>
+        <span class="dot"></span>
+      </button>
+      <button class="icon-btn" aria-label="Cài đặt">
+        <i class="fa-solid fa-gear"></i>
+      </button>
+      <div class="header-divider"></div>
+      <button class="user-chip" aria-label="Tài khoản">
+        <div class="avatar">TN</div>
+        <div class="user-meta">
+          <span class="user-name">Trần Ngọc</span>
+          <span class="user-role">Quản trị viên</span>
+        </div>
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- BACKDROP: lớp phủ mờ, chỉ hiện khi sidebar mở dạng overlay trên mobile -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- SIDEBAR: nav trái, 3 nhóm action link, có thể ẩn/mở (xem #sidebarToggle, #collapseToggle) -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-scroll">
+
+      <!-- Nhóm 1: Tổng quan -->
+      <div class="nav-section">
+        <div class="nav-section-label">Tổng quan</div>
+        <a href="#" class="nav-item" data-tip="Bảng điều khiển">
+          <i class="fa-solid fa-grip"></i><span class="label">Bảng điều khiển</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Phân tích">
+          <i class="fa-solid fa-chart-line"></i><span class="label">Phân tích</span>
+        </a>
+      </div>
+
+      <!-- Nhóm 2: Quản lý (mục "Tiến độ sản xuất" đang active) -->
+      <div class="nav-section">
+        <div class="nav-section-label">Quản lý</div>
+        <a href="#" class="nav-item active" data-tip="Tiến độ sản xuất">
+          <i class="fa-solid fa-industry"></i><span class="label">Tiến độ sản xuất</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Khách hàng">
+          <i class="fa-solid fa-users"></i><span class="label">Khách hàng</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Đơn hàng">
+          <i class="fa-solid fa-box"></i><span class="label">Đơn hàng</span><span class="badge">12</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Sản phẩm">
+          <i class="fa-solid fa-tags"></i><span class="label">Sản phẩm</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Hoá đơn">
+          <i class="fa-solid fa-file-invoice-dollar"></i><span class="label">Hoá đơn</span>
+        </a>
+      </div>
+
+      <!-- Nhóm 3: Hệ thống -->
+      <div class="nav-section">
+        <div class="nav-section-label">Hệ thống</div>
+        <a href="#" class="nav-item" data-tip="Phân quyền">
+          <i class="fa-solid fa-user-shield"></i><span class="label">Phân quyền</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Nhật ký">
+          <i class="fa-regular fa-clock"></i><span class="label">Nhật ký hoạt động</span>
+        </a>
+        <a href="#" class="nav-item" data-tip="Cài đặt hệ thống">
+          <i class="fa-solid fa-sliders"></i><span class="label">Cài đặt hệ thống</span>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Nút thu gọn/mở rộng sidebar (chỉ áp dụng chế độ desktop) -->
+    <div class="sidebar-footer">
+      <button class="collapse-toggle" id="collapseToggle">
+        <i class="fa-solid fa-angles-left"></i><span>Thu gọn thanh bên</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       MAIN CONTENT: nơi đổ nội dung theo action link đang chọn.
+       Trang hiện tại: "Tiến độ sản xuất"
+       ============================================================ -->
+  <main class="app-main" id="appMain">
+    <div class="content-area">
+
+      <!-- Tiêu đề trang + breadcrumb + nút hành động -->
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">Quản lý <span class="sep">/</span><span class="current">Tiến độ sản xuất</span></div>
+          <h1 class="page-title">Tiến độ sản xuất</h1>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost"><i class="fa-solid fa-download"></i>Xuất báo cáo</button>
+          <button class="btn btn-primary"><i class="fa-solid fa-plus"></i>Ghi nhận sản lượng</button>
+        </div>
+      </div>
+
+      <!-- 4 thẻ KPI tổng quan sản xuất -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-industry"></i></div><span class="stat-trend up">18/20</span></div>
+          <div class="stat-value">18 Chuyền</div>
+          <div class="stat-label">Đang hoạt động</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div><span class="stat-trend up">+8.2%</span></div>
+          <div class="stat-value">24.680</div>
+          <div class="stat-label">Sản lượng hôm nay</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><span class="stat-trend down">−2</span></div>
+          <div class="stat-value">5 Đơn</div>
+          <div class="stat-label">Trễ tiến độ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-gauge-high"></i></div><span class="stat-trend up">+1.5%</span></div>
+          <div class="stat-value">92%</div>
+          <div class="stat-label">Hiệu suất trung bình</div>
+        </div>
+      </div>
+
+      <!-- FILTER / SEARCH BAR: bộ lọc Tổ / Trạng thái / khoảng ngày -->
+      <div class="filter-bar">
+        <!-- Ô tìm kiếm tự do theo Style / SP# -->
+        <div class="filter-group filter-search">
+          <label class="filter-label">Tìm kiếm</label>
+          <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" placeholder="Tìm theo Style, SP#...">
+          </div>
+        </div>
+
+        <!-- Dropdown lọc theo Tổ sản xuất -->
+        <div class="filter-group">
+          <label class="filter-label">Tổ</label>
+          <select>
+            <option value="">Tất cả</option>
+            <option>Tổ 1</option>
+            <option>Tổ 2</option>
+            <option>Tổ 3</option>
+            <option>Tổ 4</option>
+            <option>Tổ 5</option>
+          </select>
+        </div>
+
+        <!-- Dropdown lọc theo trạng thái tiến độ -->
+        <div class="filter-group">
+          <label class="filter-label">Trạng thái</label>
+          <select>
+            <option value="">Tất cả</option>
+            <option>Đúng tiến độ</option>
+            <option>Trễ tiến độ</option>
+            <option>Hoàn thành</option>
+            <option>Tạm dừng</option>
+          </select>
+        </div>
+
+        <!-- Khoảng ngày: Từ ngày - Đến ngày -->
+        <div class="filter-group">
+          <label class="filter-label">Ngày</label>
+          <div class="date-range">
+            <input type="date" value="2026-08-24">
+            <span class="date-sep">—</span>
+            <input type="date" value="2026-08-30">
+          </div>
+        </div>
+
+        <!-- Nút thực thi/đặt lại bộ lọc -->
+        <div class="filter-actions">
+          <button class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i>Tìm kiếm</button>
+          <button class="btn btn-ghost"><i class="fa-solid fa-arrow-rotate-left"></i>Đặt lại</button>
+        </div>
+      </div>
+
+      <!-- DATA TABLE: bảng "Tiến độ sản xuất" bọc trong khung .panel dùng chung -->
+      <div class="panel">
+        <!-- Panel head: tiêu đề + nút làm mới -->
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Danh sách chuyền sản xuất</div>
+            <div class="panel-sub">Cập nhật lúc 14:32 · 30/08/2026</div>
+          </div>
+          <button class="btn btn-ghost"><i class="fa-solid fa-rotate-right"></i>Làm mới</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <!-- Header cột: Line / Style / SP# / Output / Today Output / Expected Date / Status -->
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Style</th>
+                <th>SP#</th>
+                <th>Output</th>
+                <th>Today Output</th>
+                <th>Expected Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <!-- Dữ liệu mẫu — thay bằng dữ liệu thực tế từ API khi tách component -->
+            <tbody>
+              <tr>
+                <td class="cell-strong">Line 01</td>
+                <td>Áo thun basic cổ tròn</td>
+                <td class="cell-mono">SP-2026-0113</td>
+                <td>1.500</td>
+                <td>
+                  <div class="output-cell">
+                    <span>1.240</span>
+                    <div class="progress"><div class="progress-bar" style="width:83%; background:var(--success);"></div></div>
+                  </div>
+                </td>
+                <td>05/09/2026</td>
+                <td><span class="badge-status success">Đúng tiến độ</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 02</td>
+                <td>Quần jean slim-fit nam</td>
+                <td class="cell-mono">SP-2026-0108</td>
+                <td>2.000</td>
+                <td>
+                  <div class="output-cell">
+                    <span>980</span>
+                    <div class="progress"><div class="progress-bar" style="width:49%; background:var(--danger);"></div></div>
+                  </div>
+                </td>
+                <td>02/09/2026</td>
+                <td><span class="badge-status danger">Trễ tiến độ</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 03</td>
+                <td>Váy suông linen</td>
+                <td class="cell-mono">SP-2026-0121</td>
+                <td>900</td>
+                <td>
+                  <div class="output-cell">
+                    <span>900</span>
+                    <div class="progress"><div class="progress-bar" style="width:100%; background:var(--accent-navy);"></div></div>
+                  </div>
+                </td>
+                <td>30/08/2026</td>
+                <td><span class="badge-status info">Hoàn thành</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 04</td>
+                <td>Áo sơ mi công sở nữ</td>
+                <td class="cell-mono">SP-2026-0119</td>
+                <td>1.200</td>
+                <td>
+                  <div class="output-cell">
+                    <span>410</span>
+                    <div class="progress"><div class="progress-bar" style="width:34%; background:var(--accent-gold);"></div></div>
+                  </div>
+                </td>
+                <td>08/09/2026</td>
+                <td><span class="badge-status warning">Tạm dừng</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 05</td>
+                <td>Áo khoác gió unisex</td>
+                <td class="cell-mono">SP-2026-0125</td>
+                <td>1.800</td>
+                <td>
+                  <div class="output-cell">
+                    <span>1.512</span>
+                    <div class="progress"><div class="progress-bar" style="width:84%; background:var(--success);"></div></div>
+                  </div>
+                </td>
+                <td>06/09/2026</td>
+                <td><span class="badge-status success">Đúng tiến độ</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 06</td>
+                <td>Quần short thể thao</td>
+                <td class="cell-mono">SP-2026-0130</td>
+                <td>2.400</td>
+                <td>
+                  <div class="output-cell">
+                    <span>860</span>
+                    <div class="progress"><div class="progress-bar" style="width:36%; background:var(--danger);"></div></div>
+                  </div>
+                </td>
+                <td>01/09/2026</td>
+                <td><span class="badge-status danger">Trễ tiến độ</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 07</td>
+                <td>Đầm maxi hoa nhí</td>
+                <td class="cell-mono">SP-2026-0127</td>
+                <td>750</td>
+                <td>
+                  <div class="output-cell">
+                    <span>612</span>
+                    <div class="progress"><div class="progress-bar" style="width:82%; background:var(--success);"></div></div>
+                  </div>
+                </td>
+                <td>04/09/2026</td>
+                <td><span class="badge-status success">Đúng tiến độ</span></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">Line 08</td>
+                <td>Áo polo nam basic</td>
+                <td class="cell-mono">SP-2026-0132</td>
+                <td>1.600</td>
+                <td>
+                  <div class="output-cell">
+                    <span>1.600</span>
+                    <div class="progress"><div class="progress-bar" style="width:100%; background:var(--accent-navy);"></div></div>
+                  </div>
+                </td>
+                <td>29/08/2026</td>
+                <td><span class="badge-status info">Hoàn thành</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAGINATION -->
+        <div class="pagination">
+          <div class="pagination-info">Hiển thị <strong>1–8</strong> trong <strong>42</strong> kết quả</div>
+          <div class="pagination-controls">
+            <button class="page-btn" disabled><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <span class="page-dots">…</span>
+            <button class="page-btn">6</button>
+            <button class="page-btn"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+<script>
+  /* ============================================================
+     A) THAM CHIẾU DOM (dùng chung cho các block bên dưới)
+     ============================================================ */
+  const sidebar    = document.getElementById('sidebar');
+  const appMain     = document.getElementById('appMain');
+  const toggleBtn   = document.getElementById('sidebarToggle'); // nút hamburger trên header
+  const collapseBtn = document.getElementById('collapseToggle'); // nút "Thu gọn thanh bên"
+  const backdrop    = document.getElementById('backdrop');
+
+  // true nếu đang ở breakpoint tablet/mobile (khớp media query 1024px trong CSS)
+  function isMobile(){ return window.innerWidth <= 1024; }
+
+  /* ============================================================
+     B) TOGGLE SIDEBAR (nút hamburger trên header)
+     - Desktop: thu/mở icon-only (.is-collapsed)
+     - Mobile: bật/tắt overlay trượt (.mobile-open) + backdrop
+     ============================================================ */
+  toggleBtn.addEventListener('click', () => {
+    if(isMobile()){
+      sidebar.classList.toggle('mobile-open');
+      backdrop.classList.toggle('show');
+    } else {
+      sidebar.classList.toggle('is-collapsed');
+      appMain.classList.toggle('is-collapsed');
+    }
+  });
+
+  /* ============================================================
+     C) NÚT "THU GỌN THANH BÊN" trong footer sidebar (chỉ desktop)
+     ============================================================ */
+  collapseBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('is-collapsed');
+    appMain.classList.toggle('is-collapsed');
+  });
+
+  /* ============================================================
+     D) ĐÓNG SIDEBAR MOBILE khi bấm ra vùng backdrop
+     ============================================================ */
+  backdrop.addEventListener('click', () => {
+    sidebar.classList.remove('mobile-open');
+    backdrop.classList.remove('show');
+  });
+
+  /* ============================================================
+     E) TRẠNG THÁI ACTIVE CỦA ACTION LINK (nav-item)
+     Bấm 1 mục -> gán active cho mục đó, bỏ active mục còn lại;
+     trên mobile thì tự đóng sidebar overlay sau khi chọn.
+     ============================================================ */
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      if(isMobile()){
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('show');
+      }
+    });
+  });
+
+  /* ============================================================
+     F) ĐỒNG BỘ TRẠNG THÁI KHI RESIZE CỬA SỔ
+     Khi mở rộng từ mobile lên desktop, tự đóng overlay/backdrop
+     đang mở dở để tránh lệch trạng thái giữa 2 chế độ.
+     ============================================================ */
+  window.addEventListener('resize', () => {
+    if(!isMobile()){
+      sidebar.classList.remove('mobile-open');
+      backdrop.classList.remove('show');
+    }
+  });
+</script>
+</body>
+</html>

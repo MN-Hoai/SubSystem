@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SNP_SubSystem/SNP_SubSystem.csproj" />
+  <Project Path="Sub_Entities/Sub_Entities.csproj" />
+  <Project Path="Sub_Services/Sub_Services.csproj" />
+</Solution>

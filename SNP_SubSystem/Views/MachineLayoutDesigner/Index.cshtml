@@ -1,0 +1,1288 @@
+@{
+    ViewData["Title"] = "Thiết kế layout máy";
+}
+
+<style>
+    /* =====================================================
+       MACHINE LAYOUT DESIGNER — scoped styles
+       ===================================================== */
+
+    /* ---- Page shell ---- */
+    .mld-page {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        height: calc(100vh - var(--header-h));
+        overflow: hidden;
+    }
+
+    /* ---- Page header ---- */
+    .mld-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 28px 16px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        gap: 16px;
+    }
+
+    .mld-topbar-left .mld-breadcrumb {
+        font-size: 12px;
+        color: var(--ink-500);
+        margin-bottom: 4px;
+    }
+
+    .mld-topbar-left .mld-breadcrumb .sep { margin: 0 6px; color: var(--ink-300); }
+    .mld-topbar-left .mld-breadcrumb .current { color: var(--ink-700-solid); font-weight: 600; }
+
+    .mld-page-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--ink-900);
+        letter-spacing: -.3px;
+        margin: 0;
+    }
+
+    .mld-topbar-actions { display: flex; gap: 10px; }
+
+    /* ---- Layout body: sidebar config + canvas ---- */
+    .mld-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    /* ---- Config panel (left sidebar) ---- */
+    .mld-config {
+        width: 300px;
+        min-width: 260px;
+        background: var(--bg-surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        flex-shrink: 0;
+    }
+
+    .mld-config-inner {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .mld-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .8px;
+        text-transform: uppercase;
+        color: var(--ink-300);
+        margin-bottom: 12px;
+    }
+
+    /* ---- Form controls ---- */
+    .mld-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .mld-label {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-700-solid);
+    }
+
+    .mld-label span {
+        font-weight: 400;
+        color: var(--ink-500);
+        font-size: 11px;
+        margin-left: 4px;
+    }
+
+    .mld-input,
+    .mld-select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1.5px solid var(--border);
+        border-radius: 9px;
+        font-family: inherit;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--ink-900);
+        background: var(--bg-canvas);
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+        appearance: none;
+    }
+
+    .mld-input:focus,
+    .mld-select:focus {
+        border-color: var(--accent-navy);
+        box-shadow: 0 0 0 3px var(--accent-navy-soft);
+        background: #fff;
+    }
+
+    .mld-input-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    /* ---- Toggle pill: Auto / Custom ---- */
+    .mld-toggle-group {
+        display: flex;
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 2px;
+    }
+
+    .mld-toggle-btn {
+        flex: 1;
+        padding: 8px 0;
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-500);
+        cursor: pointer;
+        border: none;
+        background: none;
+        transition: background .2s, color .2s, box-shadow .2s;
+        text-align: center;
+    }
+
+    .mld-toggle-btn.active {
+        background: var(--accent-navy);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(31,58,103,.25);
+    }
+
+    /* ---- Custom size row ---- */
+    .mld-size-custom {
+        display: none;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .mld-size-custom.visible { display: flex; }
+
+    .mld-size-custom .mld-input { text-align: center; }
+
+    .mld-size-x {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink-300);
+        flex-shrink: 0;
+    }
+
+    /* ---- Divider ---- */
+    .mld-divider {
+        height: 1px;
+        background: var(--border-soft);
+        margin: 4px 0;
+    }
+
+    /* ---- Apply button ---- */
+    .mld-apply-btn {
+        width: 100%;
+        padding: 11px;
+        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
+        color: #fff;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: .2px;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: opacity .2s, transform .15s, box-shadow .2s;
+        box-shadow: 0 4px 16px rgba(31,58,103,.28);
+    }
+
+    .mld-apply-btn:hover { opacity: .92; transform: translateY(-1px); }
+    .mld-apply-btn:active { transform: translateY(0); opacity: 1; }
+
+    /* ---- Stats chips ---- */
+    .mld-stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .mld-stat-chip {
+        flex: 1;
+        min-width: 70px;
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        text-align: center;
+    }
+
+    .mld-stat-chip .num {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--ink-900);
+        line-height: 1;
+    }
+
+    .mld-stat-chip .lbl {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--ink-500);
+        margin-top: 3px;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+
+    /* ---- Canvas area ---- */
+    .mld-canvas-wrap {
+        flex: 1;
+        overflow: auto;
+        background: var(--bg-canvas);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 28px;
+    }
+
+    /* ---- Empty state ---- */
+    .mld-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        color: var(--ink-300);
+        text-align: center;
+        min-height: 300px;
+        width: 100%;
+        animation: fadeIn .4s ease;
+    }
+
+    .mld-empty .empty-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: var(--bg-surface);
+        border: 2px dashed var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        color: var(--ink-300);
+    }
+
+    .mld-empty h3 { font-size: 16px; font-weight: 700; color: var(--ink-500); }
+    .mld-empty p { font-size: 13px; color: var(--ink-300); max-width: 280px; line-height: 1.6; }
+
+    /* ---- Grid layout ---- */
+    .mld-grid {
+        display: grid;
+        animation: fadeIn .35s ease;
+    }
+
+    /* ---- Grid cell ---- */
+    .mld-cell {
+        background: var(--bg-surface);
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color .2s, background .2s, transform .2s, box-shadow .2s;
+        position: relative;
+        overflow: hidden;
+        min-height: 100px;
+        min-width: 80px;
+    }
+
+    .mld-cell:hover {
+        border-color: var(--accent-navy);
+        background: var(--accent-navy-soft);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .mld-cell.is-empty .add-icon {
+        font-size: 22px;
+        color: var(--ink-300);
+        transition: color .2s, transform .2s;
+    }
+
+    .mld-cell.is-empty:hover .add-icon {
+        color: var(--accent-navy);
+        transform: scale(1.15) rotate(90deg);
+    }
+
+    .mld-cell.is-empty .add-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--ink-300);
+        margin-top: 6px;
+        transition: color .2s;
+    }
+
+    .mld-cell.is-empty:hover .add-label { color: var(--accent-navy); }
+
+    /* ---- Cell: has machine ---- */
+    .mld-cell.has-machine {
+        border: 2px solid transparent;
+        background: var(--bg-surface);
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        align-items: flex-start;
+        padding: 12px 14px;
+    }
+
+    .mld-cell.has-machine:hover {
+        border-color: var(--accent-navy);
+        box-shadow: var(--shadow-md);
+    }
+
+    .mld-cell.has-machine .cell-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .mld-cell .cell-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+    }
+
+    .mld-cell .cell-icon.active-bg { background: #E6F4EF; color: var(--success); }
+    .mld-cell .cell-icon.inactive-bg { background: #FEF3F2; color: var(--danger); }
+    .mld-cell .cell-icon.maintenance-bg { background: var(--accent-gold-soft); color: var(--accent-gold); }
+
+    .mld-cell .cell-machine-name {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--ink-900);
+        line-height: 1.3;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .mld-cell .cell-dept {
+        font-size: 11px;
+        color: var(--ink-500);
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mld-cell .cell-body {
+        width: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .mld-cell .cell-footer {
+        margin-top: auto;
+        padding-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .mld-cell .cell-note {
+        font-size: 10.5px;
+        color: var(--ink-300);
+        font-style: italic;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 80%;
+    }
+
+    /* ---- Cell position badge ---- */
+    .mld-cell .cell-pos {
+        position: absolute;
+        top: 7px;
+        right: 9px;
+        font-size: 9.5px;
+        font-weight: 700;
+        color: var(--ink-300);
+        letter-spacing: .3px;
+    }
+
+    /* ---- Status badges ---- */
+    .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .3px;
+    }
+
+    .badge-pill::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .badge-pill.active { background: #E6F4EF; color: var(--success); }
+    .badge-pill.active::before { background: var(--success); }
+    .badge-pill.inactive { background: #FEF3F2; color: var(--danger); }
+    .badge-pill.inactive::before { background: var(--danger); }
+    .badge-pill.maintenance { background: var(--accent-gold-soft); color: var(--accent-gold); }
+    .badge-pill.maintenance::before { background: var(--accent-gold); }
+
+    /* ============================================================
+       MODAL: dialog thêm / sửa máy
+       ============================================================ */
+    .mld-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(22, 33, 62, 0.45);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s ease;
+    }
+
+    .mld-modal-backdrop.open {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    .mld-modal {
+        background: #fff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 480px;
+        box-shadow: var(--shadow-lg);
+        transform: translateY(20px) scale(.97);
+        transition: transform .28s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
+        opacity: 0;
+        overflow: hidden;
+        margin: 16px;
+    }
+
+    .mld-modal-backdrop.open .mld-modal {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+
+    .mld-modal-head {
+        padding: 22px 24px 18px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .mld-modal-head .modal-title-group { display: flex; align-items: center; gap: 12px; }
+
+    .mld-modal-head .modal-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: var(--accent-navy-soft);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent-navy);
+        font-size: 17px;
+    }
+
+    .mld-modal-head .modal-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--ink-900);
+    }
+
+    .mld-modal-head .modal-sub {
+        font-size: 12px;
+        color: var(--ink-500);
+        margin-top: 2px;
+    }
+
+    .mld-modal-close {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-500);
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        background: none;
+        transition: background .18s, color .18s;
+    }
+
+    .mld-modal-close:hover { background: var(--bg-canvas); color: var(--ink-900); }
+
+    .mld-modal-body {
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .mld-modal-field { display: flex; flex-direction: column; gap: 6px; }
+
+    .mld-modal-label {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--ink-700-solid);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .mld-modal-label .req { color: var(--danger); }
+
+    .mld-modal-input,
+    .mld-modal-select,
+    .mld-modal-textarea {
+        width: 100%;
+        padding: 10px 13px;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 13.5px;
+        color: var(--ink-900);
+        background: var(--bg-canvas);
+        outline: none;
+        transition: border-color .2s, box-shadow .2s, background .2s;
+        appearance: none;
+    }
+
+    .mld-modal-textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+    .mld-modal-input:focus,
+    .mld-modal-select:focus,
+    .mld-modal-textarea:focus {
+        border-color: var(--accent-navy);
+        box-shadow: 0 0 0 3px var(--accent-navy-soft);
+        background: #fff;
+    }
+
+    /* Status picker */
+    .mld-status-picker {
+        display: flex;
+        gap: 8px;
+    }
+
+    .mld-status-opt {
+        flex: 1;
+        padding: 10px 6px;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        text-align: center;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink-500);
+        transition: all .2s;
+        background: var(--bg-canvas);
+        user-select: none;
+    }
+
+    .mld-status-opt .so-dot {
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin: 0 auto 6px;
+        transition: background .2s;
+    }
+
+    .mld-status-opt[data-val="active"] .so-dot { background: #c8dfd6; }
+    .mld-status-opt[data-val="inactive"] .so-dot { background: #f3c4c1; }
+    .mld-status-opt[data-val="maintenance"] .so-dot { background: #e8d5af; }
+
+    .mld-status-opt[data-val="active"].selected { border-color: var(--success); background: #E6F4EF; color: var(--success); }
+    .mld-status-opt[data-val="active"].selected .so-dot { background: var(--success); }
+    .mld-status-opt[data-val="inactive"].selected { border-color: var(--danger); background: #FEF3F2; color: var(--danger); }
+    .mld-status-opt[data-val="inactive"].selected .so-dot { background: var(--danger); }
+    .mld-status-opt[data-val="maintenance"].selected { border-color: var(--accent-gold); background: var(--accent-gold-soft); color: var(--accent-gold); }
+    .mld-status-opt[data-val="maintenance"].selected .so-dot { background: var(--accent-gold); }
+
+    .mld-modal-foot {
+        padding: 16px 24px 22px;
+        display: flex;
+        gap: 10px;
+        border-top: 1px solid var(--border);
+    }
+
+    .mld-modal-foot .btn-cancel {
+        flex: 1;
+        padding: 11px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--ink-700-solid);
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        cursor: pointer;
+        transition: background .18s, border-color .18s;
+    }
+
+    .mld-modal-foot .btn-cancel:hover { background: var(--border-soft); border-color: var(--ink-300); }
+
+    .mld-modal-foot .btn-save {
+        flex: 2;
+        padding: 11px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        box-shadow: 0 4px 12px rgba(31,58,103,.25);
+        transition: opacity .2s, transform .15s;
+    }
+
+    .mld-modal-foot .btn-save:hover { opacity: .9; transform: translateY(-1px); }
+
+    .mld-modal-foot .btn-delete {
+        padding: 11px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+        color: var(--danger);
+        background: #FEF3F2;
+        border: 1.5px solid #F5C0BC;
+        cursor: pointer;
+        transition: background .18s;
+        display: none;
+    }
+
+    .mld-modal-foot .btn-delete:hover { background: #FDDFDC; }
+    .mld-modal-foot .btn-delete.visible { display: block; }
+
+    /* ---- Animations ---- */
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Responsive ---- */
+    @@media (max-width: 768px) {
+        .mld-body { flex-direction: column; }
+        .mld-config { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); max-height: 360px; }
+        .mld-canvas-wrap { padding: 16px; }
+    }
+</style>
+
+<!-- =====================================================
+     PAGE SHELL
+     ===================================================== -->
+<div class="mld-page">
+
+    <!-- TOP BAR -->
+    <div class="mld-topbar">
+        <div class="mld-topbar-left">
+            <div class="mld-breadcrumb">
+                Quản lý <span class="sep">/</span>
+                <span class="current">Thiết kế layout máy</span>
+            </div>
+            <h1 class="mld-page-title">Thiết kế layout máy</h1>
+        </div>
+        <div class="mld-topbar-actions">
+            <button class="btn btn-ghost" id="mldClearBtn" title="Xóa toàn bộ layout">
+                <i class="fa-solid fa-trash-can"></i> Xóa layout
+            </button>
+            <button class="btn btn-primary" id="mldExportBtn">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu layout
+            </button>
+        </div>
+    </div>
+
+    <!-- BODY: config panel + canvas -->
+    <div class="mld-body">
+
+        <!-- =====================================================
+             CONFIG PANEL
+             ===================================================== -->
+        <div class="mld-config">
+            <div class="mld-config-inner">
+
+                <!-- Section: Cấu hình lưới -->
+                <div>
+                    <div class="mld-section-title">Cấu hình lưới</div>
+
+                    <!-- Rows & Cols -->
+                    <div class="mld-field" style="margin-bottom:12px;">
+                        <label class="mld-label">Số hàng (Rows) <span>1–30</span></label>
+                        <input type="number" id="mldRows" class="mld-input" value="3" min="1" max="30">
+                    </div>
+                    <div class="mld-field" style="margin-bottom:12px;">
+                        <label class="mld-label">Số cột (Columns) <span>1–20</span></label>
+                        <input type="number" id="mldCols" class="mld-input" value="4" min="1" max="20">
+                    </div>
+
+                    <!-- Gap -->
+                    <div class="mld-field">
+                        <label class="mld-label">Khoảng cách (Gap) <span>px</span></label>
+                        <input type="number" id="mldGap" class="mld-input" value="12" min="0" max="60">
+                    </div>
+                </div>
+
+                <div class="mld-divider"></div>
+
+                <!-- Section: Kích thước ô -->
+                <div>
+                    <div class="mld-section-title">Kích thước ô</div>
+
+                    <!-- Toggle Auto / Custom -->
+                    <div class="mld-field" style="margin-bottom:12px;">
+                        <div class="mld-toggle-group" id="mldSizeToggle">
+                            <button class="mld-toggle-btn active" data-mode="auto" id="mldAutoBtn">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right:5px;font-size:11px;"></i>Tự động
+                            </button>
+                            <button class="mld-toggle-btn" data-mode="custom" id="mldCustomBtn">
+                                <i class="fa-solid fa-ruler-combined" style="margin-right:5px;font-size:11px;"></i>Tùy chỉnh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom size inputs -->
+                    <div class="mld-size-custom" id="mldSizeCustom">
+                        <input type="number" id="mldCellW" class="mld-input" placeholder="W" value="160" min="60" style="text-align:center;">
+                        <span class="mld-size-x">×</span>
+                        <input type="number" id="mldCellH" class="mld-input" placeholder="H" value="120" min="60" style="text-align:center;">
+                    </div>
+                    <div id="mldAutoHint" style="font-size:11.5px;color:var(--ink-300);line-height:1.5;margin-top:6px;">
+                        <i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>
+                        Ô sẽ tự co giãn theo kích thước màn hình.
+                    </div>
+                </div>
+
+                <div class="mld-divider"></div>
+
+                <!-- Bộ phận filter -->
+                <div>
+                    <div class="mld-section-title">Bộ phận</div>
+                    <div class="mld-field">
+                        <label class="mld-label">Hiển thị bộ phận</label>
+                        <select id="mldDeptFilter" class="mld-input mld-select">
+                            <option value="all">Tất cả bộ phận</option>
+                            <option value="Bộ phận Cắt">Bộ phận Cắt</option>
+                            <option value="Bộ phận May">Bộ phận May</option>
+                            <option value="Bộ phận Hoàn thiện">Bộ phận Hoàn thiện</option>
+                            <option value="Bộ phận Kiểm tra">Bộ phận Kiểm tra</option>
+                            <option value="Bộ phận Đóng gói">Bộ phận Đóng gói</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mld-divider"></div>
+
+                <!-- Apply -->
+                <button class="mld-apply-btn" id="mldApplyBtn">
+                    <i class="fa-solid fa-table-cells-large"></i>
+                    Tạo layout
+                </button>
+
+                <!-- Stats -->
+                <div>
+                    <div class="mld-section-title" style="margin-bottom:10px;">Thống kê</div>
+                    <div class="mld-stats">
+                        <div class="mld-stat-chip">
+                            <div class="num" id="statTotal">0</div>
+                            <div class="lbl">Tổng ô</div>
+                        </div>
+                        <div class="mld-stat-chip">
+                            <div class="num" id="statFilled">0</div>
+                            <div class="lbl">Có máy</div>
+                        </div>
+                        <div class="mld-stat-chip">
+                            <div class="num" id="statEmpty">0</div>
+                            <div class="lbl">Trống</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div><!-- /mld-config -->
+
+        <!-- =====================================================
+             CANVAS AREA
+             ===================================================== -->
+        <div class="mld-canvas-wrap" id="mldCanvasWrap">
+            <!-- Empty state (initial) -->
+            <div class="mld-empty" id="mldEmptyState">
+                <div class="empty-icon"><i class="fa-solid fa-border-all"></i></div>
+                <h3>Chưa có layout</h3>
+                <p>Thiết lập số hàng, số cột và khoảng cách ở bên trái, sau đó nhấn <strong>Tạo layout</strong> để bắt đầu.</p>
+            </div>
+
+            <!-- Grid (populated by JS) -->
+            <div class="mld-grid" id="mldGrid"></div>
+        </div>
+
+    </div><!-- /mld-body -->
+</div><!-- /mld-page -->
+
+
+<!-- =====================================================
+     MODAL: Thêm / sửa thông tin máy
+     ===================================================== -->
+<div class="mld-modal-backdrop" id="mldModalBackdrop">
+    <div class="mld-modal" id="mldModal" role="dialog" aria-modal="true" aria-labelledby="mldModalTitle">
+        <div class="mld-modal-head">
+            <div class="modal-title-group">
+                <div class="modal-icon"><i class="fa-solid fa-gears"></i></div>
+                <div>
+                    <div class="modal-title" id="mldModalTitle">Thêm máy vào ô</div>
+                    <div class="modal-sub" id="mldModalSub">Nhập thông tin máy cho ô này</div>
+                </div>
+            </div>
+            <button class="mld-modal-close" id="mldModalClose" aria-label="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="mld-modal-body">
+            <!-- Tên máy -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fMachineName">
+                    Tên máy <span class="req">*</span>
+                </label>
+                <input type="text" id="fMachineName" class="mld-modal-input"
+                       placeholder="VD: Máy may 1K, Máy cắt CT-01..." autocomplete="off">
+            </div>
+
+            <!-- Bộ phận -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fDept">Bộ phận <span class="req">*</span></label>
+                <select id="fDept" class="mld-modal-select">
+                    <option value="">-- Chọn bộ phận --</option>
+                    <option value="Bộ phận Cắt">Bộ phận Cắt</option>
+                    <option value="Bộ phận May">Bộ phận May</option>
+                    <option value="Bộ phận Hoàn thiện">Bộ phận Hoàn thiện</option>
+                    <option value="Bộ phận Kiểm tra">Bộ phận Kiểm tra</option>
+                    <option value="Bộ phận Đóng gói">Bộ phận Đóng gói</option>
+                </select>
+            </div>
+
+            <!-- Trạng thái -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label">Trạng thái <span class="req">*</span></label>
+                <div class="mld-status-picker" id="mldStatusPicker">
+                    <div class="mld-status-opt selected" data-val="active">
+                        <span class="so-dot"></span>Hoạt động
+                    </div>
+                    <div class="mld-status-opt" data-val="inactive">
+                        <span class="so-dot"></span>Ngừng
+                    </div>
+                    <div class="mld-status-opt" data-val="maintenance">
+                        <span class="so-dot"></span>Bảo trì
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ghi chú -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fNote">Ghi chú</label>
+                <textarea id="fNote" class="mld-modal-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
+            </div>
+        </div>
+
+        <div class="mld-modal-foot">
+            <button class="btn-delete" id="mldBtnDelete" title="Xóa máy khỏi ô">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+            <button class="btn-cancel" id="mldBtnCancel">Hủy</button>
+            <button class="btn-save" id="mldBtnSave">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Existing shared btn classes used above -->
+<style>
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; transition: background .18s, opacity .18s, transform .15s; }
+    .btn-primary { background: linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-ghost { background: var(--bg-canvas); color: var(--ink-700-solid); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: var(--border-soft); }
+</style>
+
+<script>
+    (function () {
+        /* =====================================================
+           STATE
+           ===================================================== */
+        // machines[cellIndex] = { name, dept, status, note }  (or null if empty)
+        var machines = {};
+        var currentCellIndex = null;
+        var currentMode = 'auto'; // 'auto' | 'custom'
+
+        /* =====================================================
+           DOM REFS
+           ===================================================== */
+        var rowsEl       = document.getElementById('mldRows');
+        var colsEl       = document.getElementById('mldCols');
+        var gapEl        = document.getElementById('mldGap');
+        var applyBtn     = document.getElementById('mldApplyBtn');
+        var clearBtn     = document.getElementById('mldClearBtn');
+        var gridEl       = document.getElementById('mldGrid');
+        var emptyState   = document.getElementById('mldEmptyState');
+        var canvasWrap   = document.getElementById('mldCanvasWrap');
+
+        var autoBtn      = document.getElementById('mldAutoBtn');
+        var customBtn    = document.getElementById('mldCustomBtn');
+        var sizeCustom   = document.getElementById('mldSizeCustom');
+        var autoHint     = document.getElementById('mldAutoHint');
+        var cellWEl      = document.getElementById('mldCellW');
+        var cellHEl      = document.getElementById('mldCellH');
+
+        var backdrop     = document.getElementById('mldModalBackdrop');
+        var modalClose   = document.getElementById('mldModalClose');
+        var btnCancel    = document.getElementById('mldBtnCancel');
+        var btnSave      = document.getElementById('mldBtnSave');
+        var btnDelete    = document.getElementById('mldBtnDelete');
+        var modalTitle   = document.getElementById('mldModalTitle');
+        var modalSub     = document.getElementById('mldModalSub');
+
+        var fName        = document.getElementById('fMachineName');
+        var fDept        = document.getElementById('fDept');
+        var fNote        = document.getElementById('fNote');
+
+        var statTotal    = document.getElementById('statTotal');
+        var statFilled   = document.getElementById('statFilled');
+        var statEmpty    = document.getElementById('statEmpty');
+
+        var selectedStatus = 'active';
+
+        /* =====================================================
+           HELPERS
+           ===================================================== */
+        function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+        function updateStats() {
+            var total  = gridEl.querySelectorAll('.mld-cell').length;
+            var filled = Object.keys(machines).length;
+            statTotal.textContent  = total;
+            statFilled.textContent = filled;
+            statEmpty.textContent  = total - filled;
+        }
+
+        function statusLabel(s) {
+            return s === 'active' ? 'Hoạt động' : s === 'inactive' ? 'Ngừng hoạt động' : 'Bảo trì';
+        }
+
+        function statusIconBg(s) {
+            return s === 'active' ? 'active-bg' : s === 'inactive' ? 'inactive-bg' : 'maintenance-bg';
+        }
+
+        function statusIcon(s) {
+            return s === 'active' ? 'fa-check' : s === 'inactive' ? 'fa-xmark' : 'fa-wrench';
+        }
+
+        /* =====================================================
+           TOGGLE: Auto / Custom size
+           ===================================================== */
+        autoBtn.addEventListener('click', function () {
+            currentMode = 'auto';
+            autoBtn.classList.add('active');
+            customBtn.classList.remove('active');
+            sizeCustom.classList.remove('visible');
+            autoHint.style.display = '';
+        });
+
+        customBtn.addEventListener('click', function () {
+            currentMode = 'custom';
+            customBtn.classList.add('active');
+            autoBtn.classList.remove('active');
+            sizeCustom.classList.add('visible');
+            autoHint.style.display = 'none';
+        });
+
+        /* =====================================================
+           STATUS PICKER
+           ===================================================== */
+        document.getElementById('mldStatusPicker').addEventListener('click', function (e) {
+            var opt = e.target.closest('.mld-status-opt');
+            if (!opt) return;
+            document.querySelectorAll('.mld-status-opt').forEach(function (o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            selectedStatus = opt.dataset.val;
+        });
+
+        /* =====================================================
+           BUILD GRID
+           ===================================================== */
+        function buildGrid() {
+            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
+            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
+            var gap  = clamp(parseInt(gapEl.value)  || 12, 0, 60);
+            var total = rows * cols;
+
+            rowsEl.value = rows;
+            colsEl.value = cols;
+            gapEl.value  = gap;
+
+            // Reset machines index when grid changes (warn user)
+            if (Object.keys(machines).length > 0) {
+                var proceed = confirm('Tạo layout mới sẽ xóa toàn bộ thông tin máy hiện tại. Tiếp tục?');
+                if (!proceed) return;
+            }
+            machines = {};
+
+            // Hide empty state
+            emptyState.style.display = 'none';
+
+            // Grid CSS
+            gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', ' + (currentMode === 'custom' ? (parseInt(cellWEl.value)||160) + 'px' : '1fr') + ')';
+            gridEl.style.gridTemplateRows    = 'repeat(' + rows + ', ' + (currentMode === 'custom' ? (parseInt(cellHEl.value)||120) + 'px' : 'auto') + ')';
+            gridEl.style.gap                 = gap + 'px';
+
+            if (currentMode === 'auto') {
+                // Fill the canvas width
+                var canvasW = canvasWrap.clientWidth - 56;
+                gridEl.style.width = canvasW + 'px';
+            } else {
+                gridEl.style.width = 'auto';
+            }
+
+            // Build cells
+            gridEl.innerHTML = '';
+            for (var i = 0; i < total; i++) {
+                gridEl.appendChild(makeCell(i, rows, cols));
+            }
+
+            updateStats();
+        }
+
+        function makeCell(index, rows, cols) {
+            var row = Math.floor(index / cols) + 1;
+            var col = (index % cols) + 1;
+
+            var cell = document.createElement('div');
+            cell.className = 'mld-cell is-empty';
+            cell.dataset.index = index;
+
+            var posLabel = 'H' + row + '-C' + col;
+
+            // auto height hint
+            if (currentMode === 'auto') {
+                cell.style.minHeight = '110px';
+            }
+
+            cell.innerHTML =
+                '<span class="cell-pos">' + posLabel + '</span>' +
+                '<div class="add-icon"><i class="fa-solid fa-plus"></i></div>' +
+                '<div class="add-label">Thêm máy</div>';
+
+            cell.addEventListener('click', function () { openModal(parseInt(this.dataset.index), rows, cols); });
+            return cell;
+        }
+
+        function renderCell(index, rows, cols) {
+            var col = (index % cols) + 1;
+            var row = Math.floor(index / cols) + 1;
+            var posLabel = 'H' + row + '-C' + col;
+
+            var m = machines[index];
+            var cell = gridEl.querySelector('[data-index="' + index + '"]');
+            if (!cell) return;
+
+            if (!m) {
+                cell.className = 'mld-cell is-empty';
+                cell.innerHTML =
+                    '<span class="cell-pos">' + posLabel + '</span>' +
+                    '<div class="add-icon"><i class="fa-solid fa-plus"></i></div>' +
+                    '<div class="add-label">Thêm máy</div>';
+            } else {
+                cell.className = 'mld-cell has-machine';
+                cell.innerHTML =
+                    '<span class="cell-pos">' + posLabel + '</span>' +
+                    '<div class="cell-header">' +
+                        '<div class="cell-icon ' + statusIconBg(m.status) + '">' +
+                            '<i class="fa-solid ' + statusIcon(m.status) + '"></i>' +
+                        '</div>' +
+                        '<span class="badge-pill ' + m.status + '">' + statusLabel(m.status) + '</span>' +
+                    '</div>' +
+                    '<div class="cell-body">' +
+                        '<div class="cell-machine-name" title="' + m.name + '">' + m.name + '</div>' +
+                        '<div class="cell-dept">' + (m.dept || '—') + '</div>' +
+                    '</div>' +
+                    '<div class="cell-footer">' +
+                        '<span class="cell-note">' + (m.note ? m.note : '') + '</span>' +
+                        '<i class="fa-solid fa-pen-to-square" style="color:var(--ink-300);font-size:11px;"></i>' +
+                    '</div>';
+            }
+
+            // Re-attach click
+            cell.onclick = function () { openModal(parseInt(this.dataset.index), rows, cols); };
+        }
+
+        /* =====================================================
+           MODAL OPEN / CLOSE
+           ===================================================== */
+        function openModal(cellIndex, rows, cols) {
+            currentCellIndex = cellIndex;
+            var col = (cellIndex % cols) + 1;
+            var row = Math.floor(cellIndex / cols) + 1;
+            var posLabel = 'Hàng ' + row + ' · Cột ' + col;
+            var m = machines[cellIndex];
+
+            if (m) {
+                modalTitle.textContent = 'Chỉnh sửa máy';
+                modalSub.textContent   = posLabel;
+                fName.value  = m.name  || '';
+                fDept.value  = m.dept  || '';
+                fNote.value  = m.note  || '';
+                selectedStatus = m.status || 'active';
+                btnDelete.classList.add('visible');
+            } else {
+                modalTitle.textContent = 'Thêm máy vào ô';
+                modalSub.textContent   = posLabel;
+                fName.value  = '';
+                fDept.value  = '';
+                fNote.value  = '';
+                selectedStatus = 'active';
+                btnDelete.classList.remove('visible');
+            }
+
+            // Sync status picker UI
+            document.querySelectorAll('.mld-status-opt').forEach(function (o) {
+                o.classList.toggle('selected', o.dataset.val === selectedStatus);
+            });
+
+            backdrop.classList.add('open');
+            setTimeout(function () { fName.focus(); }, 300);
+        }
+
+        function closeModal() {
+            backdrop.classList.remove('open');
+            currentCellIndex = null;
+        }
+
+        /* =====================================================
+           SAVE
+           ===================================================== */
+        btnSave.addEventListener('click', function () {
+            var name = fName.value.trim();
+            var dept = fDept.value;
+            if (!name) { fName.focus(); fName.classList.add('shake'); setTimeout(function(){fName.classList.remove('shake');},500); return; }
+
+            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
+            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
+
+            machines[currentCellIndex] = {
+                name: name,
+                dept: dept,
+                status: selectedStatus,
+                note: fNote.value.trim()
+            };
+
+            renderCell(currentCellIndex, rows, cols);
+            updateStats();
+            closeModal();
+        });
+
+        /* =====================================================
+           DELETE
+           ===================================================== */
+        btnDelete.addEventListener('click', function () {
+            if (!confirm('Xóa máy khỏi ô này?')) return;
+            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
+            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
+            delete machines[currentCellIndex];
+            renderCell(currentCellIndex, rows, cols);
+            updateStats();
+            closeModal();
+        });
+
+        /* =====================================================
+           CLEAR ALL
+           ===================================================== */
+        clearBtn.addEventListener('click', function () {
+            if (!confirm('Xóa toàn bộ layout và dữ liệu máy?')) return;
+            machines = {};
+            gridEl.innerHTML = '';
+            emptyState.style.display = '';
+            updateStats();
+        });
+
+        /* =====================================================
+           CLOSE MODAL (backdrop / button)
+           ===================================================== */
+        modalClose.addEventListener('click', closeModal);
+        btnCancel.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', function (e) {
+            if (e.target === backdrop) closeModal();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        /* =====================================================
+           APPLY BTN
+           ===================================================== */
+        applyBtn.addEventListener('click', buildGrid);
+
+        /* =====================================================
+           EXPORT (simple JSON to console for demo)
+           ===================================================== */
+        document.getElementById('mldExportBtn').addEventListener('click', function () {
+            var rows = parseInt(rowsEl.value) || 3;
+            var cols = parseInt(colsEl.value) || 4;
+            var payload = { rows: rows, cols: cols, gap: parseInt(gapEl.value)||12, machines: machines };
+            console.log('[MachineLayout] Saved payload:', JSON.stringify(payload, null, 2));
+            // Show toast-like feedback
+            var btn = this;
+            var orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã lưu!';
+            btn.style.background = 'linear-gradient(135deg,var(--success) 0%,#1e7a57 100%)';
+            setTimeout(function () {
+                btn.innerHTML = orig;
+                btn.style.background = '';
+            }, 2000);
+        });
+
+        /* =====================================================
+           SHAKE animation for validation
+           ===================================================== */
+        var shakeStyle = document.createElement('style');
+        shakeStyle.textContent = '@@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}.shake{animation:shake .4s ease;}';
+        document.head.appendChild(shakeStyle);
+
+    }());
+</script>

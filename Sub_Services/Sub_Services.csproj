@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sub_Entities\Sub_Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Execute\Style_Service\" />
+  </ItemGroup>
+
+</Project>

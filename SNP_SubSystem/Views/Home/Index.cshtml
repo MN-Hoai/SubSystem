@@ -1,0 +1,638 @@
+@{
+    ViewData["Title"] = "Trang chủ - Bảng điều khiển";
+}
+
+<div class="content-area">
+
+    <!-- Tiêu đề trang + breadcrumb + nút hành động -->
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">Quản lý <span class="sep">/</span><span class="current">Trang chủ & Bảng điều khiển</span></div>
+            <h1 class="page-title">Trang chủ hệ thống</h1>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-ghost" onclick="location.reload();">
+                <i class="fa-solid fa-rotate-right"></i>Làm mới
+            </button>
+            <a asp-controller="ProductionProgress" asp-action="ATProgress" class="btn btn-primary">
+                <i class="fa-solid fa-industry"></i>Tiến độ sản xuất
+            </a>
+        </div>
+    </div>
+
+    <!-- WELCOME HERO BANNER -->
+    <div class="welcome-banner">
+        <div class="welcome-content">
+            <div class="welcome-badge"><i class="fa-solid fa-sparkles"></i> SNP SubSystem v2.0</div>
+            <h2 class="welcome-title">Chào mừng trở lại, Bảng điều khiển điều hành</h2>
+            <p class="welcome-desc">
+                Hệ thống quản lý thông tin sản xuất tập trung. Bạn có thể truy cập nhanh các phân hệ chức năng dưới đây để theo dõi tiến độ sản xuất và thông tin các bộ phận.
+            </p>
+            <div class="welcome-tags">
+                <span class="tag-item"><i class="fa-solid fa-circle-check"></i> Hệ thống sẵn sàng</span>
+                <span class="tag-item"><i class="fa-solid fa-server"></i> Máy chủ: Online</span>
+                <span class="tag-item"><i class="fa-solid fa-clock"></i> Cập nhật: Vừa xong</span>
+            </div>
+        </div>
+        <div class="welcome-illustration">
+            <div class="illust-icon"><i class="fa-solid fa-grip"></i></div>
+        </div>
+    </div>
+
+    <!-- STATS OVERVIEW CARDS -->
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fa-solid fa-industry"></i></div>
+                <span class="stat-trend up">18/20</span>
+            </div>
+            <div class="stat-value">18 Chuyền</div>
+            <div class="stat-label">Chuyền máy đang chạy</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fa-solid fa-users-gear"></i></div>
+                <span class="stat-trend up">6 Khối</span>
+            </div>
+            <div class="stat-value">6 Bộ phận</div>
+            <div class="stat-label">Bộ phận sản xuất</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+                <span class="stat-trend up">+8.2%</span>
+            </div>
+            <div class="stat-value">24.680</div>
+            <div class="stat-label">Sản lượng trong ngày</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                <span class="stat-trend up">92%</span>
+            </div>
+            <div class="stat-value">92.5%</div>
+            <div class="stat-label">Hiệu suất tổng thể</div>
+        </div>
+    </div>
+
+    <!-- SECTION TITLE: CARD LINK TRUY CẬP TRANG CON (CONTROLLER LINKS) -->
+    <div class="section-head">
+        <div>
+            <h2 class="section-title">Danh sách phân hệ chức năng</h2>
+            <p class="section-sub">Chọn phân hệ bên dưới để điều hướng trực tiếp đến các trang quản lý trong hệ thống</p>
+        </div>
+        <span class="section-badge">3 Trang khả dụng</span>
+    </div>
+
+    <!-- CARDS GRID - GẮN SẴN LINK CONTROLLER -->
+    <div class="subpage-grid">
+
+        <!-- CARD 1: Tiến độ sản xuất (ProductionProgress / ATProgress) -->
+        <a asp-controller="ProductionProgress" asp-action="ATProgress" class="subpage-card primary-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-navy">
+                    <i class="fa-solid fa-industry"></i>
+                </div>
+                <div class="card-status-badge badge-active">
+                    <span class="status-dot"></span> Sẵn sàng
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="card-route-tag">
+                    <i class="fa-solid fa-code-branch"></i> ProductionProgress / ATProgress
+                </div>
+                <h3 class="card-title">Tiến độ sản xuất</h3>
+                <p class="card-description">
+                    Theo dõi chi tiết tiến độ các chuyền may, sản lượng thực tế hôm nay, phân tích tỷ lệ trễ tiến độ và hiệu suất theo từng mã hàng (SP#).
+                </p>
+                <div class="card-features">
+                    <span class="feature-tag"><i class="fa-solid fa-chart-bar"></i> Thống kê chuyền</span>
+                    <span class="feature-tag"><i class="fa-solid fa-filter"></i> Bộ lọc đa năng</span>
+                    <span class="feature-tag"><i class="fa-solid fa-file-export"></i> Xuất báo cáo</span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <span class="link-label">Truy cập ngay</span>
+                <div class="arrow-btn"><i class="fa-solid fa-arrow-right"></i></div>
+            </div>
+        </a>
+
+        <!-- CARD 2: Thông tin bộ phận (ProductionDepartment / ATDepartment) -->
+        <a asp-controller="ProductionDepartment" asp-action="ATDepartment" class="subpage-card accent-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-gold">
+                    <i class="fa-solid fa-users-gear"></i>
+                </div>
+                <div class="card-status-badge badge-active">
+                    <span class="status-dot"></span> Sẵn sàng
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="card-route-tag">
+                    <i class="fa-solid fa-code-branch"></i> ProductionDepartment / ATDepartment
+                </div>
+                <h3 class="card-title">Thông tin bộ phận</h3>
+                <p class="card-description">
+                    Quản lý danh sách các bộ phận sản xuất (Cắt, May, Thêu, Ủi, Kiểm phẩm, Đóng gói), máy móc và xem chi tiết sản lượng từng công đoạn sản xuất.
+                </p>
+                <div class="card-features">
+                    <span class="feature-tag"><i class="fa-solid fa-sitemap"></i> 6 Bộ phận</span>
+                    <span class="feature-tag"><i class="fa-solid fa-circle-info"></i> Popup chi tiết</span>
+                    <span class="feature-tag"><i class="fa-solid fa-list-check"></i> Tiến độ công đoạn</span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <span class="link-label">Truy cập ngay</span>
+                <div class="arrow-btn"><i class="fa-solid fa-arrow-right"></i></div>
+            </div>
+        </a>
+
+        <!-- CARD 3: Chính sách & Bảo mật (Home / Privacy) -->
+        <a asp-controller="Home" asp-action="Privacy" class="subpage-card system-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-slate">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="card-status-badge badge-system">
+                    <i class="fa-solid fa-lock"></i> Hệ thống
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="card-route-tag">
+                    <i class="fa-solid fa-code-branch"></i> Home / Privacy
+                </div>
+                <h3 class="card-title">Chính sách & Bảo mật</h3>
+                <p class="card-description">
+                    Quy định bảo mật dữ liệu sản xuất, chính sách phân quyền tài khoản quản trị và điều khoản sử dụng hệ thống SNP SubSystem.
+                </p>
+                <div class="card-features">
+                    <span class="feature-tag"><i class="fa-solid fa-user-shield"></i> Phân quyền</span>
+                    <span class="feature-tag"><i class="fa-solid fa-key"></i> An toàn dữ liệu</span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <span class="link-label">Xem chính sách</span>
+                <div class="arrow-btn"><i class="fa-solid fa-arrow-right"></i></div>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- PHÂN HỆ MỞ RỘNG TRONG TƯƠNG LAI -->
+    <div class="section-head mt-32">
+        <div>
+            <h2 class="section-title">Các phân hệ quản lý hệ thống khác</h2>
+            <p class="section-sub">Các phân hệ đang được kết nối trong hệ thống quản trị chung</p>
+        </div>
+    </div>
+
+    <div class="subpage-grid grid-4-col">
+        <div class="subpage-card minor-card disabled-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-sm"><i class="fa-solid fa-box"></i></div>
+                <span class="card-badge badge-coming">Sắp ra mắt</span>
+            </div>
+            <h4 class="card-title-sm">Quản lý Đơn hàng</h4>
+            <p class="card-desc-sm">Quản lý danh sách đơn hàng xuất nhập, thông tin đối tác & mã đơn.</p>
+        </div>
+
+        <div class="subpage-card minor-card disabled-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-sm"><i class="fa-solid fa-tags"></i></div>
+                <span class="card-badge badge-coming">Sắp ra mắt</span>
+            </div>
+            <h4 class="card-title-sm">Quản lý Sản phẩm</h4>
+            <p class="card-desc-sm">Danh mục mẫu sản phẩm, thông số kỹ thuật rập & quy chuẩn.</p>
+        </div>
+
+        <div class="subpage-card minor-card disabled-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-sm"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                <span class="card-badge badge-coming">Sắp ra mắt</span>
+            </div>
+            <h4 class="card-title-sm">Quản lý Hóa đơn</h4>
+            <p class="card-desc-sm">Theo dõi chứng từ chi phí sản xuất, hóa đơn & quyết toán.</p>
+        </div>
+
+        <div class="subpage-card minor-card disabled-card">
+            <div class="card-header">
+                <div class="card-icon-wrap icon-sm"><i class="fa-solid fa-sliders"></i></div>
+                <span class="card-badge badge-coming">Cấu hình</span>
+            </div>
+            <h4 class="card-title-sm">Cài đặt Hệ thống</h4>
+            <p class="card-desc-sm">Tùy chỉnh thông số vận hành, kết nối database & nhật ký hệ thống.</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- STYLES DÙNG RIÊNG CHO TRANG HOME (ĐỒNG BỘ THEO DESIGN TOKENS CỦA MAIN.CSS) -->
+<style>
+    /* Welcome Banner */
+    .welcome-banner {
+        background: linear-gradient(135deg, var(--accent-navy) 0%, #152A4A 60%, var(--accent-navy-700) 100%);
+        color: #ffffff;
+        border-radius: var(--radius);
+        padding: 28px 32px;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .welcome-banner::before {
+        content: '';
+        position: absolute;
+        top: -40%;
+        right: -10%;
+        width: 350px;
+        height: 350px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(192, 149, 78, 0.25) 0%, rgba(255,255,255,0) 70%);
+        pointer-events: none;
+    }
+
+    .welcome-content {
+        max-width: 650px;
+        z-index: 2;
+    }
+
+    .welcome-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--accent-gold-soft);
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 12px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+    }
+
+    .welcome-title {
+        font-family: 'Fraunces', serif;
+        font-size: 24px;
+        font-weight: 600;
+        line-height: 1.3;
+        margin-bottom: 10px;
+        color: #ffffff;
+    }
+
+    .welcome-desc {
+        font-size: 13.5px;
+        color: rgba(255, 255, 255, 0.82);
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+
+    .welcome-tags {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .tag-item {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.9);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+    }
+
+    .tag-item i {
+        color: var(--accent-gold);
+    }
+
+    .welcome-illustration {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }
+
+    .illust-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        color: var(--accent-gold-soft);
+    }
+
+    /* Section Head */
+    .section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 18px;
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--ink-900);
+        margin-bottom: 4px;
+    }
+
+    .section-sub {
+        font-size: 13px;
+        color: var(--ink-500);
+    }
+
+    .section-badge {
+        font-size: 12px;
+        font-weight: 700;
+        background: var(--accent-navy-soft);
+        color: var(--accent-navy);
+        padding: 4px 12px;
+        border-radius: 999px;
+    }
+
+    .mt-32 {
+        margin-top: 32px;
+    }
+
+    /* Subpage Cards Grid */
+    .subpage-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    .grid-4-col {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    /* Subpage Card Style */
+    .subpage-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.22s ease;
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+
+    .subpage-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--accent-navy);
+    }
+
+    .primary-card:hover {
+        border-color: var(--accent-navy);
+    }
+
+    .accent-card:hover {
+        border-color: var(--accent-gold);
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .card-icon-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        transition: transform 0.22s ease;
+    }
+
+    .subpage-card:hover .card-icon-wrap {
+        transform: scale(1.08);
+    }
+
+    .icon-navy {
+        background: var(--accent-navy-soft);
+        color: var(--accent-navy);
+    }
+
+    .icon-gold {
+        background: var(--accent-gold-soft);
+        color: #8A6423;
+    }
+
+    .icon-slate {
+        background: #F0F2F5;
+        color: var(--ink-700-solid);
+    }
+
+    .icon-sm {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+        border-radius: 10px;
+        background: var(--border-soft);
+        color: var(--ink-500);
+    }
+
+    .card-status-badge {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .badge-active {
+        background: #E8F7F0;
+        color: var(--success);
+    }
+
+    .badge-system {
+        background: #F0F3F8;
+        color: var(--accent-navy);
+    }
+
+    .badge-coming {
+        background: var(--border-soft);
+        color: var(--ink-500);
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--success);
+        display: inline-block;
+    }
+
+    .card-route-tag {
+        font-size: 11px;
+        font-family: monospace;
+        font-weight: 600;
+        color: var(--ink-500);
+        background: var(--bg-canvas);
+        padding: 3px 8px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 10px;
+        border: 1px solid var(--border-soft);
+    }
+
+    .card-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--ink-900);
+        margin-bottom: 8px;
+        transition: color 0.18s ease;
+    }
+
+    .subpage-card:hover .card-title {
+        color: var(--accent-navy);
+    }
+
+    .card-description {
+        font-size: 13px;
+        color: var(--ink-500);
+        line-height: 1.55;
+        margin-bottom: 16px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .card-features {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 20px;
+    }
+
+    .feature-tag {
+        font-size: 11.5px;
+        color: var(--ink-700-solid);
+        background: var(--border-soft);
+        padding: 3px 9px;
+        border-radius: 6px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .feature-tag i {
+        font-size: 10px;
+        color: var(--accent-navy);
+    }
+
+    .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 14px;
+        border-top: 1px dashed var(--border);
+    }
+
+    .link-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent-navy);
+    }
+
+    .arrow-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--accent-navy-soft);
+        color: var(--accent-navy);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+
+    .subpage-card:hover .arrow-btn {
+        background: var(--accent-navy);
+        color: #ffffff;
+        transform: translateX(4px);
+    }
+
+    /* Minor / Disabled Cards */
+    .minor-card {
+        padding: 16px;
+    }
+
+    .disabled-card {
+        opacity: 0.75;
+        cursor: default;
+        background: #FAFAFD;
+    }
+
+    .disabled-card:hover {
+        transform: none;
+        box-shadow: var(--shadow-sm);
+        border-color: var(--border);
+    }
+
+    .card-title-sm {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink-900);
+        margin: 10px 0 4px;
+    }
+
+    .card-desc-sm {
+        font-size: 12px;
+        color: var(--ink-500);
+        line-height: 1.45;
+    }
+
+    /* Responsive */
+    @@media (max-width: 1100px) {
+        .subpage-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .grid-4-col {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+   @@media (max-width: 640px) {
+        .subpage-grid, .grid-4-col {
+            grid-template-columns: 1fr;
+        }
+        .welcome-banner {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+        }
+    }
+</style>

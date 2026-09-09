@@ -1,0 +1,589 @@
+@{
+    ViewData["Title"] = "Tiến độ sản xuất";
+}
+
+@* Lấy ngày đầu tháng và hôm nay dạng yyyy-MM-dd để gán value mặc định cho date input *@
+@{
+    var today     = DateTime.Today.ToString("yyyy-MM-dd");
+    var firstDay  = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).ToString("yyyy-MM-dd");
+}
+
+<div class="content-area">
+
+    <!-- Tiêu đề trang + breadcrumb + nút hành động -->
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">Quản lý <span class="sep">/</span><span class="current">Tiến độ sản xuất</span></div>
+            <h1 class="page-title">Tiến độ sản xuất</h1>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-ghost"><i class="fa-solid fa-download"></i>Xuất báo cáo</button>
+            <button class="btn btn-primary"><i class="fa-solid fa-plus"></i>Ghi nhận sản lượng</button>
+        </div>
+    </div>
+
+    <!-- 4 thẻ KPI tổng quan sản xuất -->
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-industry"></i></div><span class="stat-trend up">18/20</span></div>
+            <div class="stat-value">18 Chuyền</div>
+            <div class="stat-label">Đang hoạt động</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div><span class="stat-trend up">+8.2%</span></div>
+            <div class="stat-value">24.680</div>
+            <div class="stat-label">Sản lượng hôm nay</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><span class="stat-trend down">−2</span></div>
+            <div class="stat-value">5 Đơn</div>
+            <div class="stat-label">Trễ tiến độ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-gauge-high"></i></div><span class="stat-trend up">+1.5%</span></div>
+            <div class="stat-value">92%</div>
+            <div class="stat-label">Hiệu suất trung bình</div>
+        </div>
+    </div>
+
+    <!-- FILTER / SEARCH BAR -->
+    <div class="filter-bar">
+
+        <!-- Tìm kiếm tự do -->
+        <div class="filter-group filter-search">
+            <label class="filter-label">Tìm kiếm</label>
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="Tìm theo Style, SP#, Line...">
+            </div>
+        </div>
+
+        <!-- Bộ phận — đổ động từ API -->
+        <div class="filter-group">
+            <label class="filter-label">Bộ phận</label>
+            <select id="deptSelect">
+                <option value="">Tất cả bộ phận</option>
+            </select>
+        </div>
+
+        <!-- Line — đổ động từ API, liên kết với Bộ phận -->
+        <div class="filter-group">
+            <label class="filter-label">Line</label>
+            <select id="lineSelect">
+                <option value="">Tất cả Line</option>
+            </select>
+        </div>
+
+        <!-- Trạng thái (Status ProductionInfo: 1=Đang, 0=Ngừng) -->
+        <div class="filter-group">
+            <label class="filter-label">Trạng thái</label>
+            <select id="statusSelect">
+                <option value="">Tất cả</option>
+                <option value="1" selected>Đang hoạt động</option>
+                <option value="0">Ngừng hoạt động</option>
+            </select>
+        </div>
+
+        <!-- Khoảng ngày -->
+        <div class="filter-group">
+            <label class="filter-label">Ngày</label>
+            <div class="date-range">
+                <input type="date" id="fromDate" value="@firstDay">
+                <span class="date-sep">—</span>
+                <input type="date" id="toDate" value="@today">
+            </div>
+        </div>
+
+        <!-- Hành động -->
+        <div class="filter-actions">
+            <button class="btn btn-primary" id="btnFilterSearch"><i class="fa-solid fa-magnifying-glass"></i>Tìm kiếm</button>
+            <button class="btn btn-ghost" id="btnFilterReset"><i class="fa-solid fa-arrow-rotate-left"></i>Đặt lại</button>
+        </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <div class="panel-title" id="panelTableTitle">Danh sách chuyền sản xuất</div>
+                <div class="panel-sub" id="panelTableSub">Đang tải dữ liệu...</div>
+            </div>
+            <button class="btn btn-ghost" id="btnRefreshData"><i class="fa-solid fa-rotate-right"></i>Làm mới</button>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="tableLoading" style="display:none; padding:40px; text-align:center; color:var(--ink-500);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px; margin-bottom:8px;"></i>
+            <div>Đang tải dữ liệu...</div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="tableEmpty" style="display:none; padding:48px; text-align:center; color:var(--ink-400);">
+            <i class="fa-solid fa-inbox" style="font-size:36px; margin-bottom:12px; display:block;"></i>
+            <div style="font-weight:600;">Không có dữ liệu phù hợp</div>
+            <div style="font-size:13px; margin-top:4px;">Thử thay đổi điều kiện lọc và tìm kiếm lại</div>
+        </div>
+
+        <div class="table-wrap" id="tableWrap">
+            <table id="progressTable">
+                <thead>
+                    <tr>
+                        <th>Line</th>
+                        <th>Style</th>
+                        <th>SP#</th>
+                        <th>Color</th>
+                        <th>Total Output</th>
+                        <th>Today Output</th>
+                        <th>Inline Line</th>
+                        <th>Department Line</th>
+                        <th>Expected Date </th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="progressTableBody">
+                    <!-- Render động từ JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PAGINATION -->
+        <div class="pagination" id="paginationSection">
+            <div class="pagination-info" id="paginationInfo">
+                Hiển thị <strong id="showingCount">0</strong> trong <strong id="totalCount">0</strong> kết quả
+            </div>
+            <div class="pagination-controls" id="paginationControls">
+                <!-- Render động từ JS -->
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===================================================================
+     SCRIPT TỔNG HỢP: Load filter + Fetch danh sách + Render bảng + Phân trang
+     =================================================================== -->
+<script>
+(function () {
+    'use strict';
+
+    // ---------------------------------------------------------------
+    // DOM References
+    // ---------------------------------------------------------------
+    const searchInput     = document.getElementById('searchInput');
+    const deptSelect      = document.getElementById('deptSelect');
+    const lineSelect      = document.getElementById('lineSelect');
+    const statusSelect    = document.getElementById('statusSelect');
+    const fromDateInput   = document.getElementById('fromDate');
+    const toDateInput     = document.getElementById('toDate');
+    const btnSearch       = document.getElementById('btnFilterSearch');
+    const btnReset        = document.getElementById('btnFilterReset');
+    const btnRefresh      = document.getElementById('btnRefreshData');
+    const tbody           = document.getElementById('progressTableBody');
+    const tableWrap       = document.getElementById('tableWrap');
+    const tableLoading    = document.getElementById('tableLoading');
+    const tableEmpty      = document.getElementById('tableEmpty');
+    const panelTitle      = document.getElementById('panelTableTitle');
+    const panelSub        = document.getElementById('panelTableSub');
+    const showingCount    = document.getElementById('showingCount');
+    const totalCountEl    = document.getElementById('totalCount');
+    const paginationCtrl  = document.getElementById('paginationControls');
+
+    // ---------------------------------------------------------------
+    // State phân trang
+    // ---------------------------------------------------------------
+    let currentPage = 1;
+    const PAGE_SIZE = 20;
+
+    // ---------------------------------------------------------------
+    // 1. Load danh sách Bộ phận
+    // ---------------------------------------------------------------
+    async function loadDepartments() {
+        try {
+            const res  = await fetch('/ProductionProgress/GetDepartments');
+            if (!res.ok) return;
+            const list = await res.json();
+            list.forEach(dept => {
+                const opt       = document.createElement('option');
+                opt.value       = dept.id;
+                opt.textContent = dept.departmentName;
+                deptSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('[PP] Lỗi load Bộ phận:', e);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 2. Load danh sách Line (theo Bộ phận nếu chọn)
+    // ---------------------------------------------------------------
+    async function loadLines(departmentId) {
+        while (lineSelect.options.length > 1) lineSelect.remove(1);
+        try {
+            const url  = departmentId
+                ? `/ProductionProgress/GetLines?departmentId=${departmentId}`
+                : '/ProductionProgress/GetLines';
+            const res  = await fetch(url);
+            if (!res.ok) return;
+            const list = await res.json();
+            list.forEach(line => {
+                const opt       = document.createElement('option');
+                opt.value       = line;
+                opt.textContent = `Line ${line}`;
+                lineSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('[PP] Lỗi load Line:', e);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 3. Fetch danh sách tiến độ từ POST /ProductionProgress/GetList
+    // ---------------------------------------------------------------
+    async function fetchList(page) {
+        // Hiện loading mượt mà: làm mờ bảng thay vì ẩn đi, thêm spinner vào nút Làm mới
+        tableWrap.style.opacity = '0.5';
+        tableWrap.style.pointerEvents = 'none';
+        btnRefresh.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...';
+        btnRefresh.disabled = true;
+        tableEmpty.style.display   = 'none';
+
+        const deptId = deptSelect.value || null;
+        const line   = lineSelect.value || null;
+        const status = statusSelect.value !== '' ? parseInt(statusSelect.value) : null;
+
+        const requestBody = {
+            fromDate:               fromDateInput.value,
+            toDate:                 toDateInput.value,
+            keyword:                searchInput.value.trim() || null,
+            line:                   line,
+            productionDepartmentId: deptId,
+            status:                 status,
+            page:                   page,
+            pageSize:               PAGE_SIZE
+        };
+
+        try {
+            const res = await fetch('/ProductionProgress/GetList', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(requestBody)
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert('Lỗi truy vấn: ' + (err.message || res.statusText));
+                resetLoadingState();
+                return;
+            }
+
+            const data = await res.json();
+            // data: { items, totalCount, page, pageSize, totalPages, hasPreviousPage, hasNextPage }
+
+            resetLoadingState();
+
+            if (!data.items || data.items.length === 0) {
+                tableEmpty.style.display = 'block';
+                tableWrap.style.display  = 'none';
+                renderPagination(0, 1, 1);
+                showingCount.textContent = 0;
+                totalCountEl.textContent = data.totalCount ?? 0;
+                updatePanelHeader(deptSelect, data.totalCount ?? 0);
+                return;
+            }
+
+            tableWrap.style.display = 'block';
+            renderRows(data.items);
+            renderPagination(data.totalCount, data.page, data.totalPages);
+
+            // Cập nhật thống kê hiển thị
+            const from = (data.page - 1) * data.pageSize + 1;
+            const to   = Math.min(data.page * data.pageSize, data.totalCount);
+            showingCount.textContent = `${from}–${to}`;
+            totalCountEl.textContent = data.totalCount;
+
+            updatePanelHeader(deptSelect, data.totalCount);
+            updatePanelSub();
+
+        } catch (e) {
+            console.error('[PP] Lỗi fetchList:', e);
+            resetLoadingState();
+        }
+    }
+
+    function resetLoadingState() {
+        tableWrap.style.opacity = '1';
+        tableWrap.style.pointerEvents = 'auto';
+        tableWrap.style.display = 'block';
+        btnRefresh.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Làm mới';
+        btnRefresh.disabled = false;
+    }
+
+    // ---------------------------------------------------------------
+    // 4. Render các dòng tbody
+    // ---------------------------------------------------------------
+    function renderRows(items) {
+        tbody.innerHTML = '';
+        items.forEach(p => {
+            // Tính % cho Today Output so với Target
+            const todayPct = p.target && p.target > 0
+                ? Math.round((p.todayOutput / p.target) * 100)
+                : 0;
+            const safeTodayPct = Math.min(todayPct, 100);
+            const todayBarColor = todayPct >= 80 ? 'var(--success)' : todayPct >= 50 ? 'var(--accent-gold)' : 'var(--danger)';
+
+            // Tính % cho Total Output so với TotalQty
+            const totalPct = p.totalQty && p.totalQty > 0
+                ? Math.round((p.totalOutput / p.totalQty) * 100)
+                : 0;
+            const safeTotalPct = Math.min(totalPct, 100);
+            const totalBarColor = totalPct >= 80 ? 'var(--success)' : totalPct >= 50 ? 'var(--accent-gold)' : 'var(--danger)';
+
+            const inlineDate = p.inlineLine
+                ? new Date(p.inlineLine).toLocaleDateString('vi-VN')
+                : '—';
+            const inlineDepartment = p.inlineDepartment
+                ? new Date(p.inlineDepartment).toLocaleDateString('vi-VN')
+                : '—';
+
+            // Tính ngày dự kiến hoàn thành:
+            //   - Số ngày cần = ceil((TotalQty - TotalOutput) / Target)
+            //   - Nếu ngày Department Line (inlineDepartment) > hôm nay
+            //       → lấy ngày Department Line làm gốc + số ngày cần
+            //   - Nếu ngày Department Line <= hôm nay (hoặc đã qua)
+            //       → lấy ngày hôm nay làm gốc + số ngày cần
+            let expectedDate = '—';
+            if (p.totalQty && p.totalQty > 0 && p.target && p.target > 0) {
+                const remainingQty  = Math.max(0, p.totalQty - (p.totalOutput || 0));
+                const daysNeeded    = Math.ceil(remainingQty / p.target);
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let baseDate;
+                if (p.inlineDepartment) {
+                    const deptDate = new Date(p.inlineDepartment);
+                    deptDate.setHours(0, 0, 0, 0);
+                    // Nếu Department Line còn trong tương lai → dùng ngày đó làm gốc
+                    baseDate = deptDate > today ? deptDate : today;
+                } else {
+                    baseDate = today;
+                }
+
+                const expDate = new Date(baseDate);
+                expDate.setDate(expDate.getDate() + daysNeeded);
+                expectedDate = expDate.toLocaleDateString('vi-VN');
+            }
+
+            const statusBadge = p.status === 1
+                ? '<span class="badge-status success">Đang HĐ</span>'
+                : '<span class="badge-status warning">Ngừng HĐ</span>';
+
+            tbody.insertAdjacentHTML('beforeend', `
+                <tr>
+                    <td class="cell-strong">${escHtml(p.line ?? '—')}</td>
+                    <td>${escHtml(p.style ?? '—')}</td>
+                    <td class="cell-mono">${escHtml(p.spmain ?? '—')}</td>
+                    <td>${p.color}</td>
+                    
+                    <!-- Cột Total Output -->
+                    <td>
+                        <div class="output-cell" style="min-width: 120px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                <span>${fmtNum(p.totalOutput)} / ${fmtNum(p.totalQty)}</span>
+                                <strong style="color: ${totalBarColor};">${totalPct}%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width:${safeTotalPct}%; background:${totalBarColor};"></div>
+                            </div>
+                        </div>
+                    </td>
+                    
+                    <!-- Cột Today Output -->
+                    <td>
+                        <div class="output-cell" style="min-width: 120px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                <span>${fmtNum(p.todayOutput)} / ${fmtNum(p.target)}</span>
+                                <strong style="color: ${todayBarColor};">${todayPct}%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width:${safeTodayPct}%; background:${todayBarColor};"></div>
+                            </div>
+                        </div>
+                    </td>
+                  
+                    <td>${inlineDate}</td>
+                    <td>${inlineDepartment}</td>
+                    <td>${expectedDate}</td>
+                    <td>${statusBadge}</td>
+                </tr>
+            `);
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // 5. Render phân trang
+    // ---------------------------------------------------------------
+    function renderPagination(totalCount, page, totalPages) {
+        paginationCtrl.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        // Nút Prev
+        const prev = btn('<i class="fa-solid fa-chevron-left"></i>', page <= 1);
+        prev.addEventListener('click', () => { if (page > 1) goPage(page - 1); });
+        paginationCtrl.appendChild(prev);
+
+        // Số trang (hiển thị tối đa 7 nút, dùng dấu "…" khi cần)
+        const pages = buildPageRange(page, totalPages);
+        pages.forEach(p => {
+            if (p === '...') {
+                const dots = document.createElement('span');
+                dots.className   = 'page-dots';
+                dots.textContent = '…';
+                paginationCtrl.appendChild(dots);
+            } else {
+                const b = btn(p, false, p === page);
+                b.addEventListener('click', () => goPage(p));
+                paginationCtrl.appendChild(b);
+            }
+        });
+
+        // Nút Next
+        const next = btn('<i class="fa-solid fa-chevron-right"></i>', page >= totalPages);
+        next.addEventListener('click', () => { if (page < totalPages) goPage(page + 1); });
+        paginationCtrl.appendChild(next);
+    }
+
+    function buildPageRange(current, total) {
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+        const pages = [];
+        if (current <= 4) {
+            pages.push(1, 2, 3, 4, 5, '...', total);
+        } else if (current >= total - 3) {
+            pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
+        } else {
+            pages.push(1, '...', current - 1, current, current + 1, '...', total);
+        }
+        return pages;
+    }
+
+    function btn(html, disabled, active) {
+        const b = document.createElement('button');
+        b.className   = 'page-btn' + (active ? ' active' : '');
+        b.disabled    = !!disabled;
+        b.innerHTML   = html;
+        return b;
+    }
+
+    function goPage(page) {
+        currentPage = page;
+        fetchList(currentPage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ---------------------------------------------------------------
+    // 6. Helpers
+    // ---------------------------------------------------------------
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function fmtNum(n) {
+        if (n == null) return '—';
+        return Number(n).toLocaleString('vi-VN');
+    }
+
+    function updatePanelHeader(sel, total) {
+        const deptName = sel.options[sel.selectedIndex]?.text ?? 'Tất cả bộ phận';
+        panelTitle.textContent = `Danh sách chuyền sản xuất — ${deptName}`;
+    }
+
+    function updatePanelSub() {
+        const now = new Date();
+        const time = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const date = now.toLocaleDateString('vi-VN');
+        panelSub.textContent = `Cập nhật lúc ${time} · ${date}`;
+    }
+
+    // ---------------------------------------------------------------
+    // 7. Event handlers
+    // ---------------------------------------------------------------
+    
+    // Hàm Debounce cho ô tìm kiếm
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Tự động tìm kiếm khi gõ (debounce 1.5s)
+    const handleSearchInput = debounce(() => {
+        currentPage = 1;
+        fetchList(1);
+    }, 1500);
+
+    searchInput.addEventListener('input', handleSearchInput);
+    
+    // Nút Tìm kiếm (vẫn giữ nếu người dùng muốn bấm ngay)
+    btnSearch.addEventListener('click', () => {
+        currentPage = 1;
+        fetchList(1);
+    });
+
+    // Enter trong ô tìm kiếm gọi ngay không cần chờ debounce
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { 
+            currentPage = 1; 
+            fetchList(1); 
+        }
+    });
+
+    // Khi chọn Bộ phận → reload Line + reset page → fetch
+    deptSelect.addEventListener('change', function () {
+        currentPage = 1;
+        loadLines(this.value || null).then(() => fetchList(1));
+    });
+
+    // Tự động gọi fetch khi đổi Line, Status, Từ ngày, Đến ngày
+    [lineSelect, statusSelect, fromDateInput, toDateInput].forEach(el => {
+        el.addEventListener('change', () => {
+            currentPage = 1;
+            fetchList(1);
+        });
+    });
+
+    // Nút Đặt lại
+    btnReset.addEventListener('click', () => {
+        searchInput.value   = '';
+        deptSelect.value    = '';
+        lineSelect.value    = '';
+        statusSelect.value  = '1';
+        fromDateInput.value = '@firstDay';
+        toDateInput.value   = '@today';
+        currentPage         = 1;
+        loadLines(null).then(() => fetchList(1));
+    });
+
+    // Nút Làm mới
+    btnRefresh.addEventListener('click', () => fetchList(currentPage));
+
+    // ---------------------------------------------------------------
+    // 8. Khởi tạo khi DOM sẵn sàng
+    // ---------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadDepartments();
+        await loadLines(null);
+        fetchList(1);
+    });
+
+})();
+</script>

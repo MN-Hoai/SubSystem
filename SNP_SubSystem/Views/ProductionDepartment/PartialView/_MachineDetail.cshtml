@@ -5,915 +5,190 @@
     var machineName = ViewData["MachineName"]?.ToString() ?? "Máy";
     var machineCode = ViewData["MachineCode"]?.ToString() ?? "";
     var dept        = ViewData["Dept"]?.ToString()         ?? "";
-
-    /*
-     * =====================================================================
-     * DATA FLOW (khi kết nối DB):
-     *
-     *   1) ProductionInfo  — mã sản xuất (SP#, Style, Line, Color, Target...)
-     *                        → liên kết với máy qua ProductionMachineId &
-     *                          ProductionDepartmentId
-     *
-     *   2) DailyOutput     — sản lượng hàng ngày của một ProductionInfo
-     *                        trên một máy (ProductionMachineId)
-     *                        → gắn với StyleInfo (StyleInfoId)
-     *
-     *   3) DailyOutputDetail — chi tiết từng công đoạn (StyleDetail)
-     *                          trong một DailyOutput
-     *                        → OutputNumber, InputTime, StyleDetailId
-     *
-     *   4) StyleInfo       — định nghĩa Style (StyleCode, Keyword)
-     *   5) StyleDetail     — chi tiết từng công đoạn of a Style (DetailName)
-     *
-     * API gợi ý (TODO):
-     *   GET /ProductionDepartment/GetProductionInfos?machineId={id}
-     *       → List<ProductionInfoDto> { Id, Style, Spmain, Line, Color,
-     *           TotalQty, FinishQty, Target, InlineLine, InlineDepartment,
-     *           Machine, Remark, Status, CreateDate }
-     *
-     *   GET /ProductionDepartment/GetDailyOutputDetails?productionInfoId={id}
-     *       → List<DailyOutputDetailDto> { DailyOutputId, StyleDetailId,
-     *           DetailName, OutputNumber, InputTime, TotalOutputNumber,
-     *           StyleCode, CreateDate }
-     * =====================================================================
-     */
+    var deptId      = ViewData["DeptId"]?.ToString()       ?? "";
 }
-
-<!-- =====================================================
-     MOCK DATA  — khớp 1-1 với entity fields
-     ===================================================== -->
-<script id="mockProductionInfos" type="application/json">
-[
-  {
-    "id": "pi-001",
-    "style": "Áo thun basic cổ tròn",
-    "spmain": "SP-2026-0113",
-    "line": "Tổ 1",
-    "color": "Trắng",
-    "totalQty": 1500,
-    "finishQty": 1240,
-    "target": 1500,
-    "machine": 1,
-    "inlineLine": "2026-08-20",
-    "inlineDepartment": "2026-08-22",
-    "remark": "Ưu tiên giao sớm",
-    "keyword": "basic tee",
-    "status": 1,
-    "createDate": "2026-08-18",
-    "dailyOutputs": [
-      {
-        "id": "do-001-1",
-        "totalOutputNumber": 420,
-        "createDate": "2026-08-25",
-        "styleCode": "AT-BASIC-01",
-        "details": [
-          { "detailName": "Ráp thân trước", "outputNumber": 145, "inputTime": "07:30" },
-          { "detailName": "Ráp thân sau",   "outputNumber": 140, "inputTime": "09:00" },
-          { "detailName": "Ráp tay áo",     "outputNumber": 135, "inputTime": "13:30" }
-        ]
-      },
-      {
-        "id": "do-001-2",
-        "totalOutputNumber": 410,
-        "createDate": "2026-08-26",
-        "styleCode": "AT-BASIC-01",
-        "details": [
-          { "detailName": "Ráp thân trước", "outputNumber": 138, "inputTime": "07:30" },
-          { "detailName": "Ráp thân sau",   "outputNumber": 137, "inputTime": "09:00" },
-          { "detailName": "Ráp tay áo",     "outputNumber": 135, "inputTime": "13:30" }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "pi-002",
-    "style": "Quần jean slim-fit nam",
-    "spmain": "SP-2026-0108",
-    "line": "Tổ 2",
-    "color": "Xanh indigo",
-    "totalQty": 2000,
-    "finishQty": 980,
-    "target": 2000,
-    "machine": 1,
-    "inlineLine": "2026-08-15",
-    "inlineDepartment": "2026-08-17",
-    "remark": "",
-    "keyword": "slim jean",
-    "status": 1,
-    "createDate": "2026-08-13",
-    "dailyOutputs": [
-      {
-        "id": "do-002-1",
-        "totalOutputNumber": 320,
-        "createDate": "2026-08-20",
-        "styleCode": "QJ-SLIM-01",
-        "details": [
-          { "detailName": "Ráp đũng trước", "outputNumber": 108, "inputTime": "07:30" },
-          { "detailName": "Ráp đũng sau",   "outputNumber": 105, "inputTime": "09:15" },
-          { "detailName": "Đóng khóa",       "outputNumber": 107, "inputTime": "14:00" }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "pi-003",
-    "style": "Áo khoác gió unisex",
-    "spmain": "SP-2026-0125",
-    "line": "Tổ 1",
-    "color": "Xám đen",
-    "totalQty": 1800,
-    "finishQty": 1512,
-    "target": 1800,
-    "machine": 1,
-    "inlineLine": "2026-09-01",
-    "inlineDepartment": "2026-09-03",
-    "remark": "Khách VIP",
-    "keyword": "windbreaker",
-    "status": 1,
-    "createDate": "2026-08-30",
-    "dailyOutputs": []
-  }
-]
-</script>
 
 <style>
     /* ============================================================
-       Machine Detail — _MachineDetail.cshtml — scoped styles
+       Machine Detail — _MachineDetail.cshtml
        ============================================================ */
-
-    /* ---- Page ---- */
-    .md-page {
-        display: flex;
-        flex-direction: column;
-        height: calc(100vh - var(--header-h));
-        overflow: hidden;
-    }
+    .md-page { display:flex; flex-direction:column; height:calc(100vh - var(--header-h,60px)); overflow:hidden; }
 
     /* ---- Top bar ---- */
-    .md-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 28px 14px;
-        background: var(--bg-surface);
-        border-bottom: 1px solid var(--border);
-        gap: 14px;
-        flex-wrap: wrap;
-        flex-shrink: 0;
-    }
+    .md-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 28px 12px; background:var(--bg-surface); border-bottom:1px solid var(--border); gap:14px; flex-wrap:wrap; flex-shrink:0; }
+    .md-back-btn { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--ink-500); cursor:pointer; border:none; background:none; font-family:inherit; padding:6px 10px; border-radius:8px; transition:background .18s,color .18s; }
+    .md-back-btn:hover { background:var(--bg-canvas); color:var(--ink-900); }
+    .md-machine-info { display:flex; align-items:center; gap:14px; flex:1; }
+    .md-machine-badge { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; box-shadow:0 4px 14px rgba(31,58,103,.25); flex-shrink:0; }
+    .md-machine-title { font-size:18px; font-weight:800; color:var(--ink-900); letter-spacing:-.2px; }
+    .md-machine-meta { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
+    .md-meta-chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--ink-500); background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:999px; padding:2px 9px; }
+    .md-topbar-actions { display:flex; gap:10px; flex-shrink:0; }
 
-    .md-back-btn {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--ink-500);
-        cursor: pointer;
-        border: none;
-        background: none;
-        font-family: inherit;
-        padding: 6px 10px;
-        border-radius: 8px;
-        transition: background .18s, color .18s;
-    }
-
-    .md-back-btn:hover { background: var(--bg-canvas); color: var(--ink-900); }
-
-    .md-machine-info {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex: 1;
-    }
-
-    .md-machine-badge {
-        width: 46px;
-        height: 46px;
-        border-radius: 13px;
-        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        font-size: 18px;
-        box-shadow: 0 4px 14px rgba(31,58,103,.25);
-        flex-shrink: 0;
-    }
-
-    .md-machine-title {
-        font-size: 19px;
-        font-weight: 800;
-        color: var(--ink-900);
-        letter-spacing: -.2px;
-    }
-
-    .md-machine-meta {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 3px;
-        flex-wrap: wrap;
-    }
-
-    .md-meta-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 11.5px;
-        font-weight: 600;
-        color: var(--ink-500);
-        background: var(--bg-canvas);
-        border: 1.5px solid var(--border);
-        border-radius: 999px;
-        padding: 3px 10px;
-    }
-
-    .md-meta-chip i { font-size: 10px; }
-
-    .md-topbar-actions { display: flex; gap: 10px; flex-shrink: 0; }
-
-    /* ---- Filter bar ---- */
-    .md-filter {
-        display: flex;
-        align-items: flex-end;
-        gap: 12px;
-        padding: 12px 28px;
-        background: var(--bg-surface);
-        border-bottom: 1px solid var(--border);
-        flex-wrap: wrap;
-        flex-shrink: 0;
-    }
-
-    .md-filter-group { display: flex; flex-direction: column; gap: 5px; }
-
-    .md-filter-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--ink-500);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-    }
-
-    .md-filter select,
-    .md-filter input[type="text"] {
-        padding: 8px 12px;
-        border: 1.5px solid var(--border);
-        border-radius: 9px;
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--ink-900);
-        background: var(--bg-canvas);
-        outline: none;
-        min-width: 150px;
-        transition: border-color .2s, box-shadow .2s;
-        appearance: none;
-    }
-
-    .md-filter select:focus,
-    .md-filter input:focus {
-        border-color: var(--accent-navy);
-        box-shadow: 0 0 0 3px var(--accent-navy-soft);
-        background: #fff;
-    }
-
-    .md-search-wrap { position: relative; }
-    .md-search-wrap i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-300); font-size: 12px; }
-    .md-search-wrap input { padding-left: 32px !important; }
+    /* ---- Filter ---- */
+    .md-filter { display:flex; align-items:flex-end; gap:12px; padding:10px 28px; background:var(--bg-surface); border-bottom:1px solid var(--border); flex-wrap:wrap; flex-shrink:0; }
+    .md-filter-group { display:flex; flex-direction:column; gap:4px; }
+    .md-filter-label { font-size:11px; font-weight:700; color:var(--ink-500); text-transform:uppercase; letter-spacing:.5px; }
+    .md-filter input[type="text"], .md-filter input[type="date"], .md-filter select { padding:7px 11px; border:1.5px solid var(--border); border-radius:9px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-canvas); outline:none; min-width:145px; transition:border-color .2s,box-shadow .2s; appearance:none; }
+    .md-filter input:focus, .md-filter select:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .md-search-wrap { position:relative; }
+    .md-search-wrap i { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--ink-300); font-size:12px; }
+    .md-search-wrap input { padding-left:32px !important; }
 
     /* ---- Body ---- */
-    .md-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 22px 28px 32px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-    }
+    .md-body { flex:1; overflow-y:auto; padding:20px 28px 32px; display:flex; flex-direction:column; gap:12px; }
 
-    /* ---- Summary cards ---- */
-    .md-summary-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-    }
-
-    .md-sum-card {
-        background: var(--bg-surface);
-        border: 1px solid var(--border);
-        border-radius: 13px;
-        padding: 16px 18px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        box-shadow: var(--shadow-sm);
-        transition: box-shadow .2s, transform .2s;
-    }
-
-    .md-sum-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-
-    .md-sum-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--ink-300);
-        text-transform: uppercase;
-        letter-spacing: .6px;
-    }
-
-    .md-sum-value {
-        font-size: 26px;
-        font-weight: 800;
-        color: var(--ink-900);
-        letter-spacing: -.5px;
-        line-height: 1.1;
-    }
-
-    .md-sum-sub {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--ink-500);
-        margin-top: 2px;
-    }
-
-    .md-sum-card.accent-green { border-left: 3px solid var(--success); }
-    .md-sum-card.accent-navy  { border-left: 3px solid var(--accent-navy); }
-    .md-sum-card.accent-gold  { border-left: 3px solid var(--accent-gold); }
-    .md-sum-card.accent-red   { border-left: 3px solid var(--danger); }
-
-    /* ---- Section header ---- */
-    .md-section-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 2px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .md-section-title {
-        font-size: 15px;
-        font-weight: 800;
-        color: var(--ink-900);
-        letter-spacing: -.2px;
-    }
+    /* ---- Summary ---- */
+    .md-summary-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .md-sum-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:13px; padding:14px 18px; display:flex; flex-direction:column; gap:4px; box-shadow:var(--shadow-sm); transition:box-shadow .2s,transform .2s; }
+    .md-sum-card:hover { box-shadow:var(--shadow-md); transform:translateY(-1px); }
+    .md-sum-label { font-size:11px; font-weight:700; color:var(--ink-300); text-transform:uppercase; letter-spacing:.6px; }
+    .md-sum-value { font-size:24px; font-weight:800; color:var(--ink-900); letter-spacing:-.5px; line-height:1.1; }
+    .md-sum-sub { font-size:12px; font-weight:500; color:var(--ink-500); margin-top:2px; }
+    .md-sum-card.accent-green { border-left:3px solid var(--success); }
+    .md-sum-card.accent-navy  { border-left:3px solid var(--accent-navy); }
+    .md-sum-card.accent-gold  { border-left:3px solid var(--accent-gold); }
+    .md-sum-card.accent-red   { border-left:3px solid var(--danger); }
 
     /* ---- Table ---- */
-    .md-table-wrap {
-        background: var(--bg-surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: var(--shadow-sm);
-    }
-
-    .md-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13.5px;
-    }
-
-    .md-table thead tr {
-        background: var(--bg-canvas);
-        border-bottom: 1.5px solid var(--border);
-    }
-
-    .md-table thead th {
-        padding: 11px 16px;
-        text-align: left;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .6px;
-        color: var(--ink-500);
-        white-space: nowrap;
-    }
-
-    .md-table thead th:last-child { text-align: center; }
-
-    .md-table tbody tr {
-        border-bottom: 1px solid var(--border-soft);
-        transition: background .15s;
-        cursor: pointer;
-    }
-
-    .md-table tbody tr:last-child { border-bottom: none; }
-    .md-table tbody tr:hover { background: var(--accent-navy-soft); }
-
-    .md-table tbody td {
-        padding: 13px 16px;
-        vertical-align: middle;
-    }
-
-    .md-table tbody td:last-child { text-align: center; }
-
-    .td-style-name {
-        font-weight: 700;
-        color: var(--ink-900);
-        font-size: 13.5px;
-    }
-
-    .td-sp {
-        font-family: 'Courier New', monospace;
-        font-size: 12.5px;
-        font-weight: 700;
-        color: var(--accent-navy);
-        background: var(--accent-navy-soft);
-        padding: 2px 8px;
-        border-radius: 5px;
-        white-space: nowrap;
-    }
-
-    .td-meta {
-        font-size: 12px;
-        color: var(--ink-500);
-        font-weight: 500;
-    }
-
-    /* Progress mini */
-    .td-progress-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
-
-    .td-progress-bar-bg {
-        height: 5px;
-        border-radius: 999px;
-        background: var(--border);
-        overflow: hidden;
-    }
-
-    .td-progress-bar-fill {
-        height: 100%;
-        border-radius: 999px;
-        transition: width .4s ease;
-    }
-
-    .td-pct {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--ink-500);
-    }
-
-    /* Status badge */
-    .td-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-
-    .td-badge::before {
-        content: '';
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .td-badge.active   { background: #E6F4EF; color: var(--success);      }
-    .td-badge.active::before   { background: var(--success); }
-    .td-badge.inactive { background: #FEF3F2; color: var(--danger);       }
-    .td-badge.inactive::before { background: var(--danger); }
-    .td-badge.done     { background: var(--accent-navy-soft); color: var(--accent-navy); }
-    .td-badge.done::before     { background: var(--accent-navy); }
-
-    /* View btn */
-    .td-view-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 6px 12px;
-        border-radius: 7px;
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--accent-navy);
-        background: var(--accent-navy-soft);
-        border: none;
-        cursor: pointer;
-        font-family: inherit;
-        transition: background .18s, transform .15s;
-    }
-
-    .td-view-btn:hover { background: #d5dfef; transform: translateY(-1px); }
-
-    /* ---- Empty state ---- */
-    .md-empty {
-        text-align: center;
-        padding: 48px 24px;
-        color: var(--ink-300);
-    }
-
-    .md-empty i { font-size: 32px; display: block; margin-bottom: 12px; }
-    .md-empty p { font-size: 14px; font-weight: 600; color: var(--ink-500); }
+    .md-section-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .md-section-title { font-size:15px; font-weight:800; color:var(--ink-900); }
+    .md-table-wrap { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
+    .md-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .md-table thead tr { background:var(--bg-canvas); border-bottom:1.5px solid var(--border); }
+    .md-table thead th { padding:10px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--ink-500); white-space:nowrap; }
+    .md-table tbody tr { border-bottom:1px solid var(--border-soft); transition:background .15s; cursor:pointer; }
+    .md-table tbody tr:last-child { border-bottom:none; }
+    .md-table tbody tr:hover { background:var(--accent-navy-soft); }
+    .md-table tbody td { padding:12px 16px; vertical-align:middle; }
+    .td-sp { font-family:'Courier New',monospace; font-size:12.5px; font-weight:700; color:var(--accent-navy); background:var(--accent-navy-soft); padding:2px 8px; border-radius:5px; white-space:nowrap; }
+    .td-style-name { font-weight:700; color:var(--ink-900); }
+    .td-meta { font-size:12px; color:var(--ink-500); }
+    .td-progress-wrap { display:flex; flex-direction:column; gap:3px; min-width:110px; }
+    .td-progress-bar-bg { height:5px; border-radius:999px; background:var(--border); overflow:hidden; }
+    .td-progress-bar-fill { height:100%; border-radius:999px; transition:width .4s ease; }
+    .td-pct { font-size:11px; font-weight:700; color:var(--ink-500); }
+    .td-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .td-badge.active   { background:#E6F4EF; color:var(--success); }
+    .td-badge.inactive { background:#FEF3F2; color:var(--danger); }
+    .td-badge.done     { background:var(--accent-navy-soft); color:var(--accent-navy); }
+    .td-view-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:7px; font-size:12px; font-weight:700; color:var(--accent-navy); background:var(--accent-navy-soft); border:none; cursor:pointer; font-family:inherit; transition:background .18s,transform .15s; }
+    .td-view-btn:hover { background:#d5dfef; transform:translateY(-1px); }
+    .md-empty { text-align:center; padding:48px 24px; color:var(--ink-300); }
+    .md-empty i { font-size:32px; display:block; margin-bottom:12px; }
+    .md-empty p { font-size:14px; font-weight:600; color:var(--ink-500); }
 
     /* ---- Utility buttons ---- */
-    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition: background .18s, opacity .18s, transform .15s; }
-    .btn-primary { background: linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s,transform .15s; }
+    .btn-primary { background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
     .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
     .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
     .btn-ghost:hover { background:var(--border-soft); }
-    .btn-sm { padding: 7px 13px; font-size: 12.5px; border-radius: 8px; }
+    .btn-sm { padding:6px 13px; font-size:12.5px; border-radius:8px; }
+    .btn-danger { background:linear-gradient(135deg,var(--danger) 0%,#c0392b 100%); color:#fff; }
 
-    /* ============================================================
-       MODAL: chi tiết sản lượng hàng ngày
-       ============================================================ */
-    .md-modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(22, 33, 62, 0.45);
-        backdrop-filter: blur(5px);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .25s ease;
-    }
+    /* ================================================================
+       MODAL: Chi tiết sản lượng (DailyOutput)
+    ================================================================ */
+    .md-modal-backdrop { position:fixed; inset:0; background:rgba(22,33,62,.45); backdrop-filter:blur(5px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s ease; }
+    .md-modal-backdrop.open { opacity:1; pointer-events:all; }
+    .md-modal { background:#fff; border-radius:20px; width:100%; max-width:700px; max-height:88vh; display:flex; flex-direction:column; box-shadow:var(--shadow-lg); transform:translateY(24px) scale(.97); opacity:0; transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease; overflow:hidden; margin:16px; }
+    .md-modal-backdrop.open .md-modal { transform:translateY(0) scale(1); opacity:1; }
+    .md-modal-head { padding:18px 22px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .md-modal-head-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .md-modal-title-group { display:flex; align-items:center; gap:12px; }
+    .md-modal-icon { width:42px; height:42px; border-radius:11px; background:var(--accent-navy-soft); display:flex; align-items:center; justify-content:center; color:var(--accent-navy); font-size:17px; flex-shrink:0; }
+    .md-modal-title { font-size:17px; font-weight:800; color:var(--ink-900); letter-spacing:-.2px; }
+    .md-modal-sub { font-size:12px; color:var(--ink-500); margin-top:2px; font-weight:500; }
+    .md-modal-close { width:32px; height:32px; border-radius:8px; border:none; background:var(--bg-canvas); display:flex; align-items:center; justify-content:center; color:var(--ink-500); font-size:13px; cursor:pointer; transition:background .18s,color .18s; flex-shrink:0; }
+    .md-modal-close:hover { background:var(--border-soft); color:var(--ink-900); }
+    .md-modal-chips { display:flex; gap:8px; flex-wrap:wrap; }
+    .md-modal-chip { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:999px; font-size:12px; font-weight:700; background:var(--bg-canvas); border:1.5px solid var(--border); color:var(--ink-700-solid); }
+    .md-modal-chip.hl { background:var(--accent-navy-soft); border-color:#c0cfe8; color:var(--accent-navy); }
+    .md-modal-date-filter { display:flex; align-items:center; gap:10px; padding:9px 22px 11px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+    .md-modal-date-filter label { font-size:11px; font-weight:700; color:var(--ink-500); text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+    .md-modal-date-filter input[type="date"] { padding:5px 10px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; }
+    .md-modal-date-filter input:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .md-date-sep { font-size:12px; color:var(--ink-300); font-weight:600; }
+    .md-date-count { font-size:12px; font-weight:700; color:var(--ink-500); margin-left:auto; }
+    .md-modal-body { flex:1; overflow-y:auto; min-height:0; padding:16px 22px 20px; display:flex; flex-direction:column; gap:14px; }
+    .md-day-card { background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+    .md-day-card-head { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--bg-surface); border-bottom:1px solid var(--border-soft); }
+    .md-day-date { font-size:13px; font-weight:700; color:var(--ink-900); display:flex; align-items:center; gap:7px; }
+    .md-day-date i { color:var(--ink-300); font-size:12px; }
+    .md-day-total { font-size:13px; font-weight:800; color:var(--accent-navy); background:var(--accent-navy-soft); padding:3px 10px; border-radius:7px; }
+    .md-detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .md-detail-table thead th { padding:7px 14px; text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-300); border-bottom:1px solid var(--border-soft); white-space:nowrap; }
+    .md-detail-table tbody td { padding:9px 14px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+    .md-detail-table tbody tr:last-child td { border-bottom:none; }
+    .md-detail-table tbody tr:hover { background:var(--accent-navy-soft); }
+    .md-output-num { font-size:15px; font-weight:800; color:var(--accent-navy); }
 
-    .md-modal-backdrop.open {
-        opacity: 1;
-        pointer-events: all;
-    }
+    /* ================================================================
+       MODAL: Thêm mã sản xuất (2 tab: Chọn có sẵn / Tạo mới)
+    ================================================================ */
+    .add-modal-wide { max-width:560px !important; }
+    .add-modal-tabs { display:flex; border-bottom:2px solid var(--border); background:var(--bg-canvas); padding:0 20px; gap:4px; flex-shrink:0; }
+    .add-tab-btn { display:flex; align-items:center; gap:7px; padding:11px 16px; font-size:13px; font-weight:600; color:var(--ink-400); background:transparent; border:none; border-bottom:2.5px solid transparent; cursor:pointer; transition:color .18s,border-color .18s; margin-bottom:-2px; }
+    .add-tab-btn:hover { color:var(--ink-700-solid); }
+    .add-tab-btn.active { color:var(--accent-navy); border-bottom-color:var(--accent-navy); }
+    .add-tab-pane { display:none; padding:16px 20px; overflow-y:auto; max-height:420px; flex-direction:column; gap:12px; }
+    .add-tab-pane.active { display:flex; }
 
-    .md-modal {
-        background: #fff;
-        border-radius: 20px;
-        width: 100%;
-        max-width: 700px;
-        max-height: 88vh;
-        display: flex;
-        flex-direction: column;
-        box-shadow: var(--shadow-lg);
-        transform: translateY(24px) scale(.97);
-        opacity: 0;
-        transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
-        overflow: hidden;
-        margin: 16px;
-    }
+    /* Picker list for existing infos */
+    .add-picker-search-wrap { display:flex; align-items:center; gap:10px; background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:9px; padding:8px 12px; }
+    .add-picker-search-wrap i { color:var(--ink-300); font-size:13px; }
+    .add-picker-search { flex:1; border:none; background:transparent; font-size:13.5px; color:var(--ink-900); outline:none; }
+    .add-picker-list { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; border:1.5px solid var(--border); border-radius:10px; padding:8px; background:var(--bg-canvas); }
+    .add-picker-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; border:1.5px solid transparent; transition:background .15s; }
+    .add-picker-item:hover { background:var(--bg-surface); border-color:var(--border); }
+    .add-picker-item.selected { background:rgba(31,58,103,.07); border-color:var(--accent-navy); }
+    .add-picker-item-icon { width:30px; height:30px; border-radius:7px; background:var(--accent-navy-soft); color:var(--accent-navy); display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+    .add-picker-item-info { flex:1; min-width:0; }
+    .add-picker-item-sp { font-size:12px; font-weight:700; color:var(--accent-navy); font-family:'Courier New',monospace; }
+    .add-picker-item-style { font-size:12.5px; font-weight:700; color:var(--ink-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .add-picker-item-meta { font-size:11px; color:var(--ink-400); }
+    .add-picker-item-check { color:var(--accent-navy); font-size:14px; }
+    .add-picker-empty { display:flex; align-items:center; gap:8px; justify-content:center; padding:20px; color:var(--ink-300); font-size:13px; }
+    .add-picker-selected { display:flex; align-items:center; gap:8px; padding:9px 14px; background:rgba(31,58,103,.07); border:1.5px solid var(--accent-navy); border-radius:9px; font-size:13px; font-weight:600; color:var(--ink-900); }
+    .add-picker-selected > span { flex:1; font-family:'Courier New',monospace; }
+    .picker-clear-btn { background:transparent; border:none; cursor:pointer; color:var(--ink-400); font-size:14px; padding:2px 4px; border-radius:4px; transition:color .15s; }
+    .picker-clear-btn:hover { color:var(--danger); }
 
-    .md-modal-backdrop.open .md-modal {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
-
-    /* Modal head */
-    .md-modal-head {
-        padding: 20px 24px 16px;
-        border-bottom: 1px solid var(--border);
-        flex-shrink: 0;
-    }
-
-    .md-modal-head-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 14px;
-    }
-
-    .md-modal-title-group { display: flex; align-items: center; gap: 13px; }
-
-    .md-modal-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: var(--accent-navy-soft);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent-navy);
-        font-size: 18px;
-        flex-shrink: 0;
-    }
-
-    .md-modal-title {
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--ink-900);
-        letter-spacing: -.2px;
-    }
-
-    .md-modal-sub {
-        font-size: 12.5px;
-        color: var(--ink-500);
-        margin-top: 3px;
-        font-weight: 500;
-    }
-
-    .md-modal-close {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        border: none;
-        background: var(--bg-canvas);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--ink-500);
-        font-size: 14px;
-        cursor: pointer;
-        transition: background .18s, color .18s;
-        flex-shrink: 0;
-    }
-
-    .md-modal-close:hover { background: var(--border-soft); color: var(--ink-900); }
-
-    /* Modal info chips */
-    .md-modal-chips {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .md-modal-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px 12px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-        background: var(--bg-canvas);
-        border: 1.5px solid var(--border);
-        color: var(--ink-700-solid);
-    }
-
-    .md-modal-chip.hl { background: var(--accent-navy-soft); border-color: #c0cfe8; color: var(--accent-navy); }
-    .md-modal-chip i { font-size: 10px; }
-
-    /* Modal body */
-    .md-modal-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 18px 24px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-    }
-
-    /* DailyOutput card */
-    .md-day-card {
-        background: var(--bg-canvas);
-        border: 1.5px solid var(--border);
-        border-radius: 12px;
-        overflow: hidden;
-    }
-
-    .md-day-card-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 11px 16px;
-        background: var(--bg-surface);
-        border-bottom: 1px solid var(--border-soft);
-    }
-
-    .md-day-date {
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--ink-900);
-        display: flex;
-        align-items: center;
-        gap: 7px;
-    }
-
-    .md-day-date i { color: var(--ink-300); font-size: 12px; }
-
-    .md-day-total {
-        font-size: 13px;
-        font-weight: 800;
-        color: var(--accent-navy);
-        background: var(--accent-navy-soft);
-        padding: 3px 10px;
-        border-radius: 7px;
-    }
-
-    /* Detail table inside card */
-    .md-detail-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        table-layout: fixed;
-    }
-
-    .md-detail-table colgroup col:nth-child(1) { width: 40%; }
-    .md-detail-table colgroup col:nth-child(2) { width: 22%; }
-    .md-detail-table colgroup col:nth-child(3) { width: 38%; }
-
-    .md-detail-table thead th {
-        padding: 8px 14px;
-        text-align: left;
-        font-size: 10.5px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        color: var(--ink-300);
-        border-bottom: 1px solid var(--border-soft);
-        white-space: nowrap;
-    }
-
-    .md-detail-table thead th:last-child { text-align: left; }
-
-    .md-detail-table tbody td {
-        padding: 10px 14px;
-        border-bottom: 1px solid var(--border-soft);
-        vertical-align: middle;
-    }
-
-    .md-detail-table tbody tr:last-child td { border-bottom: none; }
-    .md-detail-table tbody tr:hover { background: var(--accent-navy-soft); }
-
-    .md-detail-table tbody td:first-child { font-weight: 600; color: var(--ink-900); }
-    .md-detail-table tbody td:nth-child(2) { color: var(--ink-500); font-size: 12px; }
-
-    /* SL cell */
-    .md-sl-cell { display: flex; flex-direction: column; gap: 4px; }
-    .md-sl-num {
-        font-size: 15px;
-        font-weight: 800;
-        color: var(--accent-navy);
-        line-height: 1;
-    }
-    .md-sl-bar-bg {
-        height: 4px;
-        background: var(--border);
-        border-radius: 999px;
-        overflow: hidden;
-    }
-    .md-sl-bar-fill {
-        height: 100%;
-        border-radius: 999px;
-        background: var(--accent-navy);
-        transition: width .4s ease;
-    }
-    .md-output-num {
-        font-size: 15px;
-        font-weight: 800;
-        color: var(--accent-navy);
-    }
-
-    /* Modal date filter strip */
-    .md-modal-date-filter {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 24px 12px;
-        background: var(--bg-canvas);
-        border-bottom: 1px solid var(--border);
-        flex-shrink: 0;
-        flex-wrap: wrap;
-    }
-    .md-modal-date-filter label {
-        font-size: 11.5px;
-        font-weight: 700;
-        color: var(--ink-500);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        white-space: nowrap;
-    }
-    .md-modal-date-filter input[type="date"] {
-        padding: 6px 11px;
-        border: 1.5px solid var(--border);
-        border-radius: 8px;
-        font-family: inherit;
-        font-size: 13px;
-        color: var(--ink-900);
-        background: var(--bg-surface);
-        outline: none;
-        transition: border-color .2s, box-shadow .2s;
-    }
-    .md-modal-date-filter input[type="date"]:focus {
-        border-color: var(--accent-navy);
-        box-shadow: 0 0 0 3px var(--accent-navy-soft);
-    }
-    .md-modal-date-filter .md-date-sep {
-        font-size: 12px;
-        color: var(--ink-300);
-        font-weight: 600;
-    }
-    .md-date-count {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--ink-500);
-        margin-left: auto;
-    }
-
-    /* No output state */
-    .md-no-output {
-        padding: 28px;
-        text-align: center;
-        color: var(--ink-300);
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    /* Modal footer */
-    .md-modal-foot {
-        padding: 14px 24px 20px;
-        border-top: 1px solid var(--border);
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        flex-shrink: 0;
-    }
-
-    /* ---- Add Production Info Modal ---- */
-    .md-add-modal-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-    }
-
-    .md-add-field { display: flex; flex-direction: column; gap: 6px; }
-
-    .md-add-label {
-        font-size: 12.5px;
-        font-weight: 700;
-        color: var(--ink-700-solid);
-    }
-
-    .md-add-label .req { color: var(--danger); margin-left: 2px; }
-
-    .md-add-input,
-    .md-add-select,
-    .md-add-textarea {
-        width: 100%;
-        padding: 10px 13px;
-        border: 1.5px solid var(--border);
-        border-radius: 10px;
-        font-family: inherit;
-        font-size: 13.5px;
-        color: var(--ink-900);
-        background: var(--bg-canvas);
-        outline: none;
-        transition: border-color .2s, box-shadow .2s, background .2s;
-        appearance: none;
-    }
-
-    .md-add-input:focus,
-    .md-add-select:focus,
-    .md-add-textarea:focus {
-        border-color: var(--accent-navy);
-        box-shadow: 0 0 0 3px var(--accent-navy-soft);
-        background: #fff;
-    }
-
-    .md-add-textarea { min-height: 68px; resize: vertical; line-height: 1.5; }
-
-    .md-add-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
-    /* ---- Animations ---- */
-    @@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-
-    @@media (max-width: 768px) {
-        .md-topbar, .md-filter, .md-body { padding-left: 16px; padding-right: 16px; }
-        .md-summary-row { grid-template-columns: 1fr 1fr; }
-        .md-modal { max-width: 100%; margin: 8px; border-radius: 14px; }
-        .md-add-row { grid-template-columns: 1fr; }
-    }
+    /* Form fields */
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .form-group { display:flex; flex-direction:column; gap:5px; }
+    .form-group.full { grid-column:1/-1; }
+    .form-label { font-size:11.5px; font-weight:700; color:var(--ink-500); text-transform:uppercase; letter-spacing:.5px; }
+    .form-input { padding:9px 12px; border:1.5px solid var(--border); border-radius:9px; font-family:inherit; font-size:13.5px; color:var(--ink-900); background:var(--bg-canvas); outline:none; width:100%; box-sizing:border-box; transition:border-color .2s,box-shadow .2s; }
+    .form-input:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .md-modal-footer { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:14px 22px 16px; border-top:1px solid var(--border); flex-shrink:0; background:var(--bg-canvas); }
+    .md-modal-wide .md-modal-body { padding:0; }
 </style>
 
-<!-- =====================================================
-     PAGE
-     ===================================================== -->
 <div class="md-page">
 
     <!-- TOP BAR -->
     <div class="md-topbar">
-        <button class="md-back-btn" onclick="history.back()">
-            <i class="fa-solid fa-arrow-left"></i> Quay lại
-        </button>
-
         <div class="md-machine-info">
-            <div class="md-machine-badge"><i class="fa-solid fa-gears"></i></div>
+            <button class="md-back-btn" onclick="history.back()">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại
+            </button>
+            <div class="md-machine-badge"><i class="fa-solid fa-gear"></i></div>
             <div>
                 <div class="md-machine-title" id="mdMachineName">@machineName</div>
                 <div class="md-machine-meta">
                     @if (!string.IsNullOrEmpty(machineCode))
                     {
-                        <span class="md-meta-chip"><i class="fa-solid fa-barcode"></i>@machineCode</span>
+                        <span class="md-meta-chip"><i class="fa-solid fa-hashtag"></i>@machineCode</span>
                     }
                     @if (!string.IsNullOrEmpty(dept))
                     {
                         <span class="md-meta-chip"><i class="fa-solid fa-building"></i>@dept</span>
                     }
-                    <span class="md-meta-chip" id="mdTotalRecords" style="display:none;">
-                        <i class="fa-solid fa-list"></i><span id="mdRecordCount">0</span> mã sản xuất
-                    </span>
                 </div>
             </div>
         </div>
-
         <div class="md-topbar-actions">
             <button class="btn btn-ghost btn-sm" id="mdRefreshBtn">
                 <i class="fa-solid fa-rotate-right"></i> Làm mới
@@ -930,31 +205,24 @@
             <label class="md-filter-label">Tìm kiếm</label>
             <div class="md-search-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="mdSearch" placeholder="SP#, Style, Line, Color...">
+                <input type="text" id="mdSearch" placeholder="Mã SP, tên style, từ khóa..." style="min-width:220px;">
             </div>
         </div>
-
         <div class="md-filter-group">
             <label class="md-filter-label">Trạng thái</label>
             <select id="mdStatusFilter">
                 <option value="">Tất cả</option>
                 <option value="1">Đang sản xuất</option>
                 <option value="2">Hoàn thành</option>
-                <option value="0">Ngừng</option>
+                <option value="3">Tạm dừng</option>
             </select>
         </div>
-
-        <div class="md-filter-group">
-            <label class="md-filter-label">Tổ / Line</label>
-            <select id="mdLineFilter">
-                <option value="">Tất cả</option>
-            </select>
-        </div>
-
-        <div style="display:flex;gap:8px;align-self:flex-end;">
+        <div class="md-filter-group" style="align-self:flex-end;">
             <button class="btn btn-primary btn-sm" id="mdFilterApply">
                 <i class="fa-solid fa-magnifying-glass"></i> Lọc
             </button>
+        </div>
+        <div class="md-filter-group" style="align-self:flex-end;">
             <button class="btn btn-ghost btn-sm" id="mdFilterReset">
                 <i class="fa-solid fa-arrow-rotate-left"></i> Đặt lại
             </button>
@@ -962,197 +230,205 @@
     </div>
 
     <!-- BODY -->
-    <div class="md-body" id="mdBody">
+    <div class="md-body">
 
-        <!-- Summary cards (populated by JS) -->
+        <!-- Summary cards -->
         <div class="md-summary-row" id="mdSummaryRow">
             <div class="md-sum-card accent-navy">
-                <div class="md-sum-label">Tổng mã sx</div>
-                <div class="md-sum-value" id="sTotal">0</div>
-                <div class="md-sum-sub">ProductionInfo records</div>
+                <div class="md-sum-label">Tổng mã SP</div>
+                <div class="md-sum-value" id="sumTotal">—</div>
+                <div class="md-sum-sub">mã đang gắn máy</div>
             </div>
             <div class="md-sum-card accent-green">
-                <div class="md-sum-label">Tổng SL đạt</div>
-                <div class="md-sum-value" id="sFinish">0</div>
-                <div class="md-sum-sub">FinishQty tổng cộng</div>
+                <div class="md-sum-label">Tổng sản lượng</div>
+                <div class="md-sum-value" id="sumOutput">—</div>
+                <div class="md-sum-sub">sản phẩm đã ra</div>
             </div>
             <div class="md-sum-card accent-gold">
-                <div class="md-sum-label">Target tổng</div>
-                <div class="md-sum-value" id="sTarget">0</div>
-                <div class="md-sum-sub">Target tổng cộng</div>
+                <div class="md-sum-label">Tổng kế hoạch</div>
+                <div class="md-sum-value" id="sumTarget">—</div>
+                <div class="md-sum-sub">sản phẩm mục tiêu</div>
             </div>
             <div class="md-sum-card accent-red">
-                <div class="md-sum-label">Tỷ lệ hoàn thành</div>
-                <div class="md-sum-value" id="sRate">0%</div>
-                <div class="md-sum-sub">FinishQty / TotalQty</div>
+                <div class="md-sum-label">Đang sản xuất</div>
+                <div class="md-sum-value" id="sumActive">—</div>
+                <div class="md-sum-sub">mã đang chạy</div>
             </div>
         </div>
 
-        <!-- Table section -->
-        <div>
-            <div class="md-section-head">
-                <div class="md-section-title">Danh sách mã sản xuất</div>
-                <div style="font-size:12px;color:var(--ink-300);font-weight:600;" id="mdCountLabel"></div>
-            </div>
-
-            <div class="md-table-wrap">
-                <table class="md-table" id="mdTable">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Style / SP#</th>
-                            <th>Tổ · Line</th>
-                            <th>Màu</th>
-                            <th>Tiến độ</th>
-                            <th>Inline Line</th>
-                            <th>Trạng thái</th>
-                            <th>Chi tiết</th>
-                        </tr>
-                    </thead>
-                    <tbody id="mdTableBody">
-                        <!-- rendered by JS -->
-                    </tbody>
-                </table>
-            </div>
+        <!-- Production info table -->
+        <div class="md-section-head">
+            <div class="md-section-title">Danh sách mã sản xuất</div>
+            <span id="mdRecordCount" style="font-size:12px;color:var(--ink-400);font-weight:600;"></span>
+        </div>
+        <div class="md-table-wrap">
+            <table class="md-table">
+                <thead>
+                    <tr>
+                        <th>Tổ</th>
+                        <th>Style</th>
+                        <th>Mã SP</th>
+                        <th>Màu</th>
+                        <th>Output / Qty</th>
+                        <th>Hôm nay / Target</th>
+                        <th>Trạng thái</th>
+                        <th style="text-align:center;">Chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody id="mdTableBody">
+                    <tr><td colspan="8" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải dữ liệu...</p></td></tr>
+                </tbody>
+            </table>
         </div>
 
-    </div><!-- /md-body -->
-</div><!-- /md-page -->
+    </div><!-- end body -->
 
+</div><!-- end page -->
 
-<!-- =====================================================
-     MODAL: Chi tiết sản lượng (DailyOutput + DailyOutputDetail)
-     ===================================================== -->
-<div class="md-modal-backdrop" id="mdDetailBackdrop">
-    <div class="md-modal" role="dialog" aria-modal="true" style="max-width:760px;">
-
+<!-- ================================================================
+     MODAL: Chi tiết sản lượng hàng ngày (DailyOutput)
+================================================================ -->
+<div class="md-modal-backdrop" id="detailBackdrop">
+    <div class="md-modal">
         <div class="md-modal-head">
             <div class="md-modal-head-top">
                 <div class="md-modal-title-group">
-                    <div class="md-modal-icon"><i class="fa-solid fa-chart-bar"></i></div>
+                    <div class="md-modal-icon"><i class="fa-solid fa-chart-gantt"></i></div>
                     <div>
-                        <div class="md-modal-title" id="mdModalTitle">Chi tiết sản lượng</div>
-                        <div class="md-modal-sub" id="mdModalSub">—</div>
+                        <div class="md-modal-title" id="detailModalTitle">Sản lượng chi tiết</div>
+                        <div class="md-modal-sub" id="detailModalSub"></div>
                     </div>
                 </div>
-                <button class="md-modal-close" id="mdDetailClose">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <button class="md-modal-close" id="detailModalClose"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="md-modal-chips" id="mdModalChips"></div>
+            <div class="md-modal-chips" id="detailModalChips"></div>
         </div>
 
-        <!-- DATE FILTER STRIP -->
+        <!-- Date filter -->
         <div class="md-modal-date-filter">
-            <label><i class="fa-regular fa-calendar" style="margin-right:5px;"></i>Lọc theo ngày:</label>
-            <input type="date" id="mdDateFrom" title="Từ ngày">
+            <label>Từ ngày:</label>
+            <input type="date" id="detailFromDate">
             <span class="md-date-sep">→</span>
-            <input type="date" id="mdDateTo" title="Đến ngày">
-            <button class="btn btn-primary btn-sm" id="mdDateApply" style="padding:6px 12px;font-size:12px;">
+            <label>Đến:</label>
+            <input type="date" id="detailToDate">
+            <button class="btn btn-primary btn-sm" id="detailDateApply">
                 <i class="fa-solid fa-filter"></i> Lọc
             </button>
-            <button class="btn btn-ghost btn-sm" id="mdDateReset" style="padding:6px 12px;font-size:12px;">
-                <i class="fa-solid fa-xmark"></i> Xóa
-            </button>
-            <span class="md-date-count" id="mdDateCount"></span>
+            <span class="md-date-count" id="detailDateCount"></span>
         </div>
 
-        <div class="md-modal-body" id="mdModalBody">
-            <!-- DailyOutput cards rendered here -->
+        <div class="md-summary-row" style="padding: 16px 22px 0; grid-template-columns: 1fr 1fr; flex-shrink: 0;" id="detailCards">
+            <div class="md-sum-card accent-navy">
+                <div class="md-sum-label">Tổng sản lượng</div>
+                <div class="md-sum-value" id="detailTotalOutput">—</div>
+                <div class="md-sum-sub" id="detailTotalSub"></div>
+            </div>
+            <div class="md-sum-card accent-gold">
+                <div class="md-sum-label">Đạt kế hoạch (Hôm nay / Chọn)</div>
+                <div class="md-sum-value" id="detailTargetPercent">—</div>
+                <div class="md-sum-sub" id="detailTargetSub"></div>
+            </div>
         </div>
 
-        <div class="md-modal-foot">
-            <button class="btn btn-ghost btn-sm" id="mdDetailCloseBtn">Đóng</button>
-            <button class="btn btn-primary btn-sm">
-                <i class="fa-solid fa-file-export"></i> Xuất
-            </button>
+        <div class="md-modal-body" id="detailModalBody">
+            <!-- DailyOutput cards rendered by JS -->
         </div>
     </div>
 </div>
 
-<!-- =====================================================
-     MODAL: Thêm mã sản xuất (ProductionInfo)
-     ===================================================== -->
-<div class="md-modal-backdrop" id="mdAddBackdrop">
-    <div class="md-modal" role="dialog" aria-modal="true">
-
+<!-- ================================================================
+     MODAL: Thêm mã sản xuất (2 tab: Chọn có sẵn / Tạo mới)
+================================================================ -->
+<div class="md-modal-backdrop" id="addBackdrop">
+    <div class="md-modal add-modal-wide">
         <div class="md-modal-head">
             <div class="md-modal-head-top">
                 <div class="md-modal-title-group">
-                    <div class="md-modal-icon" style="background:#E6F4EF;color:var(--success);">
+                    <div class="md-modal-icon" style="background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%);color:#fff;">
                         <i class="fa-solid fa-plus"></i>
                     </div>
                     <div>
                         <div class="md-modal-title">Thêm mã sản xuất</div>
-                        <div class="md-modal-sub">Tạo ProductionInfo mới cho máy này</div>
+                        <div class="md-modal-sub">Chọn mã có sẵn hoặc tạo mã mới</div>
                     </div>
                 </div>
-                <button class="md-modal-close" id="mdAddClose">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <button class="md-modal-close" id="addModalClose"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
 
-        <div class="md-add-modal-body">
-            <!-- Row 1: Style / SP -->
-            <div class="md-add-row">
-                <div class="md-add-field">
-                    <label class="md-add-label">Style <span class="req">*</span></label>
-                    <input type="text" id="fStyle" class="md-add-input" placeholder="VD: Áo thun basic cổ tròn">
-                </div>
-                <div class="md-add-field">
-                    <label class="md-add-label">SP# <span class="req">*</span></label>
-                    <input type="text" id="fSpmain" class="md-add-input" placeholder="VD: SP-2026-0113">
-                </div>
+        <!-- 2 tabs -->
+        <div class="add-modal-tabs">
+            <button class="add-tab-btn active" id="addTabBtnPick">
+                <i class="fa-solid fa-list-check"></i> Chọn có sẵn
+            </button>
+            <button class="add-tab-btn" id="addTabBtnNew">
+                <i class="fa-solid fa-plus-circle"></i> Tạo mã mới
+            </button>
+        </div>
+
+        <!-- Tab Pick -->
+        <div class="add-tab-pane active" id="addTabPanePick">
+            <div class="add-picker-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="add-picker-search" id="addPickerSearch" placeholder="Tìm mã SP, tên style...">
             </div>
-            <!-- Row 2: Line / Color -->
-            <div class="md-add-row">
-                <div class="md-add-field">
-                    <label class="md-add-label">Tổ / Line</label>
-                    <input type="text" id="fLine" class="md-add-input" placeholder="VD: Tổ 1">
-                </div>
-                <div class="md-add-field">
-                    <label class="md-add-label">Màu sắc</label>
-                    <input type="text" id="fColor" class="md-add-input" placeholder="VD: Trắng">
-                </div>
+            <div class="add-picker-list" id="addPickerList">
+                <div class="add-picker-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>
             </div>
-            <!-- Row 3: TotalQty / Target -->
-            <div class="md-add-row">
-                <div class="md-add-field">
-                    <label class="md-add-label">Tổng số lượng (TotalQty)</label>
-                    <input type="number" id="fTotalQty" class="md-add-input" placeholder="0" min="0">
-                </div>
-                <div class="md-add-field">
-                    <label class="md-add-label">Mục tiêu (Target)</label>
-                    <input type="number" id="fTarget" class="md-add-input" placeholder="0" min="0">
-                </div>
-            </div>
-            <!-- Row 4: InlineLine / InlineDepartment -->
-            <div class="md-add-row">
-                <div class="md-add-field">
-                    <label class="md-add-label">Ngày Inline Line</label>
-                    <input type="date" id="fInlineLine" class="md-add-input">
-                </div>
-                <div class="md-add-field">
-                    <label class="md-add-label">Ngày Inline Bộ phận</label>
-                    <input type="date" id="fInlineDept" class="md-add-input">
-                </div>
-            </div>
-            <!-- Keyword / Remark -->
-            <div class="md-add-field">
-                <label class="md-add-label">Từ khóa (Keyword)</label>
-                <input type="text" id="fKeyword" class="md-add-input" placeholder="Từ khóa tìm kiếm nhanh">
-            </div>
-            <div class="md-add-field">
-                <label class="md-add-label">Ghi chú (Remark)</label>
-                <textarea id="fRemark" class="md-add-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
+            <!-- Selected preview -->
+            <div class="add-picker-selected" id="addPickerSelected" style="display:none;">
+                <i class="fa-solid fa-circle-check" style="color:var(--accent-navy);"></i>
+                <span id="addPickerSelectedSp">—</span>
+                <button class="picker-clear-btn" id="addPickerClearBtn"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
 
-        <div class="md-modal-foot">
-            <button class="btn btn-ghost btn-sm" id="mdAddCancelBtn">Hủy</button>
-            <button class="btn btn-primary btn-sm" id="mdAddSaveBtn">
-                <i class="fa-solid fa-floppy-disk"></i> Lưu mã sản xuất
+        <!-- Tab New -->
+        <div class="add-tab-pane" id="addTabPaneNew">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Mã SP <span style="color:var(--danger)">*</span></label>
+                    <input type="text" class="form-input" id="fSpmain" placeholder="SP-2026-xxxx">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tên Style <span style="color:var(--danger)">*</span></label>
+                    <input type="text" class="form-input" id="fStyle" placeholder="Tên sản phẩm">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tổ / Line</label>
+                    <input type="text" class="form-input" id="fLine" placeholder="Tổ 1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Màu sắc</label>
+                    <input type="text" class="form-input" id="fColor" placeholder="Trắng, Xanh...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Kế hoạch (chiếc)</label>
+                    <input type="number" class="form-input" id="fTarget" placeholder="1500" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tổng SL</label>
+                    <input type="number" class="form-input" id="fTotalQty" placeholder="1500" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Inline Line</label>
+                    <input type="date" class="form-input" id="fInlineLine">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Inline Dept</label>
+                    <input type="date" class="form-input" id="fInlineDept">
+                </div>
+                <div class="form-group full">
+                    <label class="form-label">Ghi chú</label>
+                    <input type="text" class="form-input" id="fRemark" placeholder="Ghi chú...">
+                </div>
+            </div>
+        </div>
+
+        <div class="md-modal-footer">
+            <button class="btn btn-ghost btn-sm" id="addModalCancel">Hủy</button>
+            <button class="btn btn-primary btn-sm" id="addModalSave">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu
             </button>
         </div>
     </div>
@@ -1161,463 +437,476 @@
 <script>
 (function () {
     /* =====================================================
+       CONFIG từ Razor
+       ===================================================== */
+    var MACHINE_ID = '@machineId';
+    var DEPT_ID    = '@deptId';
+    var DEPT_NAME  = '@Html.Raw(dept.Replace("'", "\\'"))';
+
+    /* =====================================================
+       STATE
+       ===================================================== */
+    var allInfos       = [];
+    var currentSearch  = '';
+    var currentStatus  = '';
+    var addActiveTab   = 'pick';
+    var addPickerItems = [];
+    var pickedInfo     = null;
+
+    // Modal detail state
+    var currentDetailInfo = null;
+
+    /* =====================================================
        HELPERS
        ===================================================== */
-    function fmt(n) { return Number(n || 0).toLocaleString('vi-VN'); }
-    function fmtDate(d) { if (!d) return '—'; var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-    function pct(a, b) { return b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0; }
-    function pctColor(p) { return p >= 100 ? 'var(--accent-navy)' : p >= 70 ? 'var(--success)' : p >= 40 ? 'var(--accent-gold)' : 'var(--danger)'; }
-    function statusInfo(s) {
-        return s === 1 ? { cls:'active',   lbl:'Đang SX'     }
-             : s === 2 ? { cls:'done',     lbl:'Hoàn thành'  }
-             : { cls:'inactive', lbl:'Ngừng' };
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('vi-VN'); }
+
+    function fmtDate(d) {
+        if (!d) return '—';
+        var dt = new Date(d);
+        if (isNaN(dt)) return d;
+        return dt.getDate().toString().padStart(2,'0') + '/' + (dt.getMonth()+1).toString().padStart(2,'0') + '/' + dt.getFullYear();
+    }
+
+    function toast(msg, ok) {
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:700;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.18);background:' + (ok ? 'var(--success)' : 'var(--danger)') + ';';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function () { t.remove(); }, 3000);
+    }
+
+    function statusBadge(s) {
+        if (s === 1) return '<span class="td-badge active">Đang SX</span>';
+        if (s === 2) return '<span class="td-badge done">Hoàn thành</span>';
+        return '<span class="td-badge inactive">Tạm dừng</span>';
+    }
+
+    function progressColor(pct) {
+        if (pct >= 80) return 'var(--success)';
+        if (pct >= 50) return 'var(--accent-gold)';
+        return 'var(--danger)';
     }
 
     /* =====================================================
-       LOAD DATA
-       TODO: Thay loadData() bằng:
-         fetch('/ProductionDepartment/GetProductionInfos?machineId=' + MACHINE_ID)
-           .then(r => r.json())
-           .then(data => { allData = data; applyFilters(); });
+       LOAD: Danh sách mã sản xuất theo máy
        ===================================================== */
-    var allData = [];
-    try {
-        var el = document.getElementById('mockProductionInfos');
-        allData = el ? JSON.parse(el.textContent) : [];
-    } catch(e) {}
-
-    /* =====================================================
-       POPULATE LINE FILTER
-       ===================================================== */
-    var lineFilter = document.getElementById('mdLineFilter');
-    var lines = [...new Set(allData.map(function(d){ return d.line; }).filter(Boolean))];
-    lines.forEach(function(l) {
-        var o = document.createElement('option');
-        o.value = l;
-        o.textContent = l;
-        lineFilter.appendChild(o);
-    });
-
-    /* =====================================================
-       SUMMARY CARDS
-       ===================================================== */
-    function renderSummary(data) {
-        var totalFinish = data.reduce(function(a,d){ return a + (d.finishQty||0); }, 0);
-        var totalTarget = data.reduce(function(a,d){ return a + (d.totalQty||0);  }, 0);
-        var rate = pct(totalFinish, totalTarget);
-        document.getElementById('sTotal').textContent  = data.length;
-        document.getElementById('sFinish').textContent = fmt(totalFinish);
-        document.getElementById('sTarget').textContent = fmt(totalTarget);
-        document.getElementById('sRate').textContent   = rate + '%';
-        document.getElementById('mdRecordCount').textContent = data.length;
-        document.getElementById('mdTotalRecords').style.display = '';
-    }
-
-    /* =====================================================
-       RENDER TABLE
-       ===================================================== */
-    function renderTable(data) {
-        var tbody = document.getElementById('mdTableBody');
-        tbody.innerHTML = '';
-
-        document.getElementById('mdCountLabel').textContent =
-            data.length + ' / ' + allData.length + ' bản ghi';
-
-        if (data.length === 0) {
-            tbody.innerHTML =
-                '<tr><td colspan="8">' +
-                    '<div class="md-empty"><i class="fa-regular fa-folder-open"></i><p>Không có dữ liệu</p></div>' +
-                '</td></tr>';
+    function loadProductionInfos() {
+        if (!MACHINE_ID) {
+            renderTable([]);
             return;
         }
+        var url = '/ProductionDepartment/GetProductionInfos?machineId=' + encodeURIComponent(MACHINE_ID);
+        if (currentSearch) url += '&keyword=' + encodeURIComponent(currentSearch);
 
-        data.forEach(function(item, idx) {
-            var p = pct(item.finishQty || 0, item.totalQty || 0);
-            var st = statusInfo(item.status);
+        document.getElementById('mdTableBody').innerHTML =
+            '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></td></tr>';
 
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td style="color:var(--ink-300);font-weight:700;font-size:12px;">' + (idx+1) + '</td>' +
-                '<td>' +
-                    '<div class="td-style-name">' + esc(item.style) + '</div>' +
-                    '<div style="margin-top:4px;"><span class="td-sp">' + esc(item.spmain) + '</span></div>' +
-                '</td>' +
-                '<td class="td-meta">' + esc(item.line || '—') + '</td>' +
-                '<td class="td-meta">' + esc(item.color || '—') + '</td>' +
-                '<td>' +
-                    '<div class="td-progress-wrap">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">' +
-                            '<span style="font-size:12px;color:var(--ink-500);">' + fmt(item.finishQty) + ' / ' + fmt(item.totalQty) + '</span>' +
-                            '<span class="td-pct">' + p + '%</span>' +
-                        '</div>' +
-                        '<div class="td-progress-bar-bg">' +
-                            '<div class="td-progress-bar-fill" style="width:' + p + '%;background:' + pctColor(p) + ';"></div>' +
-                        '</div>' +
-                    '</div>' +
-                '</td>' +
-                '<td class="td-meta">' + fmtDate(item.inlineLine) + '</td>' +
-                '<td><span class="td-badge ' + st.cls + '">' + st.lbl + '</span></td>' +
-                '<td>' +
-                    '<button class="td-view-btn" data-idx="' + idx + '">' +
-                        '<i class="fa-solid fa-table-list"></i> Chi tiết' +
-                    '</button>' +
-                '</td>';
-
-            tbody.appendChild(tr);
-        });
-
-        // Attach row click → open detail modal
-        tbody.querySelectorAll('.td-view-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                openDetailModal(data[parseInt(this.dataset.idx)]);
+        fetch(url)
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (list) {
+                allInfos = list;
+                renderAll();
+            })
+            .catch(function (e) {
+                document.getElementById('mdTableBody').innerHTML =
+                    '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ' + esc(e.message) + '</p></td></tr>';
             });
-        });
-
-        tbody.querySelectorAll('tr').forEach(function(tr) {
-            tr.addEventListener('click', function() {
-                var btn = this.querySelector('.td-view-btn');
-                if (btn) btn.click();
-            });
-        });
     }
 
-    function esc(s) {
-        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    /* =====================================================
-       FILTER & SEARCH
-       ===================================================== */
-    var currentSearch = '', currentStatus = '', currentLine = '';
-
-    function applyFilters() {
-        var q = currentSearch.toLowerCase();
-        var filtered = allData.filter(function(d) {
-            if (currentStatus && String(d.status) !== currentStatus) return false;
-            if (currentLine   && d.line !== currentLine)               return false;
-            if (q && !(
-                (d.style  ||'').toLowerCase().includes(q) ||
-                (d.spmain ||'').toLowerCase().includes(q) ||
-                (d.color  ||'').toLowerCase().includes(q) ||
-                (d.keyword||'').toLowerCase().includes(q)
-            )) return false;
+    function renderAll() {
+        var filtered = allInfos.filter(function (p) {
+            if (currentStatus && p.status !== parseInt(currentStatus)) return false;
             return true;
         });
         renderSummary(filtered);
         renderTable(filtered);
     }
 
+    function renderSummary(list) {
+        var totalOutput = list.reduce(function (s, p) { return s + (p.totalOutputNumber || 0); }, 0);
+        var totalTarget = list.reduce(function (s, p) { return s + (p.target || 0); }, 0);
+        var active = list.filter(function (p) { return p.status === 1; }).length;
+        document.getElementById('sumTotal').textContent  = fmt(list.length);
+        document.getElementById('sumOutput').textContent = fmt(totalOutput);
+        document.getElementById('sumTarget').textContent = fmt(totalTarget);
+        document.getElementById('sumActive').textContent = fmt(active);
+        document.getElementById('mdRecordCount').textContent = list.length + ' bản ghi';
+    }
+
+    function renderTable(list) {
+        var tbody = document.getElementById('mdTableBody');
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-inbox"></i><p>Không có mã sản xuất nào</p></td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        list.forEach(function (p) {
+            var qty     = p.totalQty || 0;
+            var output  = p.totalOutputNumber || 0;
+            var pctQty  = qty > 0 ? Math.min(100, Math.round(output / qty * 100)) : 0;
+            var colorQty= progressColor(pctQty);
+
+            var target  = p.target || 0;
+            var today   = p.todayOutput || 0;
+            var pctTarget = target > 0 ? Math.min(100, Math.round(today / target * 100)) : 0;
+            var colorTarget = progressColor(pctTarget);
+
+            var tr = document.createElement('tr');
+            tr.dataset.id = p.id;
+            tr.innerHTML =
+                '<td><div style="font-size:13px;font-weight:600;">' + esc(p.line || '—') + '</div></td>' +
+                '<td><div class="td-style-name">' + esc(p.style || '—') + '</div>' +
+                    (p.remark ? '<div class="td-meta">' + esc(p.remark) + '</div>' : '') + '</td>' +
+                '<td><span class="td-sp">' + esc(p.spmain || '—') + '</span></td>' +
+                '<td>' + esc(p.color || '—') + '</td>' +
+                '<td><div class="td-progress-wrap">' +
+                    '<div style="font-size:14px;font-weight:800;color:var(--accent-navy);">' + fmt(output) + ' / ' + fmt(qty) + '</div>' +
+                    '<div class="td-progress-bar-bg"><div class="td-progress-bar-fill" style="width:' + pctQty + '%;background:' + colorQty + ';"></div></div>' +
+                    '<div class="td-pct">' + pctQty + '%</div>' +
+                '</div></td>' +
+                '<td><div class="td-progress-wrap">' +
+                    '<div style="font-size:14px;font-weight:800;color:var(--accent-navy);">' + fmt(today) + ' / ' + fmt(target) + '</div>' +
+                    '<div class="td-progress-bar-bg"><div class="td-progress-bar-fill" style="width:' + pctTarget + '%;background:' + colorTarget + ';"></div></div>' +
+                    '<div class="td-pct">' + pctTarget + '%</div>' +
+                '</div></td>' +
+                '<td>' + statusBadge(p.status) + '</td>' +
+                '<td style="text-align:center;"><button class="td-view-btn" data-id="' + p.id + '"><i class="fa-solid fa-eye"></i> Xem</button></td>';
+
+            tr.querySelector('.td-view-btn').addEventListener('click', function (e) {
+                e.stopPropagation();
+                openDetailModal(p);
+            });
+            tr.addEventListener('click', function () { openDetailModal(p); });
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* =====================================================
+       MODAL: Chi tiết sản lượng
+       ===================================================== */
+    var detailBackdrop = document.getElementById('detailBackdrop');
+
+    function openDetailModal(info) {
+        currentDetailInfo = info;
+        document.getElementById('detailModalTitle').textContent = info.spmain || '—';
+        document.getElementById('detailModalSub').textContent   = info.style || '';
+        document.getElementById('detailModalChips').innerHTML   =
+            '<span class="md-modal-chip hl"><i class="fa-solid fa-shirt"></i>' + esc(info.spmain || '—') + '</span>' +
+            (info.line  ? '<span class="md-modal-chip"><i class="fa-solid fa-users"></i>' + esc(info.line)  + '</span>' : '') +
+            (info.color ? '<span class="md-modal-chip"><i class="fa-solid fa-palette"></i>' + esc(info.color) + '</span>' : '');
+
+        // Mặc định chọn ngày hiện tại
+        var today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        var todayStr = today.toISOString().split('T')[0];
+        document.getElementById('detailFromDate').value = todayStr;
+        document.getElementById('detailToDate').value   = todayStr;
+        document.getElementById('detailDateCount').textContent = '';
+
+        detailBackdrop.classList.add('open');
+        loadDailyOutputs(info.id);
+    }
+
+    function closeDetailModal() {
+        detailBackdrop.classList.remove('open');
+        currentDetailInfo = null;
+    }
+
+    document.getElementById('detailModalClose').addEventListener('click', closeDetailModal);
+    detailBackdrop.addEventListener('click', function (e) { if (e.target === detailBackdrop) closeDetailModal(); });
+
+    document.getElementById('detailDateApply').addEventListener('click', function () {
+        if (!currentDetailInfo) return;
+        loadDailyOutputs(currentDetailInfo.id);
+    });
+
+    function loadDailyOutputs(productionInfoId) {
+        var body = document.getElementById('detailModalBody');
+        body.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:24px;color:var(--ink-300);"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...</div>';
+
+        var url = '/ProductionDepartment/GetDailyOutputs'
+            + '?productionInfoId=' + encodeURIComponent(productionInfoId)
+            + '&machineId='        + encodeURIComponent(MACHINE_ID);
+
+        var from = document.getElementById('detailFromDate').value;
+        var to   = document.getElementById('detailToDate').value;
+        if (from) url += '&from=' + encodeURIComponent(from);
+        if (to)   url += '&to='   + encodeURIComponent(to);
+
+        fetch(url)
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (list) {
+                document.getElementById('detailDateCount').textContent = list.length + ' ngày';
+                renderDailyOutputs(list);
+            })
+            .catch(function (e) {
+                body.innerHTML = '<div class="md-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>' + esc(e.message) + '</p></div>';
+            });
+    }
+
+    function renderDailyOutputs(list) {
+        var body = document.getElementById('detailModalBody');
+
+        var info = currentDetailInfo || {};
+        var qty = info.totalQty || 0;
+        var target = info.target || 0;
+
+        var totalOutput = 0;
+        list.forEach(function(d) { totalOutput += (d.totalOutputNumber || 0); });
+
+        var pctQty = qty > 0 ? Math.min(100, Math.round(totalOutput / qty * 100)) : 0;
+        document.getElementById('detailTotalOutput').textContent = fmt(totalOutput) + ' / ' + fmt(qty);
+        document.getElementById('detailTotalSub').textContent = pctQty + '% Qty';
+
+        var pctTarget = target > 0 ? Math.min(100, Math.round(totalOutput / target * 100)) : 0;
+        document.getElementById('detailTargetPercent').textContent = pctTarget + '%';
+        document.getElementById('detailTargetSub').textContent = fmt(totalOutput) + ' / ' + fmt(target) + ' mục tiêu';
+
+        if (!list.length) {
+            body.innerHTML = '<div class="md-empty"><i class="fa-solid fa-calendar-xmark"></i><p>Chưa có sản lượng nào trong khoảng thời gian này</p></div>';
+            return;
+        }
+        body.innerHTML = '';
+        list.forEach(function (d) {
+            var card = document.createElement('div');
+            card.className = 'md-day-card';
+
+            var detailMap = {};
+            (d.details || []).forEach(function(dt) {
+                var name = dt.detailName || 'Khác';
+                if (!detailMap[name]) detailMap[name] = 0;
+                detailMap[name] += (dt.outputNumber || 0);
+            });
+            var summaryArr = [];
+            for (var k in detailMap) summaryArr.push(k + ': ' + fmt(detailMap[k]));
+            var summaryText = summaryArr.length ? '<div style="padding: 10px 16px; font-size: 12px; color: var(--ink-500); background: var(--bg-canvas); border-bottom: 1px solid var(--border-soft);">Tổng: ' + esc(summaryArr.join(', ')) + '</div>' : '';
+
+            var detailRows = (d.details || []).map(function (dt) {
+                return '<tr>' +
+                    '<td>' + esc(dt.detailName) + '</td>' +
+                    '<td style="color:var(--ink-500);">' + (dt.inputTime || '—') + '</td>' +
+                    '<td><span class="md-output-num">' + fmt(dt.outputNumber) + '</span></td>' +
+                '</tr>';
+            }).join('');
+
+            var isFirst = (list.indexOf(d) === 0);
+            var initDisplay = isFirst ? 'block' : 'none';
+            var initRot = isFirst ? 'rotate(180deg)' : 'rotate(0deg)';
+
+            card.innerHTML =
+                '<div class="md-day-card-head" style="cursor:pointer; user-select:none;">' +
+                    '<div class="md-day-date"><i class="fa-regular fa-calendar"></i>' + fmtDate(d.createDate) + (d.styleCode ? ' &nbsp;·&nbsp; <span style="font-family:Courier New;font-size:11.5px;color:var(--ink-400);">' + esc(d.styleCode) + '</span>' : '') + '</div>' +
+                    '<div class="md-day-total"><i class="fa-solid fa-box"></i> ' + fmt(d.totalOutputNumber) + ' thành phẩm <i class="fa-solid fa-chevron-down" style="font-size:11px; margin-left:6px; transition:transform 0.2s; transform:' + initRot + '"></i></div>' +
+                '</div>' +
+                '<div class="md-day-card-content" style="display:' + initDisplay + ';">' +
+                summaryText +
+                (detailRows ?
+                    '<table class="md-detail-table">' +
+                        '<thead><tr><th>Công đoạn</th><th>Giờ vào</th><th>Lần nhập</th></tr></thead>' +
+                        '<tbody>' + detailRows + '</tbody>' +
+                    '</table>'
+                : '<div style="padding:12px 16px;font-size:12.5px;color:var(--ink-300);">Chưa có chi tiết công đoạn</div>') +
+                '</div>';
+                
+            var head = card.querySelector('.md-day-card-head');
+            var content = card.querySelector('.md-day-card-content');
+            var icon = card.querySelector('.fa-chevron-down');
+            head.addEventListener('click', function() {
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.style.transform = 'rotate(180deg)';
+                } else {
+                    content.style.display = 'none';
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            });
+            body.appendChild(card);
+        });
+    }
+
+    /* =====================================================
+       MODAL: Thêm mã sản xuất
+       ===================================================== */
+    var addBackdrop = document.getElementById('addBackdrop');
+
+    // Tab switching
+    document.getElementById('addTabBtnPick').addEventListener('click', function () { switchAddTab('pick'); });
+    document.getElementById('addTabBtnNew').addEventListener('click',  function () { switchAddTab('new');  });
+
+    function switchAddTab(tab) {
+        addActiveTab = tab;
+        document.getElementById('addTabBtnPick').classList.toggle('active', tab === 'pick');
+        document.getElementById('addTabBtnNew').classList.toggle('active', tab === 'new');
+        document.getElementById('addTabPanePick').classList.toggle('active', tab === 'pick');
+        document.getElementById('addTabPaneNew').classList.toggle('active', tab === 'new');
+    }
+
+    // Open modal
+    document.getElementById('mdAddBtn').addEventListener('click', function () {
+        pickedInfo = null;
+        document.getElementById('addPickerSelected').style.display = 'none';
+        document.getElementById('addPickerSearch').value = '';
+        switchAddTab('pick');
+        resetNewForm();
+        addBackdrop.classList.add('open');
+        loadAddPickerItems('');
+    });
+
+    function closeAddModal() { addBackdrop.classList.remove('open'); }
+    document.getElementById('addModalClose').addEventListener('click', closeAddModal);
+    document.getElementById('addModalCancel').addEventListener('click', closeAddModal);
+    addBackdrop.addEventListener('click', function (e) { if (e.target === addBackdrop) closeAddModal(); });
+
+    // Picker search
+    document.getElementById('addPickerSearch').addEventListener('input', function () {
+        renderAddPickerList(this.value);
+    });
+
+    document.getElementById('addPickerClearBtn').addEventListener('click', function () {
+        pickedInfo = null;
+        document.getElementById('addPickerSelected').style.display = 'none';
+        renderAddPickerList(document.getElementById('addPickerSearch').value);
+    });
+
+    function loadAddPickerItems(keyword) {
+        var list_el = document.getElementById('addPickerList');
+        list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
+        addPickerItems = [];
+
+        if (!DEPT_ID) { renderAddPickerList(''); return; }
+
+        fetch('/ProductionDepartment/GetProductionInfosByDept?deptId=' + encodeURIComponent(DEPT_ID))
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                addPickerItems = list;
+                renderAddPickerList(document.getElementById('addPickerSearch').value);
+            })
+            .catch(function () {
+                list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải danh sách</span></div>';
+            });
+    }
+
+    function renderAddPickerList(keyword) {
+        var kw = (keyword || '').toLowerCase().trim();
+        var filtered = addPickerItems.filter(function (p) {
+            if (!kw) return true;
+            return (p.spmain||'').toLowerCase().includes(kw) ||
+                   (p.style||'').toLowerCase().includes(kw) ||
+                   (p.keyword||'').toLowerCase().includes(kw);
+        });
+
+        var list_el = document.getElementById('addPickerList');
+        list_el.innerHTML = '';
+
+        if (!filtered.length) {
+            list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-inbox"></i><span>' +
+                (addPickerItems.length ? 'Không tìm thấy mã phù hợp' : 'Chưa có mã sản xuất nào trong bộ phận') +
+                '</span></div>';
+            return;
+        }
+
+        filtered.forEach(function (p) {
+            var isSelected = pickedInfo && pickedInfo.id === p.id;
+            var item = document.createElement('div');
+            item.className = 'add-picker-item' + (isSelected ? ' selected' : '');
+            item.innerHTML =
+                '<div class="add-picker-item-icon"><i class="fa-solid fa-shirt"></i></div>' +
+                '<div class="add-picker-item-info">' +
+                    '<div class="add-picker-item-sp">' + esc(p.spmain || '—') + '</div>' +
+                    '<div class="add-picker-item-style">' + esc(p.style || '—') + '</div>' +
+                    (p.line || p.color ? '<div class="add-picker-item-meta">' + esc(p.line||'') + (p.color ? ' · ' + esc(p.color) : '') + '</div>' : '') +
+                '</div>' +
+                (isSelected ? '<i class="fa-solid fa-circle-check add-picker-item-check"></i>' : '');
+
+            item.addEventListener('click', function () {
+                pickedInfo = p;
+                document.getElementById('addPickerSelectedSp').textContent = (p.spmain || '—') + ' — ' + (p.style || '');
+                document.getElementById('addPickerSelected').style.display = 'flex';
+                renderAddPickerList(document.getElementById('addPickerSearch').value);
+            });
+            list_el.appendChild(item);
+        });
+    }
+
+    function resetNewForm() {
+        ['fSpmain','fStyle','fLine','fColor','fRemark'].forEach(function (id) {
+            document.getElementById(id).value = '';
+        });
+        ['fTarget','fTotalQty'].forEach(function (id) { document.getElementById(id).value = ''; });
+        ['fInlineLine','fInlineDept'].forEach(function (id) { document.getElementById(id).value = ''; });
+    }
+
+    // Save (stub — ghi log, trong tương lai gọi API)
+    document.getElementById('addModalSave').addEventListener('click', function () {
+        var payload;
+        if (addActiveTab === 'pick') {
+            if (!pickedInfo) { toast('Vui lòng chọn một mã sản xuất', false); return; }
+            payload = { productionInfoId: pickedInfo.id, machineId: MACHINE_ID };
+        } else {
+            var sp = document.getElementById('fSpmain').value.trim();
+            var st = document.getElementById('fStyle').value.trim();
+            if (!sp || !st) {
+                toast('Vui lòng nhập Mã SP và Tên Style', false);
+                return;
+            }
+            payload = {
+                productionInfoId: null,
+                spmain: sp, style: st,
+                line:   document.getElementById('fLine').value.trim(),
+                color:  document.getElementById('fColor').value.trim(),
+                target:    parseInt(document.getElementById('fTarget').value) || null,
+                totalQty:  parseInt(document.getElementById('fTotalQty').value) || null,
+                inlineLine: document.getElementById('fInlineLine').value || null,
+                inlineDept: document.getElementById('fInlineDept').value || null,
+                remark: document.getElementById('fRemark').value.trim(),
+                machineId: MACHINE_ID, deptId: DEPT_ID
+            };
+        }
+
+        console.log('[MachineDetail] Save payload:', payload);
+        // TODO: fetch('/ProductionDepartment/AssignProductionInfo', { method:'POST', ... })
+        toast('Đã lưu! (chức năng lưu DB sẽ hoàn thiện sau)', true);
+        closeAddModal();
+        loadProductionInfos();
+    });
+
+    /* =====================================================
+       FILTER EVENTS
+       ===================================================== */
     document.getElementById('mdFilterApply').addEventListener('click', function () {
-        currentSearch = document.getElementById('mdSearch').value.trim();
+        currentSearch = document.getElementById('mdSearch').value.trim().toLowerCase();
         currentStatus = document.getElementById('mdStatusFilter').value;
-        currentLine   = document.getElementById('mdLineFilter').value;
-        applyFilters();
+        loadProductionInfos();
     });
 
     document.getElementById('mdFilterReset').addEventListener('click', function () {
         document.getElementById('mdSearch').value = '';
         document.getElementById('mdStatusFilter').value = '';
-        document.getElementById('mdLineFilter').value   = '';
-        currentSearch = currentStatus = currentLine = '';
-        applyFilters();
+        currentSearch = currentStatus = '';
+        loadProductionInfos();
     });
 
-    document.getElementById('mdSearch').addEventListener('input', function () {
-        currentSearch = this.value.trim();
-        applyFilters();
+    document.getElementById('mdSearch').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('mdFilterApply').click();
     });
 
     document.getElementById('mdRefreshBtn').addEventListener('click', function () {
-        /*
-         * TODO: reload từ API:
-         * fetch('/ProductionDepartment/GetProductionInfos?machineId=...')
-         *   .then(r=>r.json()).then(d=>{ allData=d; applyFilters(); });
-         */
-        applyFilters();
-        var btn = this;
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã làm mới';
-        setTimeout(function(){ btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Làm mới'; }, 1500);
+        loadProductionInfos();
     });
 
-    /* =====================================================
-       DETAIL MODAL: DailyOutput + DailyOutputDetail
-       =====================================================
-       TODO: Khi kết nối DB, load data từ:
-         GET /ProductionDepartment/GetDailyOutputDetails?productionInfoId={id}
-         → List<DailyOutputDto> { id, totalOutputNumber, createDate, styleCode,
-             details: [{ detailName, outputNumber, inputTime }] }
-       ===================================================== */
-    var detailBackdrop = document.getElementById('mdDetailBackdrop');
-    var currentDetailItem = null; // keep ref for re-render on date filter
-
-    /* ---- Date filter helpers ---- */
-    function parseISODate(s) { return s ? new Date(s + 'T00:00:00') : null; }
-    function dateInRange(dateStr, from, to) {
-        var d = parseISODate(dateStr);
-        if (!d) return true;
-        if (from && d < from) return false;
-        if (to   && d > to)   return false;
-        return true;
-    }
-
-    function renderDetailBody(item, fromDate, toDate) {
-        var body = document.getElementById('mdModalBody');
-        body.innerHTML = '';
-
-        var allOutputs = item.dailyOutputs || [];
-        var outputs = allOutputs.filter(function(o) {
-            return dateInRange(o.createDate, fromDate, toDate);
-        });
-
-        // Update count label
-        var countEl = document.getElementById('mdDateCount');
-        if (fromDate || toDate) {
-            countEl.textContent = outputs.length + ' / ' + allOutputs.length + ' ngày';
-        } else {
-            countEl.textContent = allOutputs.length + ' ngày ghi nhận';
-        }
-
-        if (allOutputs.length === 0) {
-            body.innerHTML =
-                '<div class="md-no-output">' +
-                    '<i class="fa-regular fa-folder-open" style="font-size:28px;color:var(--ink-300);display:block;margin-bottom:10px;"></i>' +
-                    'Chưa có sản lượng hàng ngày nào được ghi nhận.' +
-                '</div>';
-            return;
-        }
-
-        if (outputs.length === 0 && (fromDate || toDate)) {
-            body.innerHTML =
-                '<div class="md-no-output">' +
-                    '<i class="fa-solid fa-filter-circle-xmark" style="font-size:26px;color:var(--ink-300);display:block;margin-bottom:10px;"></i>' +
-                    'Không có dữ liệu trong khoảng ngày đã chọn.' +
-                '</div>';
-            return;
-        }
-
-        /* ---- Summary cards (tính theo dữ liệu đã lọc) ---- */
-        var grandTotal = outputs.reduce(function(a,o){ return a + (o.totalOutputNumber||0); }, 0);
-        var grandAllTotal = allOutputs.reduce(function(a,o){ return a + (o.totalOutputNumber||0); }, 0);
-
-        // Find max outputNumber across all details for progress bar scale
-        var maxOutput = 0;
-        outputs.forEach(function(o) {
-            (o.details||[]).forEach(function(d) { if ((d.outputNumber||0) > maxOutput) maxOutput = d.outputNumber; });
-        });
-
-        var summaryCard = document.createElement('div');
-        summaryCard.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;';
-        var pctVal = pct(item.finishQty, item.totalQty);
-        summaryCard.innerHTML =
-            '<div style="background:var(--accent-navy-soft);border:1.5px solid #c0cfe8;border-radius:11px;padding:12px 14px;">' +
-                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent-navy);margin-bottom:4px;">SL đã may (lọc)</div>' +
-                '<div style="font-size:22px;font-weight:800;color:var(--accent-navy);">' + fmt(grandTotal) + '</div>' +
-                '<div style="font-size:11px;color:var(--ink-500);margin-top:2px;">' + outputs.length + ' ngày ghi nhận</div>' +
-            '</div>' +
-            '<div style="background:#E6F4EF;border:1.5px solid #B8DDD2;border-radius:11px;padding:12px 14px;">' +
-                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--success);margin-bottom:4px;">Tiến độ tổng</div>' +
-                '<div style="font-size:22px;font-weight:800;color:' + pctColor(pctVal) + ';">' + pctVal + '%</div>' +
-                '<div style="font-size:11px;color:var(--ink-500);margin-top:2px;">' + fmt(item.finishQty) + ' / ' + fmt(item.totalQty) + '</div>' +
-            '</div>' +
-            '<div style="background:var(--bg-canvas);border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;">' +
-                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-300);margin-bottom:4px;">Tổng tất cả ngày</div>' +
-                '<div style="font-size:22px;font-weight:800;color:var(--ink-900);">' + fmt(grandAllTotal) + '</div>' +
-                '<div style="font-size:11px;color:var(--ink-500);margin-top:2px;">' + allOutputs.length + ' ngày ghi nhận</div>' +
-            '</div>';
-        body.appendChild(summaryCard);
-
-        /* ---- DailyOutput cards ---- */
-        outputs.forEach(function(output) {
-            var details = output.details || [];
-            var dayMax = details.reduce(function(a,d){ return Math.max(a, d.outputNumber||0); }, 0);
-
-            var detailRows = details.map(function(det) {
-                var p = dayMax > 0 ? Math.round((det.outputNumber||0) / dayMax * 100) : 0;
-                return '<tr>' +
-                    '<td>' + esc(det.detailName) + '</td>' +
-                    '<td><i class="fa-regular fa-clock" style="margin-right:4px;color:var(--ink-300);"></i>' + esc(det.inputTime) + '</td>' +
-                    '<td>' +
-                        '<div class="md-sl-cell">' +
-                            '<span class="md-sl-num">' + fmt(det.outputNumber) + ' <span style="font-size:11px;font-weight:500;color:var(--ink-500);">sp</span></span>' +
-                            '<div class="md-sl-bar-bg"><div class="md-sl-bar-fill" style="width:' + p + '%;background:' + pctColor(p) + ';"></div></div>' +
-                        '</div>' +
-                    '</td>' +
-                '</tr>';
-            }).join('');
-
-            var card = document.createElement('div');
-            card.className = 'md-day-card';
-            card.innerHTML =
-                '<div class="md-day-card-head">' +
-                    '<span class="md-day-date"><i class="fa-regular fa-calendar"></i>' + fmtDate(output.createDate) + '</span>' +
-                    '<div style="display:flex;align-items:center;gap:8px;">' +
-                        (output.styleCode ? '<span style="font-size:11px;color:var(--ink-500);font-weight:600;background:var(--bg-canvas);padding:2px 8px;border-radius:4px;border:1px solid var(--border);">' + esc(output.styleCode) + '</span>' : '') +
-                        '<span class="md-day-total"><i class="fa-solid fa-sigma" style="font-size:10px;margin-right:4px;"></i>' + fmt(output.totalOutputNumber) + ' sp</span>' +
-                    '</div>' +
-                '</div>' +
-                (details.length > 0
-                    ? '<table class="md-detail-table">' +
-                          '<colgroup><col><col><col></colgroup>' +
-                          '<thead><tr>' +
-                              '<th>Công đoạn</th>' +
-                              '<th>Giờ nhập</th>' +
-                              '<th>SL (OutputNumber)</th>' +
-                          '</tr></thead>' +
-                          '<tbody>' + detailRows + '</tbody>' +
-                      '</table>'
-                    : '<div class="md-no-output" style="padding:16px;">Chưa có chi tiết công đoạn.</div>');
-
-            body.appendChild(card);
-        });
-    }
-
-    function openDetailModal(item) {
-        currentDetailItem = item;
-
-        document.getElementById('mdModalTitle').textContent = item.style || '—';
-        document.getElementById('mdModalSub').textContent   = item.spmain || '—';
-
-        // Chips
-        var chips = document.getElementById('mdModalChips');
-        chips.innerHTML =
-            '<span class="md-modal-chip hl"><i class="fa-solid fa-hashtag"></i>' + esc(item.spmain) + '</span>' +
-            '<span class="md-modal-chip"><i class="fa-solid fa-users"></i>' + esc(item.line||'—') + '</span>' +
-            '<span class="md-modal-chip"><i class="fa-solid fa-palette"></i>' + esc(item.color||'—') + '</span>' +
-            '<span class="md-modal-chip"><i class="fa-solid fa-bullseye"></i>Target: ' + fmt(item.target) + '</span>' +
-            (item.remark ? '<span class="md-modal-chip"><i class="fa-solid fa-note-sticky"></i>' + esc(item.remark) + '</span>' : '');
-
-        // Reset date filter
-        document.getElementById('mdDateFrom').value = '';
-        document.getElementById('mdDateTo').value   = '';
-        document.getElementById('mdDateCount').textContent = '';
-
-        renderDetailBody(item, null, null);
-        detailBackdrop.classList.add('open');
-    }
-
-    // Date filter events
-    document.getElementById('mdDateApply').addEventListener('click', function () {
-        var fromVal = document.getElementById('mdDateFrom').value;
-        var toVal   = document.getElementById('mdDateTo').value;
-        var from = fromVal ? parseISODate(fromVal) : null;
-        var to   = toVal   ? parseISODate(toVal)   : null;
-        if (currentDetailItem) renderDetailBody(currentDetailItem, from, to);
-    });
-
-    document.getElementById('mdDateReset').addEventListener('click', function () {
-        document.getElementById('mdDateFrom').value = '';
-        document.getElementById('mdDateTo').value   = '';
-        document.getElementById('mdDateCount').textContent = '';
-        if (currentDetailItem) renderDetailBody(currentDetailItem, null, null);
-    });
-
-    // Close detail modal
-    function closeDetailModal() { detailBackdrop.classList.remove('open'); currentDetailItem = null; }
-    document.getElementById('mdDetailClose').addEventListener('click', closeDetailModal);
-    document.getElementById('mdDetailCloseBtn').addEventListener('click', closeDetailModal);
-    detailBackdrop.addEventListener('click', function(e){ if(e.target===this) closeDetailModal(); });
-
-    /* =====================================================
-       ADD MODAL: Thêm ProductionInfo
-       ===================================================== */
-    var addBackdrop = document.getElementById('mdAddBackdrop');
-
-    document.getElementById('mdAddBtn').addEventListener('click', function () {
-        // Reset form
-        ['fStyle','fSpmain','fLine','fColor','fKeyword','fRemark'].forEach(function(id){
-            document.getElementById(id).value = '';
-        });
-        ['fTotalQty','fTarget'].forEach(function(id){ document.getElementById(id).value = ''; });
-        ['fInlineLine','fInlineDept'].forEach(function(id){ document.getElementById(id).value = ''; });
-        addBackdrop.classList.add('open');
-        setTimeout(function(){ document.getElementById('fStyle').focus(); }, 280);
-    });
-
-    function closeAddModal() { addBackdrop.classList.remove('open'); }
-    document.getElementById('mdAddClose').addEventListener('click', closeAddModal);
-    document.getElementById('mdAddCancelBtn').addEventListener('click', closeAddModal);
-    addBackdrop.addEventListener('click', function(e){ if(e.target===this) closeAddModal(); });
-
-    document.getElementById('mdAddSaveBtn').addEventListener('click', function () {
-        var style  = document.getElementById('fStyle').value.trim();
-        var spmain = document.getElementById('fSpmain').value.trim();
-        if (!style || !spmain) {
-            if (!style)  { document.getElementById('fStyle').focus();  shake(document.getElementById('fStyle')); }
-            else         { document.getElementById('fSpmain').focus(); shake(document.getElementById('fSpmain')); }
-            return;
-        }
-
-        /*
-         * TODO: Thay bằng POST request:
-         * fetch('/ProductionDepartment/AddProductionInfo', {
-         *   method: 'POST',
-         *   headers: { 'Content-Type': 'application/json' },
-         *   body: JSON.stringify({ machineId, style, spmain, line, color,
-         *     totalQty, target, inlineLine, inlineDepartment, keyword, remark })
-         * }).then(r=>r.json()).then(newItem=>{ allData.unshift(newItem); applyFilters(); });
-         */
-        var newItem = {
-            id: 'pi-new-' + Date.now(),
-            style:    style,
-            spmain:   spmain,
-            line:     document.getElementById('fLine').value.trim()     || '',
-            color:    document.getElementById('fColor').value.trim()    || '',
-            totalQty: parseInt(document.getElementById('fTotalQty').value) || 0,
-            finishQty: 0,
-            target:   parseInt(document.getElementById('fTarget').value) || 0,
-            inlineLine:  document.getElementById('fInlineLine').value || null,
-            inlineDept:  document.getElementById('fInlineDept').value || null,
-            keyword:  document.getElementById('fKeyword').value.trim() || '',
-            remark:   document.getElementById('fRemark').value.trim()  || '',
-            status: 1,
-            createDate: new Date().toISOString().slice(0,10),
-            dailyOutputs: []
-        };
-
-        allData.unshift(newItem);
-
-        // Refresh line options
-        if (newItem.line && !lines.includes(newItem.line)) {
-            lines.push(newItem.line);
-            var opt = document.createElement('option');
-            opt.value = newItem.line; opt.textContent = newItem.line;
-            lineFilter.appendChild(opt);
-        }
-
-        applyFilters();
-        closeAddModal();
-    });
-
-    /* =====================================================
-       ESCAPE KEY
-       ===================================================== */
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') { closeDetailModal(); closeAddModal(); }
     });
 
     /* =====================================================
-       SHAKE VALIDATION
-       ===================================================== */
-    var shakeStyle = document.createElement('style');
-    shakeStyle.textContent = '@@keyframes mdShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}.md-shake{animation:mdShake .4s ease;}';
-    document.head.appendChild(shakeStyle);
-
-    function shake(el) {
-        el.classList.remove('md-shake');
-        void el.offsetWidth;
-        el.classList.add('md-shake');
-        setTimeout(function(){ el.classList.remove('md-shake'); }, 420);
-        el.style.borderColor = 'var(--danger)';
-        el.style.boxShadow = '0 0 0 3px rgba(210,89,79,.15)';
-        setTimeout(function(){ el.style.borderColor=''; el.style.boxShadow=''; }, 1500);
-    }
-
-    /* =====================================================
        INIT
        ===================================================== */
-    renderSummary(allData);
-    renderTable(allData);
+    document.addEventListener('DOMContentLoaded', function () {
+        loadProductionInfos();
+    });
 
-})();
+}());
 </script>

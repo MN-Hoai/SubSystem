@@ -1,0 +1,765 @@
+@{
+    ViewData["Title"] = "Ghi sản lượng";
+}
+<style>
+    :root {
+        --accent-navy:      #1f3a67;
+        --accent-navy-700:  #16305a;
+        --accent-navy-soft: #e8edf5;
+        --accent-gold:      #c9972a;
+        --accent-gold-soft: #fef3d0;
+        --success:          #1a9e65;
+        --danger:           #d64040;
+        --border:           #e2e6ef;
+        --border-soft:      #f0f2f8;
+        --bg-canvas:        #ffffff;
+        --bg-surface:       #f7f8fc;
+        --ink-900:          #1a1d29;
+        --ink-700-solid:    #2e3349;
+        --ink-500:          #64697f;
+        --ink-400:          #8e93a8;
+        --ink-300:          #b4b9cc;
+    }
+    .ro-page { display:flex; flex-direction:column; height:100vh; overflow:hidden; font-family:'Inter','Segoe UI',system-ui,sans-serif; background:var(--bg-surface); }
+    /* TOP BAR */
+    .ro-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; gap:16px; }
+    .ro-topbar-left { display:flex; align-items:center; gap:14px; }
+    .ro-back-btn { display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--bg-canvas); color:var(--ink-700-solid); font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; transition:background .15s; }
+    .ro-back-btn:hover { background:var(--border-soft); }
+    .ro-page-title { font-size:20px; font-weight:800; background:linear-gradient(135deg,var(--accent-navy) 0%,#3a5fa8 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .ro-date-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--ink-400); background:var(--bg-surface); border:1px solid var(--border); padding:4px 10px; border-radius:999px; }
+    /* BODY */
+    .ro-body { display:grid; grid-template-columns:320px 1fr; flex:1; overflow:hidden; }
+    /* LEFT */
+    .ro-left { display:flex; flex-direction:column; background:var(--bg-canvas); border-right:1px solid var(--border); overflow:hidden; }
+    .ro-panel-head { padding:14px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .ro-panel-title { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:var(--ink-400); margin-bottom:10px; }
+    .ro-filter-wrap { display:flex; flex-direction:column; gap:8px; }
+    .ro-select, .ro-search-inp { width:100%; box-sizing:border-box; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; transition:border-color .18s,box-shadow .18s; }
+    .ro-select:focus, .ro-search-inp:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .ro-search-wrap { position:relative; }
+    .ro-search-wrap i { position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--ink-300); }
+    .ro-search-wrap .ro-search-inp { padding-left:32px; }
+    .ro-machine-list { flex:1; overflow-y:auto; padding:10px 10px 16px; display:flex; flex-direction:column; gap:5px; }
+    .ro-machine-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:9px; cursor:pointer; border:1.5px solid transparent; transition:background .14s,border-color .14s; }
+    .ro-machine-item:hover { background:var(--bg-surface); border-color:var(--border); }
+    .ro-machine-item.selected { background:var(--accent-navy-soft); border-color:var(--accent-navy); }
+    .ro-machine-icon { width:34px; height:34px; border-radius:8px; flex-shrink:0; background:var(--accent-navy-soft); color:var(--accent-navy); display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .ro-machine-item.selected .ro-machine-icon { background:var(--accent-navy); color:#fff; }
+    .ro-machine-name { font-size:13px; font-weight:700; color:var(--ink-900); }
+    .ro-machine-meta { font-size:11.5px; color:var(--ink-400); margin-top:1px; }
+    .ro-empty-state { display:flex; flex-direction:column; align-items:center; gap:8px; padding:40px 16px; color:var(--ink-300); font-size:13px; text-align:center; }
+    .ro-empty-state i { font-size:28px; }
+    /* RIGHT */
+    .ro-right { display:flex; flex-direction:column; overflow:hidden; background:var(--bg-surface); }
+    .ro-right-head { padding:14px 20px 10px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; }
+    .ro-right-title { font-size:14px; font-weight:800; color:var(--ink-900); margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .ro-machine-chip { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; background:var(--accent-navy-soft); color:var(--accent-navy); border:1px solid var(--accent-navy); padding:3px 10px; border-radius:999px; }
+    .ro-right-filters { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .ro-right-filters .ro-search-wrap { flex:1; min-width:160px; }
+    .ro-right-filters .ro-select { width:auto; flex:0 0 160px; }
+    .ro-code-grid { flex:1; overflow-y:auto; padding:16px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; align-content:start; }
+    .ro-code-card { background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:12px; padding:14px 16px; cursor:pointer; transition:box-shadow .18s,border-color .18s,transform .15s; display:flex; flex-direction:column; gap:8px; }
+    .ro-code-card:hover { box-shadow:0 6px 20px rgba(31,58,103,.12); border-color:var(--accent-navy); transform:translateY(-2px); }
+    .ro-code-card-header { display:flex; align-items:flex-start; justify-content:space-between; }
+    .ro-code-sp { font-size:11px; font-weight:800; color:var(--accent-navy); font-family:'Courier New',monospace; }
+    .ro-code-style { font-size:13.5px; font-weight:700; color:var(--ink-900); margin-top:2px; }
+    .ro-code-meta { font-size:11.5px; color:var(--ink-400); display:flex; gap:6px; flex-wrap:wrap; }
+    .ro-code-meta-chip { display:inline-flex; align-items:center; gap:4px; background:var(--bg-surface); border:1px solid var(--border); padding:2px 7px; border-radius:5px; font-size:11px; font-weight:600; }
+    .ro-code-progress-bar-wrap { height:5px; background:var(--border-soft); border-radius:99px; overflow:hidden; margin-top:4px; }
+    .ro-code-progress-bar { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-navy) 0%,#3a5fa8 100%); transition:width .4s; }
+    .ro-code-progress-label { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-400); margin-top:4px; }
+    .ro-status-badge { font-size:10px; font-weight:800; padding:2px 8px; border-radius:5px; flex-shrink:0; }
+    .ro-status-badge.s1 { background:#e0f7ef; color:var(--success); }
+    .ro-status-badge.s2 { background:#fdecea; color:var(--danger); }
+    .ro-status-badge.s3 { background:var(--accent-gold-soft); color:var(--accent-gold); }
+    .ro-record-btn { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px; padding:7px 0; border-radius:8px; background:var(--accent-navy-soft); color:var(--accent-navy); border:1px solid var(--accent-navy); font-size:12.5px; font-weight:700; transition:background .15s,color .15s; }
+    .ro-code-card:hover .ro-record-btn { background:var(--accent-navy); color:#fff; }
+    .ro-no-machine { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--ink-300); text-align:center; padding:40px; }
+    .ro-no-machine i { font-size:48px; }
+    .ro-no-machine h3 { font-size:16px; font-weight:700; color:var(--ink-400); margin:0; }
+    /* MODAL */
+    .ro-backdrop { position:fixed; inset:0; background:rgba(15,20,40,.5); display:none; align-items:center; justify-content:center; z-index:1000; padding:20px; backdrop-filter:blur(3px); }
+    .ro-backdrop.open { display:flex; }
+    .ro-modal { background:var(--bg-canvas); border-radius:16px; width:100%; max-width:520px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.22); animation:roIn .22s ease; }
+    @@keyframes roIn { from { opacity:0; transform:translateY(16px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+    .ro-modal-head { padding:18px 22px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .ro-modal-title-row { display:flex; align-items:center; justify-content:space-between; }
+    .ro-modal-title-group { display:flex; align-items:center; gap:12px; }
+    .ro-modal-icon { width:40px; height:40px; border-radius:10px; flex-shrink:0; background:linear-gradient(135deg,var(--accent-navy) 0%,#3a5fa8 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .ro-modal-title { font-size:16px; font-weight:800; color:var(--ink-900); }
+    .ro-modal-sub { font-size:12.5px; color:var(--ink-400); margin-top:2px; }
+    .ro-modal-close { width:30px; height:30px; border-radius:8px; border:none; background:var(--bg-surface); cursor:pointer; color:var(--ink-400); display:flex; align-items:center; justify-content:center; font-size:14px; transition:background .14s,color .14s; }
+    .ro-modal-close:hover { background:#fdecea; color:var(--danger); }
+    .ro-modal-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+    .ro-chip { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:6px; background:var(--bg-surface); border:1px solid var(--border); color:var(--ink-500); }
+    .ro-chip.navy { background:var(--accent-navy-soft); border-color:var(--accent-navy); color:var(--accent-navy); }
+    .ro-modal-datetime { display:flex; align-items:center; gap:10px; padding:12px 22px 0; flex-shrink:0; flex-wrap:wrap; }
+    .ro-dt-group { display:flex; flex-direction:column; gap:3px; }
+    .ro-dt-label { font-size:10.5px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.4px; }
+    .ro-dt-input { padding:7px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; transition:border-color .18s,box-shadow .18s; }
+    .ro-dt-input:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .ro-modal-body { flex:1; overflow-y:auto; padding:14px 22px 8px; display:flex; flex-direction:column; gap:8px; }
+    .ro-detail-row { display:grid; grid-template-columns:1fr auto; align-items:center; gap:12px; padding:10px 14px; background:var(--bg-surface); border-radius:9px; border:1.5px solid var(--border); transition:border-color .15s; }
+    .ro-detail-row:focus-within { border-color:var(--accent-navy); }
+    .ro-detail-name { font-size:13px; font-weight:600; color:var(--ink-900); }
+    .ro-detail-today { font-size:11px; color:var(--ink-400); margin-top:2px; }
+    .ro-qty-input { width:90px; padding:7px 10px; text-align:right; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-900); background:var(--bg-canvas); outline:none; transition:border-color .18s,box-shadow .18s; }
+    .ro-qty-input:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .ro-modal-footer { padding:12px 22px 16px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .ro-total-preview { font-size:12px; color:var(--ink-400); }
+    .ro-total-preview strong { color:var(--ink-900); font-size:14px; }
+    .ro-footer-btns { display:flex; gap:8px; }
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s,transform .15s; }
+    .btn-primary { background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+    .btn-ghost:hover { background:var(--border-soft); }
+    .btn-sm { padding:7px 13px; font-size:12.5px; border-radius:8px; }
+    .btn:disabled { opacity:.55; pointer-events:none; }
+    .ro-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:10px; font-size:13.5px; font-weight:700; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); }
+
+    /* Excel Import Modal */
+    .xl-step { display:flex; gap:14px; align-items:flex-start; }
+    .xl-step-num { width:28px; height:28px; border-radius:50%; background:var(--accent-navy); color:#fff; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+    .xl-step-content { flex:1; }
+    .xl-step-title { font-size:13.5px; font-weight:700; color:var(--ink-900); }
+    .xl-step-desc { font-size:12px; color:var(--ink-400); margin:3px 0 8px; }
+    .xl-template-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:8px; background:#e0f7ef; color:var(--success); border:1.5px solid var(--success); font-size:12.5px; font-weight:700; text-decoration:none; cursor:pointer; transition:background .15s,color .15s; }
+    .xl-template-btn:hover { background:var(--success); color:#fff; }
+    .xl-dropzone { border:2px dashed var(--border); border-radius:12px; padding:24px 20px; text-align:center; background:var(--bg-surface); cursor:pointer; transition:border-color .18s,background .18s; }
+    .xl-dropzone.drag-over { border-color:var(--success); background:#f0fdf7; }
+    .xl-dropzone.has-file { border-color:var(--success); background:#f0fdf7; }
+    .xl-drop-icon { font-size:28px; color:var(--ink-300); margin-bottom:8px; display:block; }
+    .xl-dropzone.has-file .xl-drop-icon { color:var(--success); }
+    .xl-drop-text { font-size:13px; color:var(--ink-500); }
+    .xl-drop-link { color:var(--accent-navy); font-weight:700; cursor:pointer; text-decoration:underline; }
+    .xl-drop-hint { font-size:11px; color:var(--ink-300); margin-top:4px; }
+    .xl-file-name { margin-top:8px; font-size:12px; font-weight:700; color:var(--success); display:flex; align-items:center; justify-content:center; gap:6px; }
+    /* Result */
+    .xl-result { border-radius:10px; padding:14px 16px; }
+    .xl-result.ok  { background:#e0f7ef; border:1.5px solid var(--success); }
+    .xl-result.err { background:#fdecea; border:1.5px solid var(--danger); }
+    .xl-result-title { font-size:14px; font-weight:800; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .xl-result.ok  .xl-result-title { color:var(--success); }
+    .xl-result.err .xl-result-title { color:var(--danger); }
+    .xl-result-stats { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+    .xl-stat { font-size:12px; color:var(--ink-500); }
+    .xl-stat strong { font-size:15px; font-weight:800; color:var(--ink-900); display:block; }
+    .xl-errors { max-height:120px; overflow-y:auto; }
+    .xl-error-item { font-size:11.5px; color:var(--danger); padding:3px 0; border-bottom:1px solid #fbd5d5; }
+</style>
+
+<div class="ro-page">
+    <!-- TOP BAR -->
+    <div class="ro-topbar">
+        <div class="ro-topbar-left">
+            <button class="ro-back-btn" onclick="history.back()">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại
+            </button>
+            <div class="ro-page-title">Ghi sản lượng</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn btn-ghost btn-sm" id="roExcelImportBtn" style="border-color:#1f7a3a;color:#1a9e65;">
+                <i class="fa-solid fa-file-excel"></i> Nhập bằng Excel
+            </button>
+            <div class="ro-date-chip">
+                <i class="fa-regular fa-calendar"></i>
+                <span id="roTodayLabel">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="ro-body">
+
+        <!-- ── LEFT: Machine list ── -->
+        <div class="ro-left">
+            <div class="ro-panel-head">
+                <div class="ro-panel-title"><i class="fa-solid fa-gears"></i> &nbsp;Danh sách máy</div>
+                <div class="ro-filter-wrap">
+                    <select class="ro-select" id="roDeptFilter">
+                        <option value="">Tất cả bộ phận</option>
+                    </select>
+                    <div class="ro-search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" class="ro-search-inp" id="roMachineSearch" placeholder="Tìm tên máy, mã máy...">
+                    </div>
+                </div>
+            </div>
+            <div class="ro-machine-list" id="roMachineList">
+                <div class="ro-empty-state">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>Đang tải...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RIGHT: Production codes ── -->
+        <div class="ro-right">
+            <div class="ro-right-head">
+                <div class="ro-right-title">
+                    <i class="fa-solid fa-shirt" style="color:var(--accent-navy);"></i>
+                    Mã sản xuất
+                    <span id="roMachineChip" class="ro-machine-chip" style="display:none;">
+                        <i class="fa-solid fa-gear fa-xs"></i>
+                        <span id="roMachineChipName">—</span>
+                    </span>
+                </div>
+                <div class="ro-right-filters">
+                    <div class="ro-search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" class="ro-search-inp" id="roCodeSearch" placeholder="Tìm style, mã SP, màu...">
+                    </div>
+                    <select class="ro-select" id="roStatusFilter" style="width:160px;">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="1">Đang sản xuất</option>
+                        <option value="2">Hoàn thành</option>
+                        <option value="3">Tạm dừng</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="ro-no-machine" id="roNoMachine">
+                <i class="fa-solid fa-hand-pointer"></i>
+                <h3>Chọn máy để xem mã sản xuất</h3>
+                <p style="font-size:13px;max-width:260px;">Chọn một máy từ danh sách bên trái để hiển thị các mã đang được sản xuất.</p>
+            </div>
+
+            <div class="ro-code-grid" id="roCodeGrid" style="display:none;"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL Ghi sản lượng thủ công -->
+<div class="ro-backdrop" id="roBackdrop">
+    <div class="ro-modal">
+        <div class="ro-modal-head">
+            <div class="ro-modal-title-row">
+                <div class="ro-modal-title-group">
+                    <div class="ro-modal-icon"><i class="fa-solid fa-pencil"></i></div>
+                    <div>
+                        <div class="ro-modal-title">Ghi sản lượng</div>
+                        <div class="ro-modal-sub" id="roModalSub">Nhập số lượng theo từng công đoạn</div>
+                    </div>
+                </div>
+                <button class="ro-modal-close" id="roModalClose"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="ro-modal-chips" id="roModalChips"></div>
+        </div>
+
+        <div class="ro-modal-datetime">
+            <div class="ro-dt-group">
+                <div class="ro-dt-label"><i class="fa-regular fa-calendar"></i> Ngày</div>
+                <input type="date" class="ro-dt-input" id="roInputDate">
+            </div>
+            <div class="ro-dt-group">
+                <div class="ro-dt-label"><i class="fa-regular fa-clock"></i> Giờ nhập</div>
+                <input type="time" class="ro-dt-input" id="roInputTime">
+            </div>
+            <div style="flex:1;align-self:flex-end;">
+                <button class="btn btn-ghost btn-sm" id="roReloadDetails">
+                    <i class="fa-solid fa-rotate-right"></i> Tải lại
+                </button>
+            </div>
+        </div>
+
+        <div class="ro-modal-body" id="roModalBody"></div>
+
+        <div class="ro-modal-footer">
+            <div class="ro-total-preview">
+                Tổng lần này: <strong id="roTotalPreview">0</strong>
+            </div>
+            <div class="ro-footer-btns">
+                <button class="btn btn-ghost btn-sm" id="roModalCancel">Hủy</button>
+                <button class="btn btn-primary btn-sm" id="roModalSave">
+                    <i class="fa-solid fa-floppy-disk"></i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Nhập bằng Excel -->
+<div class="ro-backdrop" id="roExcelBackdrop">
+    <div class="ro-modal" style="max-width:560px;">
+        <div class="ro-modal-head">
+            <div class="ro-modal-title-row">
+                <div class="ro-modal-title-group">
+                    <div class="ro-modal-icon" style="background:linear-gradient(135deg,#1a9e65 0%,#145c3b 100%);">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <div class="ro-modal-title">Nhập sản lượng bằng Excel</div>
+                        <div class="ro-modal-sub">Tải file mẫu, điền dữ liệu rồi import</div>
+                    </div>
+                </div>
+                <button class="ro-modal-close" id="roExcelClose"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div style="padding:16px 22px;display:flex;flex-direction:column;gap:14px;">
+
+            <!-- Step 1: Download template -->
+            <div class="xl-step">
+                <div class="xl-step-num">1</div>
+                <div class="xl-step-content">
+                    <div class="xl-step-title">Tải file mẫu</div>
+                    <div class="xl-step-desc">File Excel bao gồm format chuẩn và hướng dẫn nhập liệu chi tiết</div>
+                    <a href="/ImportExport/DownloadOutputTemplate" class="xl-template-btn" download>
+                        <i class="fa-solid fa-download"></i>
+                        Tải file mẫu (.xlsx)
+                    </a>
+                </div>
+            </div>
+
+            <!-- Step 2: Upload file -->
+            <div class="xl-step">
+                <div class="xl-step-num">2</div>
+                <div class="xl-step-content">
+                    <div class="xl-step-title">Chọn file đã điền</div>
+                    <div class="xl-step-desc">Hỗ trợ .xlsx, .xls. Tối đa 10 MB</div>
+                    <div class="xl-dropzone" id="roDropZone">
+                        <input type="file" id="roExcelFile" accept=".xlsx,.xls" style="display:none;">
+                        <i class="fa-solid fa-cloud-arrow-up xl-drop-icon"></i>
+                        <div class="xl-drop-text">Kéo file vào đây hoặc <span class="xl-drop-link" id="roBrowseFile">chọn file</span></div>
+                        <div class="xl-drop-hint">xlsx / xls — tối đa 10 MB</div>
+                        <div class="xl-file-name" id="roFileName" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result area -->
+            <div id="roImportResult" style="display:none;"></div>
+
+        </div>
+
+        <div class="ro-modal-footer">
+            <div style="font-size:12px;color:var(--ink-400);"><i class="fa-solid fa-circle-info"></i> Dữ liệu sẽ được cộng dồn, không ghi đè</div>
+            <div class="ro-footer-btns">
+                <button class="btn btn-ghost btn-sm" id="roExcelCancel">Đóng</button>
+                <button class="btn btn-primary btn-sm" id="roImportBtn" disabled
+                    style="background:linear-gradient(135deg,#1a9e65 0%,#145c3b 100%);">
+                    <i class="fa-solid fa-file-import"></i> Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmt(n) { return Number(n||0).toLocaleString('vi-VN'); }
+    function todayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function nowTimeStr() {
+        var d = new Date();
+        return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+    function fmtDateVN(s) {
+        var p = (s||'').split('-');
+        return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+    }
+    function toast(msg, ok) {
+        var t = document.createElement('div');
+        t.className = 'ro-toast';
+        t.style.background = ok ? 'var(--success)' : 'var(--danger)';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 3000);
+    }
+    function statusBadge(s) {
+        if (s===1) return '<span class="ro-status-badge s1">Đang SX</span>';
+        if (s===2) return '<span class="ro-status-badge s2">Hoàn thành</span>';
+        return '<span class="ro-status-badge s3">Tạm dừng</span>';
+    }
+
+    // STATE
+    var allMachines     = [];
+    var allCodes        = [];
+    var selectedMachine = null;
+    var currentCode     = null;
+    var currentDetails  = [];
+
+    // INIT
+    document.getElementById('roTodayLabel').textContent = fmtDateVN(todayStr());
+    document.getElementById('roInputDate').value = todayStr();
+    document.getElementById('roInputTime').value = nowTimeStr();
+
+    // DEPARTMENTS
+    fetch('/ProductionDepartment/GetDepartments')
+        .then(function(r){ return r.json(); })
+        .then(function(list){
+            var sel = document.getElementById('roDeptFilter');
+            list.forEach(function(d){
+                var o = document.createElement('option');
+                o.value = d.id; o.textContent = d.departmentName;
+                sel.appendChild(o);
+            });
+        });
+
+    // LOAD MACHINES
+    function loadMachines() {
+        var deptId  = document.getElementById('roDeptFilter').value;
+        var keyword = document.getElementById('roMachineSearch').value.trim();
+        var url = '/ProductionDepartment/GetMachinesForRecording';
+        var p = [];
+        if (deptId)  p.push('deptId='  + encodeURIComponent(deptId));
+        if (keyword) p.push('keyword=' + encodeURIComponent(keyword));
+        if (p.length) url += '?' + p.join('&');
+        document.getElementById('roMachineList').innerHTML =
+            '<div class="ro-empty-state"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
+        fetch(url)
+            .then(function(r){ return r.json(); })
+            .then(function(list){ allMachines = list; renderMachines(); })
+            .catch(function(){
+                document.getElementById('roMachineList').innerHTML =
+                    '<div class="ro-empty-state"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải máy</span></div>';
+            });
+    }
+
+    function renderMachines() {
+        var el = document.getElementById('roMachineList');
+        el.innerHTML = '';
+        if (!allMachines.length) {
+            el.innerHTML = '<div class="ro-empty-state"><i class="fa-solid fa-inbox"></i><span>Không có máy nào</span></div>';
+            return;
+        }
+        allMachines.forEach(function(m){
+            var sel = selectedMachine && selectedMachine.id === m.id;
+            var item = document.createElement('div');
+            item.className = 'ro-machine-item' + (sel ? ' selected' : '');
+            item.innerHTML =
+                '<div class="ro-machine-icon"><i class="fa-solid fa-gear"></i></div>' +
+                '<div>' +
+                    '<div class="ro-machine-name">' + esc(m.machineName) + '</div>' +
+                    '<div class="ro-machine-meta">' + (m.remark ? esc(m.remark) + ' &nbsp;·&nbsp; ' : '') + esc(m.deptName||'') + '</div>' +
+                '</div>';
+            item.addEventListener('click', function(){ selectMachine(m); });
+            el.appendChild(item);
+        });
+    }
+
+    function selectMachine(m) {
+        selectedMachine = m;
+        renderMachines();
+        document.getElementById('roMachineChip').style.display = 'inline-flex';
+        document.getElementById('roMachineChipName').textContent = m.machineName + (m.remark ? ' ('+m.remark+')' : '');
+        document.getElementById('roNoMachine').style.display = 'none';
+        document.getElementById('roCodeGrid').style.display = 'grid';
+        document.getElementById('roCodeSearch').value = '';
+        document.getElementById('roStatusFilter').value = '';
+        loadCodes();
+    }
+
+    // LOAD CODES
+    function loadCodes() {
+        if (!selectedMachine) return;
+        var keyword = document.getElementById('roCodeSearch').value.trim();
+        var status  = document.getElementById('roStatusFilter').value;
+        var url = '/ProductionDepartment/GetProductionCodesForMachine?machineId=' + encodeURIComponent(selectedMachine.id);
+        if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+        if (status)  url += '&status='  + encodeURIComponent(status);
+        var grid = document.getElementById('roCodeGrid');
+        grid.innerHTML = '<div class="ro-empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-circle-notch fa-spin fa-lg"></i></div>';
+        fetch(url)
+            .then(function(r){ return r.json(); })
+            .then(function(list){ allCodes = list; renderCodes(); })
+            .catch(function(){
+                grid.innerHTML = '<div class="ro-empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải dữ liệu</span></div>';
+            });
+    }
+
+    function renderCodes() {
+        var grid = document.getElementById('roCodeGrid');
+        grid.innerHTML = '';
+        if (!allCodes.length) {
+            grid.innerHTML = '<div class="ro-empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-inbox"></i><span>Máy này chưa có mã nào</span></div>';
+            return;
+        }
+        allCodes.forEach(function(c){
+            var pct = (c.target && c.target > 0) ? Math.min(100, Math.round((c.todayOutput||0) / c.target * 100)) : 0;
+            var barColor = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--accent-gold)' : 'var(--accent-navy)';
+            var card = document.createElement('div');
+            card.className = 'ro-code-card';
+            card.innerHTML =
+                '<div class="ro-code-card-header">' +
+                    '<div>' +
+                        '<div class="ro-code-sp">' + esc(c.spmain||'—') + '</div>' +
+                        '<div class="ro-code-style">' + esc(c.style||'—') + '</div>' +
+                    '</div>' +
+                    statusBadge(c.status) +
+                '</div>' +
+                '<div class="ro-code-meta">' +
+                    (c.line  ? '<span class="ro-code-meta-chip"><i class="fa-solid fa-users fa-xs"></i>' + esc(c.line)  + '</span>' : '') +
+                    (c.color ? '<span class="ro-code-meta-chip"><i class="fa-solid fa-palette fa-xs"></i>' + esc(c.color) + '</span>' : '') +
+                '</div>' +
+                '<div>' +
+                    '<div class="ro-code-progress-bar-wrap">' +
+                        '<div class="ro-code-progress-bar" style="width:' + pct + '%;background:' + barColor + ';"></div>' +
+                    '</div>' +
+                    '<div class="ro-code-progress-label">' +
+                        '<span>Hôm nay: <strong>' + fmt(c.todayOutput||0) + '</strong></span>' +
+                        (c.target ? '<span>Target: ' + fmt(c.target) + '</span>' : '<span style="font-style:italic;">Chưa có target</span>') +
+                    '</div>' +
+                '</div>' +
+                '<div class="ro-record-btn"><i class="fa-solid fa-plus"></i> Ghi sản lượng</div>';
+            card.addEventListener('click', function(){ openModal(c); });
+            grid.appendChild(card);
+        });
+    }
+
+    // MODAL
+    var backdrop = document.getElementById('roBackdrop');
+
+    function openModal(code) {
+        currentCode = code;
+        document.getElementById('roModalSub').textContent = (code.spmain||'') + (code.style ? ' — '+code.style : '');
+        var chips = document.getElementById('roModalChips');
+        chips.innerHTML =
+            (code.line  ? '<span class="ro-chip"><i class="fa-solid fa-users fa-xs"></i>' + esc(code.line)  + '</span>' : '') +
+            (code.color ? '<span class="ro-chip"><i class="fa-solid fa-palette fa-xs"></i>' + esc(code.color) + '</span>' : '') +
+            (selectedMachine ? '<span class="ro-chip navy"><i class="fa-solid fa-gear fa-xs"></i>' + esc(selectedMachine.machineName) + '</span>' : '');
+        document.getElementById('roInputDate').value = todayStr();
+        document.getElementById('roInputTime').value = nowTimeStr();
+        loadStyleDetails();
+        backdrop.classList.add('open');
+    }
+
+    function closeModal() {
+        backdrop.classList.remove('open');
+        currentCode = null; currentDetails = [];
+    }
+
+    document.getElementById('roModalClose').addEventListener('click', closeModal);
+    document.getElementById('roModalCancel').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', function(e){ if(e.target===backdrop) closeModal(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+
+    function loadStyleDetails() {
+        if (!currentCode) return;
+        var dateVal = document.getElementById('roInputDate').value || todayStr();
+        var body = document.getElementById('roModalBody');
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-300);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>';
+        var url = '/ProductionDepartment/GetStyleDetailsForRecording' +
+            '?productionInfoId=' + encodeURIComponent(currentCode.productionInfoId) +
+            '&machineId='        + encodeURIComponent(currentCode.machineId) +
+            '&date='             + encodeURIComponent(dateVal);
+        fetch(url)
+            .then(function(r){ return r.json(); })
+            .then(function(list){ currentDetails = list; renderDetailInputs(); })
+            .catch(function(){
+                body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);">Lỗi tải công đoạn</div>';
+            });
+    }
+
+    document.getElementById('roReloadDetails').addEventListener('click', loadStyleDetails);
+    document.getElementById('roInputDate').addEventListener('change', loadStyleDetails);
+
+    function renderDetailInputs() {
+        var body = document.getElementById('roModalBody');
+        body.innerHTML = '';
+        currentDetails.forEach(function(d, i){
+            var row = document.createElement('div');
+            row.className = 'ro-detail-row';
+            row.innerHTML =
+                '<div>' +
+                    '<div class="ro-detail-name">' + esc(d.detailName) + '</div>' +
+                    '<div class="ro-detail-today">Đã nhập hôm nay: <strong>' + fmt(d.todayTotal) + '</strong></div>' +
+                '</div>' +
+                '<input type="number" class="ro-qty-input" id="roQty_' + i + '" min="0" placeholder="0" data-idx="' + i + '">';
+            body.appendChild(row);
+            row.querySelector('.ro-qty-input').addEventListener('input', updateTotalPreview);
+        });
+        updateTotalPreview();
+    }
+
+    function updateTotalPreview() {
+        var total = 0;
+        currentDetails.forEach(function(d, i){
+            var inp = document.getElementById('roQty_' + i);
+            if (inp) total += parseInt(inp.value)||0;
+        });
+        document.getElementById('roTotalPreview').textContent = fmt(total);
+    }
+
+    // SAVE
+    document.getElementById('roModalSave').addEventListener('click', function(){
+        if (!currentCode || !currentDetails.length) return;
+        var details = [];
+        currentDetails.forEach(function(d, i){
+            var inp = document.getElementById('roQty_' + i);
+            var qty = parseInt((inp && inp.value)||0)||0;
+            if (qty > 0 && d.styleDetailId && d.styleDetailId !== '00000000-0000-0000-0000-000000000000')
+                details.push({ styleDetailId: d.styleDetailId, outputNumber: qty });
+        });
+        if (!details.length) { toast('Vui lòng nhập ít nhất một số lượng > 0', false); return; }
+        var saveBtn = document.getElementById('roModalSave');
+        var orig = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        fetch('/ProductionDepartment/SaveOutputRecord', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                productionInfoId: currentCode.productionInfoId,
+                machineId:        currentCode.machineId,
+                date:             document.getElementById('roInputDate').value || todayStr(),
+                time:             document.getElementById('roInputTime').value || nowTimeStr(),
+                details:          details
+            })
+        })
+        .then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+        .then(function(res){
+            saveBtn.disabled = false; saveBtn.innerHTML = orig;
+            if (res.ok) {
+                toast(res.data.message || 'Đã ghi thành công!', true);
+                closeModal();
+                loadCodes();
+            } else {
+                toast(res.data.message || 'Có lỗi xảy ra.', false);
+            }
+        })
+        .catch(function(e){ saveBtn.disabled=false; saveBtn.innerHTML=orig; toast('Lỗi: '+e.message, false); });
+    });
+
+    // FILTER EVENTS
+    document.getElementById('roDeptFilter').addEventListener('change', loadMachines);
+    var mTimer;
+    document.getElementById('roMachineSearch').addEventListener('input', function(){
+        clearTimeout(mTimer); mTimer = setTimeout(loadMachines, 300);
+    });
+    var cTimer;
+    document.getElementById('roCodeSearch').addEventListener('input', function(){
+        clearTimeout(cTimer); cTimer = setTimeout(loadCodes, 300);
+    });
+    document.getElementById('roStatusFilter').addEventListener('change', loadCodes);
+
+    // INIT
+    loadMachines();
+
+    // ─── EXCEL IMPORT ────────────────────────────────────────────────
+    var excelBackdrop  = document.getElementById('roExcelBackdrop');
+    var excelFile      = document.getElementById('roExcelFile');
+    var dropZone       = document.getElementById('roDropZone');
+    var importBtn      = document.getElementById('roImportBtn');
+    var selectedFile   = null;
+
+    document.getElementById('roExcelImportBtn').addEventListener('click', function () {
+        excelBackdrop.classList.add('open');
+        resetExcelModal();
+    });
+    document.getElementById('roExcelClose').addEventListener('click', closeExcelModal);
+    document.getElementById('roExcelCancel').addEventListener('click', closeExcelModal);
+    excelBackdrop.addEventListener('click', function(e){ if(e.target===excelBackdrop) closeExcelModal(); });
+
+    function closeExcelModal() { excelBackdrop.classList.remove('open'); }
+    function resetExcelModal() {
+        selectedFile = null;
+        excelFile.value = '';
+        dropZone.classList.remove('has-file','drag-over');
+        document.getElementById('roFileName').style.display = 'none';
+        document.getElementById('roFileName').textContent = '';
+        document.getElementById('roImportResult').style.display = 'none';
+        document.getElementById('roImportResult').innerHTML = '';
+        importBtn.disabled = true;
+    }
+
+    // Browse click
+    document.getElementById('roBrowseFile').addEventListener('click', function(e) {
+        e.stopPropagation();
+        excelFile.click();
+    });
+    dropZone.addEventListener('click', function() { excelFile.click(); });
+
+    excelFile.addEventListener('change', function() {
+        if (this.files && this.files[0]) setFile(this.files[0]);
+    });
+
+    // Drag & Drop
+    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', function()  { dropZone.classList.remove('drag-over'); });
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        var f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) setFile(f);
+    });
+
+    function setFile(f) {
+        var ext = f.name.split('.').pop().toLowerCase();
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            toast('Chỉ hỗ trợ file .xlsx hoặc .xls', false);
+            return;
+        }
+        if (f.size > 10 * 1024 * 1024) {
+            toast('File quá lớn (tối đa 10 MB)', false);
+            return;
+        }
+        selectedFile = f;
+        dropZone.classList.add('has-file');
+        var nameEl = document.getElementById('roFileName');
+        nameEl.style.display = 'flex';
+        nameEl.innerHTML = '<i class="fa-solid fa-file-excel" style="color:var(--success);"></i>' + esc(f.name) +
+            ' <span style="color:var(--ink-300);font-weight:400;">('+fmt(Math.round(f.size/1024))+' KB)</span>';
+        importBtn.disabled = false;
+        document.getElementById('roImportResult').style.display = 'none';
+    }
+
+    // Import
+    importBtn.addEventListener('click', function() {
+        if (!selectedFile) return;
+        var orig = importBtn.innerHTML;
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang import...';
+        document.getElementById('roImportResult').style.display = 'none';
+
+        var fd = new FormData();
+        fd.append('file', selectedFile);
+
+        fetch('/ImportExport/ImportOutputExcel', { method:'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(res) {
+                importBtn.disabled = false;
+                importBtn.innerHTML = orig;
+                renderImportResult(res);
+                if (res.importedRows > 0) loadCodes(); // refresh right panel
+            })
+            .catch(function(e){
+                importBtn.disabled = false;
+                importBtn.innerHTML = orig;
+                toast('Lỗi kết nối: '+e.message, false);
+            });
+    });
+
+    function renderImportResult(res) {
+        var el = document.getElementById('roImportResult');
+        var isOk = res.success && res.importedRows > 0;
+        var errHtml = '';
+        if (res.errors && res.errors.length) {
+            errHtml = '<div class="xl-errors">' +
+                res.errors.map(function(e){ return '<div class="xl-error-item"><i class="fa-solid fa-circle-xmark fa-xs"></i> '+esc(e)+'</div>'; }).join('') +
+            '</div>';
+        }
+        el.style.display = 'block';
+        el.innerHTML =
+            '<div class="xl-result ' + (isOk ? 'ok' : 'err') + '">' +
+                '<div class="xl-result-title">' +
+                    '<i class="fa-solid ' + (isOk ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i>' +
+                    esc(res.message || '') +
+                '</div>' +
+                '<div class="xl-result-stats">' +
+                    '<div class="xl-stat"><strong>'+fmt(res.totalRows||0)+'</strong>Tổng dòng</div>' +
+                    '<div class="xl-stat"><strong style="color:var(--success);">'+fmt(res.importedRows||0)+'</strong>Thành công</div>' +
+                    '<div class="xl-stat"><strong style="color:var(--danger);">'+fmt(res.skippedRows||0)+'</strong>Bỏ qua</div>' +
+                '</div>' +
+                errHtml +
+            '</div>';
+    }
+
+}());
+</script>

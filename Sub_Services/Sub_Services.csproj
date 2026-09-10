@@ -14,4 +14,8 @@
     <Folder Include="Execute\Style_Service\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+  </ItemGroup>
+
 </Project>

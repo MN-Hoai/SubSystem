@@ -22,67 +22,488 @@
      Cấu trúc khớp 1-1 với ProductionDepartmentLayout
      + ProductLayoutItem + ProductionMachine
      ===================================================== -->
-<script id="mockLayouts" type="application/json">
-[
-  {
-    "id": "a1000000-0000-0000-0000-000000000001",
-    "name": "Layout Bộ phận Cắt",
-    "departmentName": "Bộ phận Cắt",
-    "rowCount": 3,
-    "columnCount": 4,
-    "cellWidth": null,
-    "cellHeight": null,
-    "gap": 10,
-    "status": 1,
-    "items": [
-      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Máy cắt CT-01", "machineCode": "CT-01", "keyword": "Cắt thẳng", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Máy cắt CT-02", "machineCode": "CT-02", "keyword": "Cắt vòng", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 2, "sortOrder": 2, "machineName": "Máy cắt CT-03", "machineCode": "CT-03", "keyword": "Cắt rập", "machineStatus": 2 },
-      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 4, "machineName": "Máy trải vải TV-01", "machineCode": "TV-01", "keyword": "Trải vải", "machineStatus": 1 },
-      { "rowIndex": 1, "columnIndex": 1, "sortOrder": 5, "machineName": "Máy trải vải TV-02", "machineCode": "TV-02", "keyword": "Trải vải", "machineStatus": 1 },
-      { "rowIndex": 2, "columnIndex": 0, "sortOrder": 8, "machineName": "Bàn đánh số ĐS-01", "machineCode": "ĐS-01", "keyword": "Đánh số", "machineStatus": 3 }
-    ]
-  },
-  {
-    "id": "a2000000-0000-0000-0000-000000000002",
-    "name": "Layout Bộ phận May",
-    "departmentName": "Bộ phận May",
-    "rowCount": 2,
-    "columnCount": 5,
-    "cellWidth": null,
-    "cellHeight": null,
-    "gap": 10,
-    "status": 1,
-    "items": [
-      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Máy may 1K-01", "machineCode": "1K-01", "keyword": "Ráp thân", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Máy may 1K-02", "machineCode": "1K-02", "keyword": "Ráp tay", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 2, "sortOrder": 2, "machineName": "Máy may 1K-03", "machineCode": "1K-03", "keyword": "Ráp cổ", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 3, "sortOrder": 3, "machineName": "Máy vắt sổ VS-01", "machineCode": "VS-01", "keyword": "Vắt sổ", "machineStatus": 2 },
-      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 5, "machineName": "Máy đính nút ĐN-01", "machineCode": "ĐN-01", "keyword": "Đính nút", "machineStatus": 1 },
-      { "rowIndex": 1, "columnIndex": 1, "sortOrder": 6, "machineName": "Máy thùa khuy TK-01", "machineCode": "TK-01", "keyword": "Thùa khuy", "machineStatus": 1 },
-      { "rowIndex": 1, "columnIndex": 3, "sortOrder": 8, "machineName": "Máy bo gấu BG-01", "machineCode": "BG-01", "keyword": "Bo gấu", "machineStatus": 3 }
-    ]
-  },
-  {
-    "id": "a3000000-0000-0000-0000-000000000003",
-    "name": "Layout Bộ phận Hoàn thiện",
-    "departmentName": "Bộ phận Hoàn thiện",
-    "rowCount": 2,
-    "columnCount": 3,
-    "cellWidth": null,
-    "cellHeight": null,
-    "gap": 10,
-    "status": 1,
-    "items": [
-      { "rowIndex": 0, "columnIndex": 0, "sortOrder": 0, "machineName": "Bàn ủi hơi UI-01", "machineCode": "UI-01", "keyword": "Ủi thân", "machineStatus": 1 },
-      { "rowIndex": 0, "columnIndex": 1, "sortOrder": 1, "machineName": "Bàn ủi hơi UI-02", "machineCode": "UI-02", "keyword": "Ủi tay", "machineStatus": 1 },
-      { "rowIndex": 1, "columnIndex": 0, "sortOrder": 3, "machineName": "Bàn kiểm phẩm KP-01", "machineCode": "KP-01", "keyword": "Kiểm QC", "machineStatus": 1 },
-      { "rowIndex": 1, "columnIndex": 2, "sortOrder": 5, "machineName": "Bàn đóng gói DG-01", "machineCode": "DG-01", "keyword": "Đóng gói", "machineStatus": 2 }
-    ]
-  }
-]
-</script>
 
+<script>
+(function () {
+    /* =====================================================
+       HELPERS
+       ===================================================== */
+    var STATUS = {
+        1: { cls: 'active',      label: 'Hoạt động',       icon: 'fa-check',  tipFn: function(n){ return n + ' — Đang hoạt động'; } },
+        2: { cls: 'inactive',    label: 'Ngừng hoạt động', icon: 'fa-xmark',  tipFn: function(n){ return n + ' — Ngừng hoạt động'; } },
+        3: { cls: 'maintenance', label: 'Bảo trì',          icon: 'fa-wrench', tipFn: function(n){ return n + ' — Đang bảo trì'; } }
+    };
+
+    function esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* Simple loading spinner inside container */
+    function showLoading(container) {
+        container.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:64px;color:var(--ink-300);font-size:14px;">' +
+                '<i class="fa-solid fa-circle-notch fa-spin fa-lg"></i> Đang tải dữ liệu...' +
+            '</div>';
+    }
+
+    /* Prompt người dùng chọn bộ phận */
+    function showSelectPrompt() {
+        var container = document.getElementById('atdLayoutContainer');
+        container.innerHTML =
+            '<div class="atd-no-data" style="padding:80px 24px;">' +
+                '<div class="nd-icon" style="background:linear-gradient(135deg,var(--accent-navy-soft,#e8edf5) 0%,var(--bg-surface) 100%);border-color:var(--accent-navy);">' +
+                    '<i class="fa-solid fa-building-user" style="color:var(--accent-navy);"></i>' +
+                '</div>' +
+                '<h3 style="color:var(--ink-700-solid);">Vui lòng chọn bộ phận cần xem</h3>' +
+                '<p>Chọn bộ phận từ danh sách bên trên để tải sơ đồ vị trí máy tương ứng.</p>' +
+            '</div>';
+    }
+
+    /* =====================================================
+       LOAD DEPARTMENTS (for filter dropdown)
+       ===================================================== */
+    function loadDepartments() {
+        return fetch('/ProductionDepartment/GetDepartments')
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                var sel = document.getElementById('atdDeptFilter');
+                list.forEach(function(d) {
+                    var opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.departmentName;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function(e) { console.error('[ATD] load depts:', e); });
+    }
+
+    /* =====================================================
+       LOAD LAYOUTS (from API)
+       ===================================================== */
+    function loadLayouts(departmentId) {
+        var container = document.getElementById('atdLayoutContainer');
+        showLoading(container);
+
+        var url = '/ProductionDepartment/GetLayouts';
+        if (departmentId) url += '?departmentId=' + encodeURIComponent(departmentId);
+
+        fetch(url)
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(layouts) {
+                allLayouts = layouts;
+                renderAll(allLayouts, currentSearch, currentCodeSearch, currentStatus);
+            })
+            .catch(function(e) {
+                container.innerHTML =
+                    '<div class="atd-no-data">' +
+                        '<div class="nd-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>' +
+                        '<h3>Lỗi tải dữ liệu</h3>' +
+                        '<p>' + esc(e.message) + '</p>' +
+                    '</div>';
+                console.error('[ATD] loadLayouts:', e);
+            });
+    }
+
+    /* =====================================================
+       RENDER
+       ===================================================== */
+    function renderAll(layouts, search, codeSearch, statusFilter) {
+        var container = document.getElementById('atdLayoutContainer');
+        container.innerHTML = '';
+
+        if (!layouts || layouts.length === 0) {
+            container.innerHTML =
+                '<div class="atd-no-data">' +
+                    '<div class="nd-icon"><i class="fa-solid fa-border-all"></i></div>' +
+                    '<h3>Không có layout nào</h3>' +
+                    '<p>Chưa có layout bộ phận. Hãy vào <strong>Thiết kế layout máy</strong> để tạo mới.</p>' +
+                '</div>';
+            return;
+        }
+
+        // Đếm kết quả khi có tìm kiếm theo mã
+        var matchCount = 0;
+        if (codeSearch) {
+            layouts.forEach(function(layout) {
+                (layout.items || []).forEach(function(it) {
+                    if (machineMatchesCode(it, codeSearch)) matchCount++;
+                });
+            });
+            updateCodeSearchBadge(matchCount, codeSearch);
+        } else {
+            updateCodeSearchBadge(0, '');
+        }
+
+        layouts.forEach(function(layout, idx) {
+            var section = buildSection(layout, search, codeSearch, statusFilter, idx);
+            container.appendChild(section);
+        });
+    }
+
+    /* Kiểm tra item có khớp mã sản xuất hay không */
+    function machineMatchesCode(item, codeSearch) {
+        if (!codeSearch) return true;
+        var kw = codeSearch.toLowerCase();
+        var codes = item.productionCodes || [];
+        return codes.some(function(c) {
+            return (c.spmain  || '').toLowerCase().includes(kw)
+                || (c.style   || '').toLowerCase().includes(kw)
+                || (c.line    || '').toLowerCase().includes(kw)
+                || (c.color   || '').toLowerCase().includes(kw);
+        });
+    }
+
+    function updateCodeSearchBadge(count, kw) {
+        var badge = document.getElementById('atdCodeSearchResult');
+        if (!badge) return;
+        if (!kw) { badge.style.display = 'none'; return; }
+        badge.style.display = 'inline-flex';
+        var inner = badge.querySelector('span');
+        if (inner) inner.textContent = count + ' máy đang may "' + kw + '"';
+    }
+
+    function buildSection(layout, search, codeSearch, statusFilter, idx) {
+        var rows = layout.rowCount;
+        var cols = layout.columnCount;
+        var gap  = layout.gap || 12;
+
+        // Build lookup: "row-col" → item (rowIndex/columnIndex are 1-based from API)
+        var map = {};
+        (layout.items || []).forEach(function(item) {
+            var key = item.rowIndex + '-' + item.columnIndex;
+            map[key] = item;
+        });
+
+        // Stats (1-based grid)
+        var total = rows * cols;
+        var cntActive = 0, cntInactive = 0, cntMaint = 0, cntEmpty = 0;
+        for (var r = 1; r <= rows; r++) {
+            for (var c = 1; c <= cols; c++) {
+                var it = map[r + '-' + c];
+                if (!it) { cntEmpty++; }
+                else if (it.status === 1) cntActive++;
+                else if (it.status === 2) cntInactive++;
+                else if (it.status === 3) cntMaint++;
+                else cntEmpty++;
+            }
+        }
+
+        var sec = document.createElement('div');
+        sec.className = 'atd-section';
+        sec.dataset.dept = layout.departmentId || '';
+        sec.style.animationDelay = (idx * 0.07) + 's';
+
+        var deptIcons = { 'Cắt': 'fa-scissors', 'May': 'fa-shirt', 'Hoàn thiện': 'fa-temperature-three-quarters', 'Kiểm tra': 'fa-magnifying-glass-chart', 'Đóng gói': 'fa-box' };
+        var icon = 'fa-gears';
+        var deptName = layout.departmentName || '';
+        Object.keys(deptIcons).forEach(function(k) { if (deptName.indexOf(k) >= 0) icon = deptIcons[k]; });
+
+        sec.innerHTML =
+            '<div class="atd-section-head">' +
+                '<div class="atd-section-title-group">' +
+                    '<div class="atd-dept-badge"><i class="fa-solid ' + esc(icon) + '"></i></div>' +
+                    '<div>' +
+                        '<h2 class="atd-section-name">' + esc(deptName) + '</h2>' +
+                        '<div class="atd-section-meta">' + esc(layout.name) + ' &nbsp;·&nbsp; ' + rows + ' hàng × ' + cols + ' cột &nbsp;·&nbsp; ' + total + ' ô</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="atd-section-stats">' +
+                    (cntActive   ? '<div class="atd-stat s-active"><i class="fa-solid fa-check fa-xs"></i>' + cntActive + ' hoạt động</div>' : '') +
+                    (cntInactive ? '<div class="atd-stat s-inactive"><i class="fa-solid fa-xmark fa-xs"></i>' + cntInactive + ' ngừng</div>' : '') +
+                    (cntMaint    ? '<div class="atd-stat s-maint"><i class="fa-solid fa-wrench fa-xs"></i>' + cntMaint + ' bảo trì</div>' : '') +
+                    (cntEmpty    ? '<div class="atd-stat s-empty"><i class="fa-regular fa-square fa-xs"></i>' + cntEmpty + ' trống</div>' : '') +
+                '</div>' +
+            '</div>';
+
+        var gridWrap = document.createElement('div');
+        gridWrap.className = 'atd-grid-wrap';
+
+        var grid = document.createElement('div');
+        grid.className = 'atd-grid';
+        var cellW = layout.cellWidth  ? layout.cellWidth  + 'px' : '1fr';
+        var cellH = layout.cellHeight ? layout.cellHeight + 'px' : 'auto';
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cellW + ')';
+        grid.style.gridTemplateRows    = 'repeat(' + rows + ', ' + cellH + ')';
+        grid.style.gap = gap + 'px';
+
+        for (var r = 1; r <= rows; r++) {
+            for (var c = 1; c <= cols; c++) {
+                var item = map[r + '-' + c] || null;
+                var cell = buildCell(r, c, item, search, codeSearch, statusFilter, deptName, layout.departmentId || '');
+                grid.appendChild(cell);
+            }
+        }
+
+        gridWrap.appendChild(grid);
+        sec.appendChild(gridWrap);
+        return sec;
+    }
+
+    function buildCell(row, col, item, search, codeSearch, statusFilter, deptName, deptId) {
+        var cell = document.createElement('div');
+        cell.className = 'atd-cell';
+        var posLabel = 'H' + row + '-C' + col;
+
+        if (!item) {
+            // ô trống — dim nếu đang search theo mã
+            cell.classList.add('empty');
+            if (codeSearch) cell.style.opacity = '0.15';
+            cell.innerHTML =
+                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                '<div class="empty-inner">' +
+                    '<i class="fa-regular fa-square-dashed"></i>' +
+                    '<span>Ô trống</span>' +
+                '</div>';
+            return cell;
+        }
+
+        var st = STATUS[item.status] || STATUS[1];
+
+        // Apply status filter
+        if (statusFilter && item.status !== parseInt(statusFilter)) {
+            cell.classList.add('empty');
+            if (codeSearch) cell.style.opacity = '0.15';
+            cell.innerHTML =
+                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                '<div class="empty-inner"><i class="fa-regular fa-square-dashed"></i><span>Ô trống</span></div>';
+            return cell;
+        }
+
+        var machineName = item.machineName || '—';
+        var remark      = item.remark      || '';
+        var keyword     = item.keyword     || '';
+
+        // -- Lọc theo tên máy --
+        if (search) {
+            var kw = search.toLowerCase();
+            var matchText = (machineName + ' ' + remark + ' ' + keyword).toLowerCase();
+            if (matchText.indexOf(kw) === -1) {
+                cell.classList.add('empty');
+                cell.style.opacity = '0.3';
+                cell.innerHTML =
+                    '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                    '<div class="empty-inner"><i class="fa-solid fa-eye-slash"></i><span style="font-size:9px;">Không khớp</span></div>';
+                return cell;
+            }
+        }
+
+        // -- Lọc theo mã sản xuất (Style/SP/Tổ/Màu) --
+        var codeMatched = !codeSearch || machineMatchesCode(item, codeSearch);
+        if (codeSearch && !codeMatched) {
+            cell.classList.add('empty');
+            cell.style.opacity = '0.2';
+            cell.innerHTML =
+                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                '<div class="empty-inner"><i class="fa-solid fa-eye-slash"></i><span style="font-size:9px;">Không có mã</span></div>';
+            return cell;
+        }
+
+        // Highlight trong tên máy
+        function highlight(text) {
+            if (!search) return esc(text);
+            var re = new RegExp('(' + search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            return esc(text).replace(re, '<mark style="background:var(--accent-gold-soft);border-radius:2px;">$1</mark>');
+        }
+
+        // Nổi bật ô khi khớp tìm kiếm mã
+        if (codeSearch && codeMatched) {
+            cell.style.outline = '2.5px solid var(--accent-navy)';
+            cell.style.outlineOffset = '-2px';
+        }
+
+        cell.classList.add(st.cls);
+        cell.setAttribute('data-tip', st.tipFn(machineName));
+        cell.style.cursor = 'pointer';
+
+        var detailUrl = '/ProductionDepartment/MachineDetail'
+            + '?machineId='   + encodeURIComponent(item.machineId   || '')
+            + '&machineName=' + encodeURIComponent(machineName)
+            + '&machineCode=' + encodeURIComponent(remark)
+            + '&dept='        + encodeURIComponent(deptName)
+            + '&deptId='      + encodeURIComponent(deptId || '');
+
+        cell.innerHTML =
+            '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+            '<div class="atd-cell-inner">' +
+                '<div class="atd-cell-top">' +
+                    '<div class="atd-cell-icon"><i class="fa-solid ' + st.icon + '"></i></div>' +
+                    '<div class="atd-cell-status-dot"></div>' +
+                '</div>' +
+                '<div class="atd-cell-name">' + highlight(machineName) + '</div>' +
+                (remark ? '<div class="atd-cell-code">' + highlight(remark) + '</div>' : '') +
+            '</div>' +
+            '<div class="atd-cell-footer">' +
+                '<span class="atd-cell-status-label">' + esc(st.label) + '</span>' +
+                '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;color:var(--ink-300);"></i>' +
+            '</div>' +
+            '<div class="atd-cell-bar"></div>';
+
+        cell.addEventListener('click', function () {
+            window.location.href = detailUrl;
+        });
+
+        return cell;
+    }
+
+    /* =====================================================
+       STATE & INIT
+       ===================================================== */
+    var allLayouts        = [];
+    var currentSearch     = '';   // tìm theo tên máy
+    var currentCodeSearch = '';   // tìm theo mã sản xuất (Style/SP/Tổ/Màu)
+    var currentStatus     = '';
+    var currentDeptId     = '';
+
+    /* ====================================================
+       URL HELPERS
+       Lưu deptId vào URL query string để giữ trạng thái
+       khi người dùng quay lại từ trang chi tiết máy.
+       ==================================================== */
+    function getDeptIdFromUrl() {
+        return new URLSearchParams(window.location.search).get('deptId') || '';
+    }
+
+    function pushDeptUrl(deptId) {
+        var url = window.location.pathname;
+        if (deptId) url += '?deptId=' + encodeURIComponent(deptId);
+        history.pushState({ deptId: deptId }, '', url);
+    }
+
+    function replaceDeptUrl(deptId) {
+        var url = window.location.pathname;
+        if (deptId) url += '?deptId=' + encodeURIComponent(deptId);
+        history.replaceState({ deptId: deptId }, '', url);
+    }
+
+    /* Chọn dept trong dropdown và tải layout (không push URL) */
+    function applyDeptId(deptId, pushUrl) {
+        currentDeptId = deptId;
+        var sel = document.getElementById('atdDeptFilter');
+        if (sel) sel.value = deptId;
+        if (pushUrl) pushDeptUrl(deptId);
+        if (!deptId) {
+            allLayouts = [];
+            showSelectPrompt();
+            return;
+        }
+        loadLayouts(deptId);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // Load departments trước, sau đó khôi phục từ URL
+        loadDepartments().then(function () {
+            var deptId = getDeptIdFromUrl();
+            if (deptId) {
+                applyDeptId(deptId, false); // đã có trong URL, không push lại
+            } else {
+                replaceDeptUrl(''); // clean URL
+                showSelectPrompt();
+            }
+        });
+
+        /* =====================================================
+           FILTER EVENTS
+           ===================================================== */
+        document.getElementById('atdFilterApply').addEventListener('click', function () {
+            currentSearch     = (document.getElementById('atdSearch').value     || '').trim().toLowerCase();
+            currentCodeSearch = (document.getElementById('atdCodeSearch').value || '').trim().toLowerCase();
+            currentStatus     = document.getElementById('atdStatusFilter').value;
+            var newDept = document.getElementById('atdDeptFilter').value;
+            if (!newDept) { showSelectPrompt(); return; }
+            if (newDept !== currentDeptId) {
+                currentDeptId = newDept;
+                pushDeptUrl(currentDeptId);
+                loadLayouts(currentDeptId);
+            } else {
+                renderAll(allLayouts, currentSearch, currentCodeSearch, currentStatus);
+            }
+        });
+
+        document.getElementById('atdFilterReset').addEventListener('click', function () {
+            document.getElementById('atdSearch').value     = '';
+            document.getElementById('atdCodeSearch').value = '';
+            document.getElementById('atdDeptFilter').value = '';
+            document.getElementById('atdStatusFilter').value = '';
+            currentSearch = currentCodeSearch = currentStatus = '';
+            currentDeptId = '';
+            allLayouts = [];
+            pushDeptUrl('');
+            showSelectPrompt();
+        });
+
+        // Live search — tên máy
+        document.getElementById('atdSearch').addEventListener('input', function () {
+            currentSearch = this.value.trim().toLowerCase();
+            renderAll(allLayouts, currentSearch, currentCodeSearch, currentStatus);
+        });
+
+        // Live search — mã sản xuất
+        document.getElementById('atdCodeSearch').addEventListener('input', function () {
+            currentCodeSearch = this.value.trim().toLowerCase();
+            renderAll(allLayouts, currentSearch, currentCodeSearch, currentStatus);
+        });
+
+        // Status filter (client-side only)
+        document.getElementById('atdStatusFilter').addEventListener('change', function () {
+            currentStatus = this.value;
+            renderAll(allLayouts, currentSearch, currentCodeSearch, currentStatus);
+        });
+
+        // Dept dropdown change → cập nhật URL và load
+        document.getElementById('atdDeptFilter').addEventListener('change', function () {
+            var deptId = this.value;
+            currentSearch     = '';
+            currentCodeSearch = '';
+            document.getElementById('atdSearch').value     = '';
+            document.getElementById('atdCodeSearch').value = '';
+            applyDeptId(deptId, true);
+        });
+
+        // Refresh → reload với dept hiện tại
+        document.getElementById('atdRefreshBtn').addEventListener('click', function () {
+            if (!currentDeptId) { showSelectPrompt(); return; }
+            var btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...';
+            loadLayouts(currentDeptId);
+            setTimeout(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Làm mới';
+            }, 1200);
+        });
+
+        // Export (stub)
+        document.getElementById('atdExportBtn').addEventListener('click', function () {
+            var btn = this;
+            var orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã xuất!';
+            btn.style.background = 'linear-gradient(135deg,var(--success) 0%,#1e7a57 100%)';
+            setTimeout(function () { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+        });
+
+        // Xử lý nút Back/Forward của trình duyệt
+        window.addEventListener('popstate', function (e) {
+            var deptId = (e.state && e.state.deptId) ? e.state.deptId : getDeptIdFromUrl();
+            currentSearch     = '';
+            currentCodeSearch = '';
+            document.getElementById('atdSearch').value     = '';
+            document.getElementById('atdCodeSearch').value = '';
+            document.getElementById('atdStatusFilter').value = '';
+            currentStatus = '';
+            applyDeptId(deptId, false);
+        });
+
+    }); // end DOMContentLoaded
+
+})();
+
+
+
+</script>
 <style>
     /* ============================================================
        ATDepartment — Machine Layout View
@@ -549,6 +970,9 @@
             <a asp-controller="MachineLayoutDesigner" asp-action="Index" class="btn btn-ghost btn-sm">
                 <i class="fa-solid fa-pen-ruler"></i> Thiết kế layout
             </a>
+            <a asp-controller="ProductionDepartment" asp-action="RecordOutput" class="btn btn-ghost btn-sm" style="background:linear-gradient(135deg,#1f3a67 0%,#3a5fa8 100%);color:#fff;border:none;box-shadow:0 4px 12px rgba(31,58,103,.22);">
+                <i class="fa-solid fa-pencil"></i> Ghi sản lượng
+            </a>
             <button class="btn btn-primary btn-sm" id="atdExportBtn">
                 <i class="fa-solid fa-file-export"></i> Xuất báo cáo
             </button>
@@ -559,14 +983,24 @@
          FILTER BAR
          ===================================================== -->
     <div class="atd-filter">
-        <!-- Tìm kiếm -->
+        <!-- Tìm kiếm máy -->
         <div class="atd-filter-group">
-            <label class="atd-filter-label">Tìm kiếm</label>
+            <label class="atd-filter-label">Tên máy</label>
             <div class="atd-search-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="atdSearch" placeholder="Tên máy, mã máy, từ khóa...">
+                <input type="text" id="atdSearch" placeholder="Tên máy, mã máy...">
             </div>
         </div>
+
+        <!-- Tìm theo mã sản xuất -->
+        <div class="atd-filter-group">
+            <label class="atd-filter-label">Mã / Style / Tổ / Màu</label>
+            <div class="atd-search-wrap" style="min-width:200px;">
+                <i class="fa-solid fa-shirt" style="color:var(--accent-navy);"></i>
+                <input type="text" id="atdCodeSearch" placeholder="SP-2026, Tổ 1, Trắng...">
+            </div>
+        </div>
+        <span id="atdCodeSearchResult" style="display:none;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--accent-navy);background:var(--accent-navy-soft);padding:4px 10px;border-radius:999px;white-space:nowrap;"><i class="fa-solid fa-bullseye"></i><span></span></span>
 
         <!-- Bộ phận -->
         <div class="atd-filter-group">
@@ -618,296 +1052,3 @@
     </div>
 </div>
 
-<script>
-(function () {
-    /* =====================================================
-       HELPERS
-       ===================================================== */
-    var STATUS = {
-        1: { cls: 'active',      label: 'Hoạt động',      icon: 'fa-check',  tipFn: function(n){ return n + ' — Đang hoạt động'; } },
-        2: { cls: 'inactive',    label: 'Ngừng hoạt động', icon: 'fa-xmark',  tipFn: function(n){ return n + ' — Ngừng hoạt động'; } },
-        3: { cls: 'maintenance', label: 'Bảo trì',         icon: 'fa-wrench', tipFn: function(n){ return n + ' — Đang bảo trì'; } }
-    };
-
-    function esc(str) {
-        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    /* =====================================================
-       LOAD DATA
-       TODO: Thay đoạn này bằng fetch('/ProductionDepartment/GetLayouts')
-             để lấy dữ liệu thực từ DB khi backend sẵn sàng.
-             Cấu trúc JSON trả về phải khớp với mock bên dưới:
-             [{ id, name, departmentName, rowCount, columnCount,
-                cellWidth, cellHeight, gap, status,
-                items: [{ rowIndex, columnIndex, sortOrder,
-                          machineName, machineCode, keyword, machineStatus }] }]
-       ===================================================== */
-    function loadLayouts() {
-        try {
-            var el = document.getElementById('mockLayouts');
-            return el ? JSON.parse(el.textContent) : [];
-        } catch(e) {
-            return [];
-        }
-    }
-
-    /* =====================================================
-       RENDER
-       ===================================================== */
-    function renderAll(layouts, search, deptFilter, statusFilter) {
-        var container = document.getElementById('atdLayoutContainer');
-        container.innerHTML = '';
-
-        // Populate dept dropdown
-        var deptSel = document.getElementById('atdDeptFilter');
-        if (deptSel.options.length <= 1) {
-            layouts.forEach(function(l) {
-                var opt = document.createElement('option');
-                opt.value = l.departmentName;
-                opt.textContent = l.departmentName;
-                deptSel.appendChild(opt);
-            });
-        }
-
-        // Filter layouts
-        var visible = layouts.filter(function(l) {
-            if (deptFilter && l.departmentName !== deptFilter) return false;
-            return true;
-        });
-
-        if (visible.length === 0) {
-            container.innerHTML =
-                '<div class="atd-no-data">' +
-                    '<div class="nd-icon"><i class="fa-solid fa-border-all"></i></div>' +
-                    '<h3>Không có layout nào</h3>' +
-                    '<p>Chưa có layout bộ phận. Hãy vào <strong>Thiết kế layout máy</strong> để tạo mới.</p>' +
-                '</div>';
-            return;
-        }
-
-        visible.forEach(function(layout, idx) {
-            var section = buildSection(layout, search, statusFilter, idx);
-            container.appendChild(section);
-        });
-    }
-
-    function buildSection(layout, search, statusFilter, idx) {
-        var rows = layout.rowCount;
-        var cols = layout.columnCount;
-        var gap  = layout.gap || 10;
-        var gap2 = gap + 'px';
-
-        // Build lookup: "row-col" → item
-        var map = {};
-        (layout.items || []).forEach(function(item) {
-            var key = item.rowIndex + '-' + item.columnIndex;
-            map[key] = item;
-        });
-
-        // Stats
-        var total = rows * cols;
-        var cntActive = 0, cntInactive = 0, cntMaint = 0, cntEmpty = 0;
-        for (var r = 0; r < rows; r++) {
-            for (var c = 0; c < cols; c++) {
-                var it = map[r + '-' + c];
-                if (!it) { cntEmpty++; }
-                else if (it.machineStatus === 1) cntActive++;
-                else if (it.machineStatus === 2) cntInactive++;
-                else if (it.machineStatus === 3) cntMaint++;
-                else cntEmpty++;
-            }
-        }
-
-        // --- Section wrapper ---
-        var sec = document.createElement('div');
-        sec.className = 'atd-section';
-        sec.dataset.dept = layout.departmentName;
-        sec.style.animationDelay = (idx * 0.07) + 's';
-
-        // Section head
-        var deptIcons = { 'Bộ phận Cắt': 'fa-scissors', 'Bộ phận May': 'fa-shirt', 'Bộ phận Hoàn thiện': 'fa-temperature-three-quarters', 'Bộ phận Kiểm tra': 'fa-magnifying-glass-chart', 'Bộ phận Đóng gói': 'fa-box' };
-        var icon = deptIcons[layout.departmentName] || 'fa-gears';
-
-        sec.innerHTML =
-            '<div class="atd-section-head">' +
-                '<div class="atd-section-title-group">' +
-                    '<div class="atd-dept-badge"><i class="fa-solid ' + esc(icon) + '"></i></div>' +
-                    '<div>' +
-                        '<h2 class="atd-section-name">' + esc(layout.departmentName) + '</h2>' +
-                        '<div class="atd-section-meta">' + esc(layout.name) + ' &nbsp;·&nbsp; ' + rows + ' hàng × ' + cols + ' cột &nbsp;·&nbsp; ' + total + ' ô</div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="atd-section-stats">' +
-                    (cntActive   ? '<div class="atd-stat s-active"><i class="fa-solid fa-check fa-xs"></i>' + cntActive + ' hoạt động</div>' : '') +
-                    (cntInactive ? '<div class="atd-stat s-inactive"><i class="fa-solid fa-xmark fa-xs"></i>' + cntInactive + ' ngừng</div>' : '') +
-                    (cntMaint    ? '<div class="atd-stat s-maint"><i class="fa-solid fa-wrench fa-xs"></i>' + cntMaint + ' bảo trì</div>' : '') +
-                    (cntEmpty    ? '<div class="atd-stat s-empty"><i class="fa-regular fa-square fa-xs"></i>' + cntEmpty + ' trống</div>' : '') +
-                '</div>' +
-            '</div>';
-
-        // Grid wrapper
-        var gridWrap = document.createElement('div');
-        gridWrap.className = 'atd-grid-wrap';
-
-        var grid = document.createElement('div');
-        grid.className = 'atd-grid';
-
-        // Calculate cell size
-        var cellW = layout.cellWidth  ? layout.cellWidth  + 'px' : '1fr';
-        var cellH = layout.cellHeight ? layout.cellHeight + 'px' : 'auto';
-
-        grid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cellW + ')';
-        grid.style.gridTemplateRows    = 'repeat(' + rows + ', ' + cellH + ')';
-        grid.style.gap = gap2;
-
-        // Render cells
-        for (var r = 0; r < rows; r++) {
-            for (var c = 0; c < cols; c++) {
-                var item = map[r + '-' + c] || null;
-                var cell = buildCell(r, c, item, search, statusFilter);
-                grid.appendChild(cell);
-            }
-        }
-
-        gridWrap.appendChild(grid);
-        sec.appendChild(gridWrap);
-        return sec;
-    }
-
-    function buildCell(row, col, item, search, statusFilter) {
-        var cell = document.createElement('div');
-        cell.className = 'atd-cell';
-        var posLabel = 'H' + (row + 1) + '-C' + (col + 1);
-
-        if (!item || item.machineStatus === 0) {
-            cell.classList.add('empty');
-            cell.innerHTML =
-                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
-                '<div class="empty-inner">' +
-                    '<i class="fa-regular fa-square-dashed"></i>' +
-                    '<span>Ô trống</span>' +
-                '</div>';
-            return cell;
-        }
-
-        // Filter by status
-        var st = STATUS[item.machineStatus] || STATUS[1];
-        if (statusFilter && item.machineStatus !== parseInt(statusFilter)) {
-            cell.classList.add('empty');
-            cell.innerHTML =
-                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
-                '<div class="empty-inner">' +
-                    '<i class="fa-regular fa-square-dashed"></i>' +
-                    '<span>Ô trống</span>' +
-                '</div>';
-            return cell;
-        }
-
-        // Highlight search
-        var nameDisplay = esc(item.machineName);
-        var codeDisplay = esc(item.machineCode);
-        if (search) {
-            var re = new RegExp('(' + search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-            nameDisplay = esc(item.machineName).replace(re, '<mark style="background:var(--accent-gold-soft);border-radius:2px;">$1</mark>');
-            codeDisplay = esc(item.machineCode).replace(re, '<mark style="background:var(--accent-gold-soft);border-radius:2px;">$1</mark>');
-        }
-
-        cell.classList.add(st.cls);
-        cell.setAttribute('data-tip', st.tipFn(item.machineName));
-        cell.style.cursor = 'pointer';
-
-        // Navigate to MachineDetail page
-        var detailUrl = '/ProductionDepartment/MachineDetail'
-            + '?machineId='   + encodeURIComponent(item.machineId   || '')
-            + '&machineName=' + encodeURIComponent(item.machineName  || '')
-            + '&machineCode=' + encodeURIComponent(item.machineCode  || '')
-            + '&dept='        + encodeURIComponent(item.dept         || '');
-
-        cell.innerHTML =
-            '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
-            '<div class="atd-cell-inner">' +
-                '<div class="atd-cell-top">' +
-                    '<div class="atd-cell-icon"><i class="fa-solid ' + st.icon + '"></i></div>' +
-                    '<div class="atd-cell-status-dot"></div>' +
-                '</div>' +
-                '<div class="atd-cell-name">' + nameDisplay + '</div>' +
-                '<div class="atd-cell-code">' + codeDisplay + '</div>' +
-                (item.keyword ? '<div class="atd-cell-kw">' + esc(item.keyword) + '</div>' : '') +
-            '</div>' +
-            '<div class="atd-cell-footer">' +
-                '<span class="atd-cell-status-label">' + esc(st.label) + '</span>' +
-                '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;color:var(--ink-300);"></i>' +
-            '</div>' +
-            '<div class="atd-cell-bar"></div>';
-
-        cell.addEventListener('click', function () {
-            window.location.href = detailUrl;
-        });
-
-        return cell;
-    }
-
-    /* =====================================================
-       INIT
-       ===================================================== */
-    var allLayouts = loadLayouts();
-    var currentSearch = '';
-    var currentDept   = '';
-    var currentStatus = '';
-
-    function applyFilters() {
-        renderAll(allLayouts, currentSearch, currentDept, currentStatus);
-    }
-
-    // Initial render
-    renderAll(allLayouts, '', '', '');
-
-    // Filter events
-    document.getElementById('atdFilterApply').addEventListener('click', function () {
-        currentSearch = (document.getElementById('atdSearch').value || '').trim().toLowerCase();
-        currentDept   = document.getElementById('atdDeptFilter').value;
-        currentStatus = document.getElementById('atdStatusFilter').value;
-        applyFilters();
-    });
-
-    document.getElementById('atdFilterReset').addEventListener('click', function () {
-        document.getElementById('atdSearch').value = '';
-        document.getElementById('atdDeptFilter').value = '';
-        document.getElementById('atdStatusFilter').value = '';
-        currentSearch = currentDept = currentStatus = '';
-        applyFilters();
-    });
-
-    // Live search
-    document.getElementById('atdSearch').addEventListener('input', function () {
-        currentSearch = this.value.trim().toLowerCase();
-        applyFilters();
-    });
-
-    // Refresh (future: reload từ API)
-    document.getElementById('atdRefreshBtn').addEventListener('click', function () {
-        /*
-         * TODO: Khi kết nối DB, thay bằng:
-         *   fetch('/ProductionDepartment/GetLayouts')
-         *     .then(r => r.json())
-         *     .then(data => { allLayouts = data; applyFilters(); });
-         */
-        applyFilters();
-        var btn = this;
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã làm mới';
-        setTimeout(function() { btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Làm mới'; }, 1500);
-    });
-
-    // Export (stub)
-    document.getElementById('atdExportBtn').addEventListener('click', function () {
-        console.log('[ATDepartment] Export payload:', JSON.stringify(allLayouts, null, 2));
-        var btn = this;
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã xuất!';
-        btn.style.background = 'linear-gradient(135deg,var(--success) 0%,#1e7a57 100%)';
-        setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
-    });
-
-})();
-</script>

@@ -799,11 +799,6 @@
                         <label class="mld-label">Hiển thị bộ phận</label>
                         <select id="mldDeptFilter" class="mld-input mld-select">
                             <option value="all">Tất cả bộ phận</option>
-                            <option value="Bộ phận Cắt">Bộ phận Cắt</option>
-                            <option value="Bộ phận May">Bộ phận May</option>
-                            <option value="Bộ phận Hoàn thiện">Bộ phận Hoàn thiện</option>
-                            <option value="Bộ phận Kiểm tra">Bộ phận Kiểm tra</option>
-                            <option value="Bộ phận Đóng gói">Bộ phận Đóng gói</option>
                         </select>
                     </div>
                 </div>
@@ -858,16 +853,18 @@
 
 
 <!-- =====================================================
-     MODAL: Thêm / sửa thông tin máy
+     MODAL: Thêm / sửa máy vào ô (2-tab: Chọn có sẵn | Tạo mới)
      ===================================================== -->
 <div class="mld-modal-backdrop" id="mldModalBackdrop">
-    <div class="mld-modal" id="mldModal" role="dialog" aria-modal="true" aria-labelledby="mldModalTitle">
+    <div class="mld-modal mld-modal-wide" id="mldModal" role="dialog" aria-modal="true" aria-labelledby="mldModalTitle">
+
+        <!-- HEAD -->
         <div class="mld-modal-head">
             <div class="modal-title-group">
                 <div class="modal-icon"><i class="fa-solid fa-gears"></i></div>
                 <div>
                     <div class="modal-title" id="mldModalTitle">Thêm máy vào ô</div>
-                    <div class="modal-sub" id="mldModalSub">Nhập thông tin máy cho ô này</div>
+                    <div class="modal-sub" id="mldModalSub">Chọn máy có sẵn hoặc tạo máy mới</div>
                 </div>
             </div>
             <button class="mld-modal-close" id="mldModalClose" aria-label="Đóng">
@@ -875,45 +872,78 @@
             </button>
         </div>
 
-        <div class="mld-modal-body">
+        <!-- TABS -->
+        <div class="mld-modal-tabs" id="mldModalTabs">
+            <button class="mld-tab-btn active" id="tabBtnPick" data-tab="pick">
+                <i class="fa-solid fa-list-check"></i> Chọn máy có sẵn
+            </button>
+            <button class="mld-tab-btn" id="tabBtnNew" data-tab="new">
+                <i class="fa-solid fa-circle-plus"></i> Tạo máy mới
+            </button>
+        </div>
+
+        <!-- TAB BODY: Chọn máy có sẵn -->
+        <div class="mld-tab-pane active" id="tabPanePick">
+            <!-- Search -->
+            <div class="mld-picker-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="pickerSearch" class="mld-picker-search" placeholder="Tìm theo tên / số hiệu máy...">
+            </div>
+            <!-- Machine list -->
+            <div class="mld-picker-list" id="pickerList">
+                <div class="picker-empty" id="pickerEmpty">
+                    <i class="fa-solid fa-inbox"></i>
+                    <span>Chưa có máy nào trong bộ phận này</span>
+                </div>
+            </div>
+            <!-- Selected preview -->
+            <div class="mld-picker-selected" id="pickerSelected" style="display:none">
+                <i class="fa-solid fa-circle-check" style="color:var(--success)"></i>
+                <span id="pickerSelectedName">—</span>
+                <button class="picker-clear-btn" id="pickerClearBtn" title="Bỏ chọn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Status for existing -->
+            <div class="mld-modal-field" style="margin-top:12px;">
+                <label class="mld-modal-label">Trạng thái <span class="req">*</span></label>
+                <div class="mld-status-picker" id="mldStatusPickerPick">
+                    <div class="mld-status-opt selected" data-val="active"><span class="so-dot"></span>Hoạt động</div>
+                    <div class="mld-status-opt" data-val="inactive"><span class="so-dot"></span>Ngừng</div>
+                    <div class="mld-status-opt" data-val="maintenance"><span class="so-dot"></span>Bảo trì</div>
+                </div>
+            </div>
+            <!-- Note for existing -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fNoteExist">Ghi chú</label>
+                <textarea id="fNoteExist" class="mld-modal-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
+            </div>
+        </div>
+
+        <!-- TAB BODY: Tạo máy mới -->
+        <div class="mld-tab-pane" id="tabPaneNew">
             <!-- Tên máy -->
             <div class="mld-modal-field">
-                <label class="mld-modal-label" for="fMachineName">
-                    Tên máy <span class="req">*</span>
-                </label>
+                <label class="mld-modal-label" for="fMachineName">Tên / số hiệu máy <span class="req">*</span></label>
                 <input type="text" id="fMachineName" class="mld-modal-input"
                        placeholder="VD: Máy may 1K, Máy cắt CT-01..." autocomplete="off">
             </div>
-
-            <!-- Bộ phận -->
+            <!-- Bộ phận (readonly) -->
             <div class="mld-modal-field">
-                <label class="mld-modal-label" for="fDept">Bộ phận <span class="req">*</span></label>
-                <select id="fDept" class="mld-modal-select">
+                <label class="mld-modal-label" for="fDept">Bộ phận</label>
+                <select id="fDept" class="mld-modal-select" disabled>
                     <option value="">-- Chọn bộ phận --</option>
-                    <option value="Bộ phận Cắt">Bộ phận Cắt</option>
-                    <option value="Bộ phận May">Bộ phận May</option>
-                    <option value="Bộ phận Hoàn thiện">Bộ phận Hoàn thiện</option>
-                    <option value="Bộ phận Kiểm tra">Bộ phận Kiểm tra</option>
-                    <option value="Bộ phận Đóng gói">Bộ phận Đóng gói</option>
                 </select>
             </div>
-
             <!-- Trạng thái -->
             <div class="mld-modal-field">
                 <label class="mld-modal-label">Trạng thái <span class="req">*</span></label>
-                <div class="mld-status-picker" id="mldStatusPicker">
-                    <div class="mld-status-opt selected" data-val="active">
-                        <span class="so-dot"></span>Hoạt động
-                    </div>
-                    <div class="mld-status-opt" data-val="inactive">
-                        <span class="so-dot"></span>Ngừng
-                    </div>
-                    <div class="mld-status-opt" data-val="maintenance">
-                        <span class="so-dot"></span>Bảo trì
-                    </div>
+                <div class="mld-status-picker" id="mldStatusPickerNew">
+                    <div class="mld-status-opt selected" data-val="active"><span class="so-dot"></span>Hoạt động</div>
+                    <div class="mld-status-opt" data-val="inactive"><span class="so-dot"></span>Ngừng</div>
+                    <div class="mld-status-opt" data-val="maintenance"><span class="so-dot"></span>Bảo trì</div>
                 </div>
             </div>
-
             <!-- Ghi chú -->
             <div class="mld-modal-field">
                 <label class="mld-modal-label" for="fNote">Ghi chú</label>
@@ -921,6 +951,7 @@
             </div>
         </div>
 
+        <!-- FOOT -->
         <div class="mld-modal-foot">
             <button class="btn-delete" id="mldBtnDelete" title="Xóa máy khỏi ô">
                 <i class="fa-solid fa-trash"></i>
@@ -933,66 +964,204 @@
     </div>
 </div>
 
-<!-- Existing shared btn classes used above -->
+
+<!-- Shared styles: btns + modal tabs + machine picker -->
 <style>
     .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; transition: background .18s, opacity .18s, transform .15s; }
     .btn-primary { background: linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
     .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
     .btn-ghost { background: var(--bg-canvas); color: var(--ink-700-solid); border: 1.5px solid var(--border); }
     .btn-ghost:hover { background: var(--border-soft); }
+
+    /* ---- Wider modal ---- */
+    .mld-modal-wide { width: 520px !important; max-width: calc(100vw - 40px) !important; }
+
+    /* ---- Modal tabs ---- */
+    .mld-modal-tabs {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg-canvas);
+        padding: 0 20px;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .mld-tab-btn {
+        display: flex; align-items: center; gap: 7px;
+        padding: 11px 16px;
+        font-size: 13px; font-weight: 600;
+        color: var(--ink-400);
+        background: transparent;
+        border: none; border-bottom: 2.5px solid transparent;
+        cursor: pointer;
+        transition: color .18s, border-color .18s;
+        margin-bottom: -2px;
+    }
+    .mld-tab-btn:hover { color: var(--ink-700-solid); }
+    .mld-tab-btn.active { color: var(--accent-navy); border-bottom-color: var(--accent-navy); }
+
+    /* ---- Tab panes ---- */
+    .mld-tab-pane {
+        display: none;
+        padding: 16px 20px;
+        overflow-y: auto;
+        max-height: 420px;
+        flex: 1;
+    }
+    .mld-tab-pane.active { display: flex; flex-direction: column; gap: 12px; }
+
+    /* ---- Picker search ---- */
+    .mld-picker-search-wrap {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        border-radius: 9px;
+        padding: 9px 12px;
+    }
+    .mld-picker-search-wrap i { color: var(--ink-300); font-size: 13px; }
+    .mld-picker-search {
+        flex: 1; border: none; background: transparent;
+        font-size: 13.5px; color: var(--ink-900);
+        outline: none;
+    }
+
+    /* ---- Picker list ---- */
+    .mld-picker-list {
+        display: flex; flex-direction: column; gap: 6px;
+        max-height: 200px; overflow-y: auto;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 8px;
+        background: var(--bg-canvas);
+    }
+    .picker-empty {
+        display: flex; align-items: center; gap: 8px; justify-content: center;
+        padding: 20px; color: var(--ink-300); font-size: 13px;
+    }
+    .picker-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background .15s;
+        border: 1.5px solid transparent;
+    }
+    .picker-item:hover { background: var(--bg-surface); border-color: var(--border); }
+    .picker-item.selected { background: rgba(31,58,103,.07); border-color: var(--accent-navy); }
+    .picker-item-icon {
+        width: 32px; height: 32px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; flex-shrink: 0;
+    }
+    .picker-item-icon.s1 { background: rgba(34,197,94,.12); color: #16a34a; }
+    .picker-item-icon.s2 { background: rgba(234,179,8,.12); color: #b45309; }
+    .picker-item-icon.s3 { background: rgba(239,68,68,.12); color: #dc2626; }
+    .picker-item-info { flex: 1; min-width: 0; }
+    .picker-item-name { font-size: 13.5px; font-weight: 700; color: var(--ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .picker-item-remark { font-size: 11.5px; color: var(--ink-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .picker-item-check { color: var(--accent-navy); font-size: 16px; }
+
+    /* ---- Selected preview ---- */
+    .mld-picker-selected {
+        display: flex; align-items: center; gap: 8px;
+        padding: 9px 14px;
+        background: rgba(31,58,103,.07);
+        border: 1.5px solid var(--accent-navy);
+        border-radius: 9px;
+        font-size: 13px; font-weight: 600; color: var(--ink-900);
+    }
+    .mld-picker-selected > span { flex: 1; }
+    .picker-clear-btn {
+        background: transparent; border: none; cursor: pointer;
+        color: var(--ink-400); font-size: 14px; padding: 2px 4px;
+        border-radius: 4px; transition: color .15s;
+    }
+    .picker-clear-btn:hover { color: var(--danger); }
+
+    /* ---- Modal body scrollable with tabs ---- */
+    .mld-modal-wide .mld-modal-body { padding: 0; }
 </style>
+
 
 <script>
     (function () {
         /* =====================================================
            STATE
            ===================================================== */
-        // machines[cellIndex] = { name, dept, status, note }  (or null if empty)
-        var machines = {};
-        var currentCellIndex = null;
-        var currentMode = 'auto'; // 'auto' | 'custom'
+        // machines[cellKey] = { itemId, machineId, name, deptId, dept, status, note }
+        var machines     = {};
+        var currentCellKey  = null;
+        var currentMode     = 'auto';
+        var currentLayoutId = null;
+        var currentDeptId   = null;
+        var currentDeptName = '';
+        var currentRows     = 3;
+        var currentCols     = 4;
+
+        // Tab state: 'pick' | 'new'
+        var activeTab = 'pick';
+        // Status per tab
+        var selectedStatusPick = 'active';
+        var selectedStatusNew  = 'active';
+        // Picker: all machines for current dept
+        var pickerMachines = [];
+        // Currently picked machine (from existing list)
+        var pickedMachine  = null;
 
         /* =====================================================
            DOM REFS
            ===================================================== */
-        var rowsEl       = document.getElementById('mldRows');
-        var colsEl       = document.getElementById('mldCols');
-        var gapEl        = document.getElementById('mldGap');
-        var applyBtn     = document.getElementById('mldApplyBtn');
-        var clearBtn     = document.getElementById('mldClearBtn');
-        var gridEl       = document.getElementById('mldGrid');
-        var emptyState   = document.getElementById('mldEmptyState');
-        var canvasWrap   = document.getElementById('mldCanvasWrap');
+        var rowsEl     = document.getElementById('mldRows');
+        var colsEl     = document.getElementById('mldCols');
+        var gapEl      = document.getElementById('mldGap');
+        var applyBtn   = document.getElementById('mldApplyBtn');
+        var clearBtn   = document.getElementById('mldClearBtn');
+        var gridEl     = document.getElementById('mldGrid');
+        var emptyState = document.getElementById('mldEmptyState');
+        var canvasWrap = document.getElementById('mldCanvasWrap');
 
-        var autoBtn      = document.getElementById('mldAutoBtn');
-        var customBtn    = document.getElementById('mldCustomBtn');
-        var sizeCustom   = document.getElementById('mldSizeCustom');
-        var autoHint     = document.getElementById('mldAutoHint');
-        var cellWEl      = document.getElementById('mldCellW');
-        var cellHEl      = document.getElementById('mldCellH');
+        var autoBtn    = document.getElementById('mldAutoBtn');
+        var customBtn  = document.getElementById('mldCustomBtn');
+        var sizeCustom = document.getElementById('mldSizeCustom');
+        var autoHint   = document.getElementById('mldAutoHint');
+        var cellWEl    = document.getElementById('mldCellW');
+        var cellHEl    = document.getElementById('mldCellH');
 
-        var backdrop     = document.getElementById('mldModalBackdrop');
-        var modalClose   = document.getElementById('mldModalClose');
-        var btnCancel    = document.getElementById('mldBtnCancel');
-        var btnSave      = document.getElementById('mldBtnSave');
-        var btnDelete    = document.getElementById('mldBtnDelete');
-        var modalTitle   = document.getElementById('mldModalTitle');
-        var modalSub     = document.getElementById('mldModalSub');
+        var backdrop   = document.getElementById('mldModalBackdrop');
+        var modalClose = document.getElementById('mldModalClose');
+        var btnCancel  = document.getElementById('mldBtnCancel');
+        var btnSave    = document.getElementById('mldBtnSave');
+        var btnDelete  = document.getElementById('mldBtnDelete');
+        var modalTitle = document.getElementById('mldModalTitle');
+        var modalSub   = document.getElementById('mldModalSub');
 
-        var fName        = document.getElementById('fMachineName');
-        var fDept        = document.getElementById('fDept');
-        var fNote        = document.getElementById('fNote');
+        var fName      = document.getElementById('fMachineName');
+        var fDept      = document.getElementById('fDept');
+        var fNote      = document.getElementById('fNote');
+        var fNoteExist = document.getElementById('fNoteExist');
 
-        var statTotal    = document.getElementById('statTotal');
-        var statFilled   = document.getElementById('statFilled');
-        var statEmpty    = document.getElementById('statEmpty');
+        var deptFilter = document.getElementById('mldDeptFilter');
+        var statTotal  = document.getElementById('statTotal');
+        var statFilled = document.getElementById('statFilled');
+        var statEmpty  = document.getElementById('statEmpty');
 
-        var selectedStatus = 'active';
+        // Tab buttons & panes
+        var tabBtnPick  = document.getElementById('tabBtnPick');
+        var tabBtnNew   = document.getElementById('tabBtnNew');
+        var tabPanePick = document.getElementById('tabPanePick');
+        var tabPaneNew  = document.getElementById('tabPaneNew');
+
+        // Picker elements
+        var pickerSearch       = document.getElementById('pickerSearch');
+        var pickerList         = document.getElementById('pickerList');
+        var pickerSelected     = document.getElementById('pickerSelected');
+        var pickerSelectedName = document.getElementById('pickerSelectedName');
+        var pickerClearBtn     = document.getElementById('pickerClearBtn');
 
         /* =====================================================
            HELPERS
            ===================================================== */
         function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+        function cellKey(row, col)  { return row + '-' + col; }
 
         function updateStats() {
             var total  = gridEl.querySelectorAll('.mld-cell').length;
@@ -1002,16 +1171,23 @@
             statEmpty.textContent  = total - filled;
         }
 
-        function statusLabel(s) {
-            return s === 'active' ? 'Hoạt động' : s === 'inactive' ? 'Ngừng hoạt động' : 'Bảo trì';
+        function statusLabel(s)  { return s === 'active' ? 'Hoạt động' : s === 'inactive' ? 'Ngừng hoạt động' : 'Bảo trì'; }
+        function statusCode(s)   { return s === 'active' ? 1 : s === 'inactive' ? 2 : 3; }
+        function statusStr(code) { return code === 1 ? 'active' : code === 2 ? 'inactive' : 'maintenance'; }
+        function statusIconBg(s) { return s === 'active' ? 'active-bg' : s === 'inactive' ? 'inactive-bg' : 'maintenance-bg'; }
+        function statusIcon(s)   { return s === 'active' ? 'fa-check' : s === 'inactive' ? 'fa-xmark' : 'fa-wrench'; }
+
+        function esc(s) {
+            return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
-        function statusIconBg(s) {
-            return s === 'active' ? 'active-bg' : s === 'inactive' ? 'inactive-bg' : 'maintenance-bg';
-        }
-
-        function statusIcon(s) {
-            return s === 'active' ? 'fa-check' : s === 'inactive' ? 'fa-xmark' : 'fa-wrench';
+        /* Simple toast */
+        function toast(msg, ok) {
+            var t = document.createElement('div');
+            t.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:700;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.18);background:' + (ok ? 'var(--success)' : 'var(--danger)') + ';';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function () { t.remove(); }, 3200);
         }
 
         /* =====================================================
@@ -1024,7 +1200,6 @@
             sizeCustom.classList.remove('visible');
             autoHint.style.display = '';
         });
-
         customBtn.addEventListener('click', function () {
             currentMode = 'custom';
             customBtn.classList.add('active');
@@ -1034,200 +1209,527 @@
         });
 
         /* =====================================================
-           STATUS PICKER
+           STATUS PICKERS (one per tab)
            ===================================================== */
-        document.getElementById('mldStatusPicker').addEventListener('click', function (e) {
+        document.getElementById('mldStatusPickerPick').addEventListener('click', function (e) {
             var opt = e.target.closest('.mld-status-opt');
             if (!opt) return;
-            document.querySelectorAll('.mld-status-opt').forEach(function (o) { o.classList.remove('selected'); });
+            this.querySelectorAll('.mld-status-opt').forEach(function (o) { o.classList.remove('selected'); });
             opt.classList.add('selected');
-            selectedStatus = opt.dataset.val;
+            selectedStatusPick = opt.dataset.val;
+        });
+        document.getElementById('mldStatusPickerNew').addEventListener('click', function (e) {
+            var opt = e.target.closest('.mld-status-opt');
+            if (!opt) return;
+            this.querySelectorAll('.mld-status-opt').forEach(function (o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            selectedStatusNew = opt.dataset.val;
         });
 
         /* =====================================================
-           BUILD GRID
+           TAB SWITCHING
+           ===================================================== */
+        function switchTab(tab) {
+            activeTab = tab;
+            tabBtnPick.classList.toggle('active', tab === 'pick');
+            tabBtnNew.classList.toggle('active', tab === 'new');
+            tabPanePick.classList.toggle('active', tab === 'pick');
+            tabPaneNew.classList.toggle('active', tab === 'new');
+        }
+        tabBtnPick.addEventListener('click', function () { switchTab('pick'); });
+        tabBtnNew.addEventListener('click',  function () { switchTab('new'); });
+
+        /* =====================================================
+           MACHINE PICKER: Load machines for dept
+           ===================================================== */
+        function loadPickerMachines(deptId) {
+            pickerList.innerHTML = '<div class="picker-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
+            pickerMachines = [];
+            if (!deptId) {
+                renderPickerList('');
+                return;
+            }
+            fetch('/MachineLayoutDesigner/GetMachinesByDepartment?departmentId=' + deptId)
+                .then(function (r) { return r.json(); })
+                .then(function (list) {
+                    pickerMachines = list;
+                    renderPickerList('');
+                })
+                .catch(function () {
+                    pickerList.innerHTML = '<div class="picker-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải danh sách máy</span></div>';
+                });
+        }
+
+        function renderPickerList(keyword) {
+            var kw = (keyword || '').toLowerCase().trim();
+            var filtered = pickerMachines.filter(function (m) {
+                return !kw || (m.machineNumber || '').toLowerCase().includes(kw) || (m.remark || '').toLowerCase().includes(kw);
+            });
+
+            pickerList.innerHTML = '';
+            if (!filtered.length) {
+                pickerList.innerHTML = '<div class="picker-empty"><i class="fa-solid fa-inbox"></i><span>' + (pickerMachines.length ? 'Không tìm thấy máy phù hợp' : 'Chưa có máy nào trong bộ phận này') + '</span></div>';
+                return;
+            }
+
+            filtered.forEach(function (m) {
+                var icon = m.status === 1 ? 'fa-check' : m.status === 2 ? 'fa-xmark' : 'fa-wrench';
+                var sClass = 's' + m.status;
+                var isSelected = pickedMachine && pickedMachine.id === m.id;
+
+                var item = document.createElement('div');
+                item.className = 'picker-item' + (isSelected ? ' selected' : '');
+                item.dataset.id = m.id;
+                item.innerHTML =
+                    '<div class="picker-item-icon ' + sClass + '"><i class="fa-solid ' + icon + '"></i></div>' +
+                    '<div class="picker-item-info">' +
+                        '<div class="picker-item-name">' + esc(m.machineNumber || '—') + '</div>' +
+                        (m.remark ? '<div class="picker-item-remark">' + esc(m.remark) + '</div>' : '') +
+                    '</div>' +
+                    (isSelected ? '<i class="fa-solid fa-circle-check picker-item-check"></i>' : '');
+
+                item.addEventListener('click', function () {
+                    selectPickerMachine(m);
+                });
+                pickerList.appendChild(item);
+            });
+        }
+
+        function selectPickerMachine(m) {
+            pickedMachine = m;
+            // Update UI
+            pickerSelectedName.textContent = m.machineNumber || '—';
+            pickerSelected.style.display = 'flex';
+            // Sync status picker to machine's default status
+            var sVal = statusStr(m.status);
+            selectedStatusPick = sVal;
+            document.getElementById('mldStatusPickerPick').querySelectorAll('.mld-status-opt').forEach(function (o) {
+                o.classList.toggle('selected', o.dataset.val === sVal);
+            });
+            // Re-render list to show selection
+            renderPickerList(pickerSearch.value);
+        }
+
+        function clearPickerSelection() {
+            pickedMachine = null;
+            pickerSelected.style.display = 'none';
+            pickerSelectedName.textContent = '—';
+            renderPickerList(pickerSearch.value);
+        }
+
+        pickerSearch.addEventListener('input', function () { renderPickerList(this.value); });
+        pickerClearBtn.addEventListener('click', clearPickerSelection);
+
+        /* =====================================================
+           BUILD GRID (local)
            ===================================================== */
         function buildGrid() {
             var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
             var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
             var gap  = clamp(parseInt(gapEl.value)  || 12, 0, 60);
-            var total = rows * cols;
 
-            rowsEl.value = rows;
-            colsEl.value = cols;
-            gapEl.value  = gap;
+            rowsEl.value = rows; colsEl.value = cols; gapEl.value = gap;
+            currentRows = rows; currentCols = cols;
 
-            // Reset machines index when grid changes (warn user)
             if (Object.keys(machines).length > 0) {
-                var proceed = confirm('Tạo layout mới sẽ xóa toàn bộ thông tin máy hiện tại. Tiếp tục?');
-                if (!proceed) return;
+                if (!confirm('Tạo layout mới sẽ xóa toàn bộ thông tin máy hiện tại. Tiếp tục?')) return;
             }
             machines = {};
-
-            // Hide empty state
             emptyState.style.display = 'none';
-
-            // Grid CSS
-            gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', ' + (currentMode === 'custom' ? (parseInt(cellWEl.value)||160) + 'px' : '1fr') + ')';
-            gridEl.style.gridTemplateRows    = 'repeat(' + rows + ', ' + (currentMode === 'custom' ? (parseInt(cellHEl.value)||120) + 'px' : 'auto') + ')';
-            gridEl.style.gap                 = gap + 'px';
-
-            if (currentMode === 'auto') {
-                // Fill the canvas width
-                var canvasW = canvasWrap.clientWidth - 56;
-                gridEl.style.width = canvasW + 'px';
-            } else {
-                gridEl.style.width = 'auto';
-            }
-
-            // Build cells
-            gridEl.innerHTML = '';
-            for (var i = 0; i < total; i++) {
-                gridEl.appendChild(makeCell(i, rows, cols));
-            }
-
+            applyGridStyle(rows, cols, gap);
+            renderAllCells(rows, cols);
             updateStats();
         }
 
-        function makeCell(index, rows, cols) {
-            var row = Math.floor(index / cols) + 1;
-            var col = (index % cols) + 1;
-
-            var cell = document.createElement('div');
-            cell.className = 'mld-cell is-empty';
-            cell.dataset.index = index;
-
-            var posLabel = 'H' + row + '-C' + col;
-
-            // auto height hint
+        function applyGridStyle(rows, cols, gap) {
+            gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', ' + (currentMode === 'custom' ? (parseInt(cellWEl.value)||160) + 'px' : '1fr') + ')';
+            gridEl.style.gridTemplateRows    = 'repeat(' + rows + ', ' + (currentMode === 'custom' ? (parseInt(cellHEl.value)||120) + 'px' : 'auto') + ')';
+            gridEl.style.gap = gap + 'px';
             if (currentMode === 'auto') {
-                cell.style.minHeight = '110px';
+                gridEl.style.width = (canvasWrap.clientWidth - 56) + 'px';
+            } else {
+                gridEl.style.width = 'auto';
             }
+        }
 
-            cell.innerHTML =
-                '<span class="cell-pos">' + posLabel + '</span>' +
-                '<div class="add-icon"><i class="fa-solid fa-plus"></i></div>' +
-                '<div class="add-label">Thêm máy</div>';
+        function renderAllCells(rows, cols) {
+            gridEl.innerHTML = '';
+            for (var i = 0; i < rows; i++)
+                for (var j = 0; j < cols; j++)
+                    gridEl.appendChild(makeCell(i + 1, j + 1));
+        }
 
-            cell.addEventListener('click', function () { openModal(parseInt(this.dataset.index), rows, cols); });
+        function makeCell(row, col) {
+            var key  = cellKey(row, col);
+            var cell = document.createElement('div');
+            cell.dataset.row = row; cell.dataset.col = col; cell.dataset.key = key;
+            if (currentMode === 'auto') cell.style.minHeight = '110px';
+            var m = machines[key];
+            if (!m) {
+                cell.className = 'mld-cell is-empty';
+                cell.innerHTML = '<span class="cell-pos">H' + row + '-C' + col + '</span><div class="add-icon"><i class="fa-solid fa-plus"></i></div><div class="add-label">Thêm máy</div>';
+            } else {
+                cell.className = 'mld-cell has-machine';
+                cell.innerHTML = machineHtml(row, col, m);
+            }
+            cell.addEventListener('click', function () { openModal(row, col); });
             return cell;
         }
 
-        function renderCell(index, rows, cols) {
-            var col = (index % cols) + 1;
-            var row = Math.floor(index / cols) + 1;
-            var posLabel = 'H' + row + '-C' + col;
+        function machineHtml(row, col, m) {
+            return '<span class="cell-pos">H' + row + '-C' + col + '</span>' +
+                '<div class="cell-header">' +
+                    '<div class="cell-icon ' + statusIconBg(m.status) + '"><i class="fa-solid ' + statusIcon(m.status) + '"></i></div>' +
+                    '<span class="badge-pill ' + m.status + '">' + statusLabel(m.status) + '</span>' +
+                '</div>' +
+                '<div class="cell-body">' +
+                    '<div class="cell-machine-name" title="' + esc(m.name) + '">' + esc(m.name) + '</div>' +
+                    '<div class="cell-dept">' + esc(m.dept || '—') + '</div>' +
+                '</div>' +
+                '<div class="cell-footer">' +
+                    '<span class="cell-note">' + esc(m.note || '') + '</span>' +
+                    '<i class="fa-solid fa-pen-to-square" style="color:var(--ink-300);font-size:11px;"></i>' +
+                '</div>';
+        }
 
-            var m = machines[index];
-            var cell = gridEl.querySelector('[data-index="' + index + '"]');
+        function renderCell(row, col) {
+            var key  = cellKey(row, col);
+            var cell = gridEl.querySelector('[data-key="' + key + '"]');
             if (!cell) return;
-
+            var m = machines[key];
             if (!m) {
                 cell.className = 'mld-cell is-empty';
-                cell.innerHTML =
-                    '<span class="cell-pos">' + posLabel + '</span>' +
-                    '<div class="add-icon"><i class="fa-solid fa-plus"></i></div>' +
-                    '<div class="add-label">Thêm máy</div>';
+                cell.innerHTML = '<span class="cell-pos">H' + row + '-C' + col + '</span><div class="add-icon"><i class="fa-solid fa-plus"></i></div><div class="add-label">Thêm máy</div>';
             } else {
                 cell.className = 'mld-cell has-machine';
-                cell.innerHTML =
-                    '<span class="cell-pos">' + posLabel + '</span>' +
-                    '<div class="cell-header">' +
-                        '<div class="cell-icon ' + statusIconBg(m.status) + '">' +
-                            '<i class="fa-solid ' + statusIcon(m.status) + '"></i>' +
-                        '</div>' +
-                        '<span class="badge-pill ' + m.status + '">' + statusLabel(m.status) + '</span>' +
-                    '</div>' +
-                    '<div class="cell-body">' +
-                        '<div class="cell-machine-name" title="' + m.name + '">' + m.name + '</div>' +
-                        '<div class="cell-dept">' + (m.dept || '—') + '</div>' +
-                    '</div>' +
-                    '<div class="cell-footer">' +
-                        '<span class="cell-note">' + (m.note ? m.note : '') + '</span>' +
-                        '<i class="fa-solid fa-pen-to-square" style="color:var(--ink-300);font-size:11px;"></i>' +
-                    '</div>';
+                cell.innerHTML = machineHtml(row, col, m);
             }
+        }
 
-            // Re-attach click
-            cell.onclick = function () { openModal(parseInt(this.dataset.index), rows, cols); };
+        /* =====================================================
+           LOAD DEPARTMENTS
+           ===================================================== */
+        function loadDepartments() {
+            fetch('/MachineLayoutDesigner/GetDepartments')
+                .then(function (r) { return r.json(); })
+                .then(function (list) {
+                    list.forEach(function (dept) {
+                        var o1 = document.createElement('option');
+                        o1.value = dept.id; o1.textContent = dept.departmentName;
+                        deptFilter.appendChild(o1);
+
+                        var o2 = document.createElement('option');
+                        o2.value = dept.id; o2.textContent = dept.departmentName;
+                        fDept.appendChild(o2);
+                    });
+                })
+                .catch(function (e) { console.error('[MLD] load depts:', e); });
+        }
+
+        /* =====================================================
+           LOAD LAYOUT KHI CHỌN BỘ PHẬN
+           ===================================================== */
+        deptFilter.addEventListener('change', function () {
+            var deptId = this.value;
+            if (!deptId || deptId === 'all') {
+                currentDeptId = null; currentLayoutId = null;
+                machines = {}; gridEl.innerHTML = '';
+                emptyState.style.display = '';
+                pickerMachines = []; updateStats();
+                return;
+            }
+            currentDeptId   = deptId;
+            currentDeptName = this.options[this.selectedIndex].text;
+
+            // Tải song song: layout + danh sách máy
+            Promise.all([
+                fetchLayoutForDept(deptId),
+                fetchPickerMachines(deptId)
+            ]).then(function (results) {
+                var layout       = results[0];
+                var machinesList = results[1];
+
+                // Áp dụng layout
+                applyLayout(layout, deptId);
+
+                // Áp dụng picker list
+                pickerMachines = machinesList;
+                renderPickerList('');
+
+                // Đồng bộ status thực của máy vào grid
+                syncMachineStatuses();
+            }).catch(function (e) {
+                console.error('[MLD] loadDept:', e);
+                toast('Lỗi tải dữ liệu: ' + e.message, false);
+                gridEl.innerHTML = ''; emptyState.style.display = '';
+            });
+        });
+
+        /* =====================================================
+           FETCH: Layout (trả Promise)
+           ===================================================== */
+        function fetchLayoutForDept(deptId) {
+            return fetch('/MachineLayoutDesigner/GetLayoutByDepartment?departmentId=' + deptId)
+                .then(function (r) {
+                    if (r.status === 204) return null;
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                });
+        }
+
+        /* =====================================================
+           FETCH: Danh sách máy theo bộ phận (trả Promise)
+           ===================================================== */
+        function fetchPickerMachines(deptId) {
+            if (!deptId) return Promise.resolve([]);
+            return fetch('/MachineLayoutDesigner/GetMachinesByDepartment?departmentId=' + deptId)
+                .then(function (r) { return r.json(); })
+                .catch(function () { return []; });
+        }
+
+        /* =====================================================
+           ÁP DỤNG LAYOUT SAU KHI FETCH
+           ===================================================== */
+        function applyLayout(layout, deptId) {
+            gridEl.innerHTML = '';
+            if (!layout) {
+                currentLayoutId = null; machines = {};
+                emptyState.style.display = '';
+                var p = emptyState.querySelector('p');
+                if (p) p.innerHTML = 'Bộ phận <strong>' + esc(currentDeptName) + '</strong> chưa có layout. Thiết lập số hàng, số cột rồi nhấn <strong>Tạo layout</strong>.';
+                updateStats(); return;
+            }
+            currentLayoutId = layout.id;
+            rowsEl.value = layout.rowCount; colsEl.value = layout.columnCount; gapEl.value = layout.gap;
+            currentRows = layout.rowCount; currentCols = layout.columnCount;
+            if (layout.cellWidth) {
+                currentMode = 'custom';
+                autoBtn.classList.remove('active'); customBtn.classList.add('active');
+                sizeCustom.classList.add('visible'); autoHint.style.display = 'none';
+                cellWEl.value = layout.cellWidth; cellHEl.value = layout.cellHeight || 120;
+            } else {
+                currentMode = 'auto';
+                autoBtn.classList.add('active'); customBtn.classList.remove('active');
+                sizeCustom.classList.remove('visible'); autoHint.style.display = '';
+            }
+            machines = {};
+            layout.items.forEach(function (item) {
+                var key = cellKey(item.rowIndex, item.columnIndex);
+                machines[key] = {
+                    itemId:    item.itemId,
+                    machineId: item.machineId,
+                    name:      item.machineName || '',
+                    deptId:    layout.departmentId,
+                    dept:      layout.departmentName,
+                    status:    statusStr(item.status),   // đã là machine.Status từ backend
+                    note:      item.remark  || '',
+                    keyword:   item.keyword || ''
+                };
+            });
+            applyGridStyle(layout.rowCount, layout.columnCount, layout.gap);
+            renderAllCells(layout.rowCount, layout.columnCount);
+            updateStats();
+        }
+
+        /* =====================================================
+           ĐỒNG BỘ STATUS: cross-ref machines[] với pickerMachines[]
+           ===================================================== */
+        function syncMachineStatuses() {
+            if (!pickerMachines.length) return;
+            var changed = false;
+            // Build map: machineId → status từ picker (real-time)
+            var statusMap = {};
+            pickerMachines.forEach(function (pm) { statusMap[pm.id] = pm.status; });
+
+            Object.keys(machines).forEach(function (key) {
+                var m = machines[key];
+                if (!m.machineId) return;
+                var realStatus = statusMap[m.machineId];
+                if (realStatus === undefined) return;
+                var realStatusStr = statusStr(realStatus);
+                if (m.status !== realStatusStr) {
+                    machines[key].status = realStatusStr;
+                    changed = true;
+                    // Re-render ô này
+                    var parts = key.split('-');
+                    renderCell(parseInt(parts[0]), parseInt(parts[1]));
+                }
+            });
+            if (changed) updateStats();
+        }
+
+        /* =====================================================
+           LEGACY wrappers — giữ tương thích với lệnh gọi từ nút Lưu layout
+           ===================================================== */
+        function loadLayoutForDept(deptId) {
+            emptyState.style.display = 'none';
+            gridEl.innerHTML = '<div style="padding:32px;color:var(--ink-300);font-size:13px;display:flex;align-items:center;gap:10px;"><i class="fa-solid fa-circle-notch fa-spin"></i>Đang tải layout...</div>';
+            fetchLayoutForDept(deptId)
+                .then(function (layout) { applyLayout(layout, deptId); })
+                .catch(function (e) {
+                    gridEl.innerHTML = ''; emptyState.style.display = '';
+                    console.error('[MLD] loadLayout:', e);
+                    toast('Lỗi tải layout: ' + e.message, false);
+                });
+        }
+
+        function loadPickerMachines(deptId) {
+            pickerList.innerHTML = '<div class="picker-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
+            pickerMachines = [];
+            fetchPickerMachines(deptId).then(function (list) {
+                pickerMachines = list;
+                renderPickerList('');
+            });
         }
 
         /* =====================================================
            MODAL OPEN / CLOSE
            ===================================================== */
-        function openModal(cellIndex, rows, cols) {
-            currentCellIndex = cellIndex;
-            var col = (cellIndex % cols) + 1;
-            var row = Math.floor(cellIndex / cols) + 1;
+        function openModal(row, col) {
+            if (!currentDeptId) { toast('Vui lòng chọn bộ phận trước.', false); return; }
+
+            var key = cellKey(row, col);
+            currentCellKey = key;
+            var m = machines[key];
             var posLabel = 'Hàng ' + row + ' · Cột ' + col;
-            var m = machines[cellIndex];
+
+            // Reset picker
+            pickedMachine = null;
+            pickerSearch.value = '';
+            pickerSelected.style.display = 'none';
+            pickerSelectedName.textContent = '—';
 
             if (m) {
+                // Ô đã có máy → mở tab "Tạo máy mới" với dữ liệu hiện tại để sửa
+                // Nhưng nếu machineId có trong picker list → pre-select
                 modalTitle.textContent = 'Chỉnh sửa máy';
                 modalSub.textContent   = posLabel;
-                fName.value  = m.name  || '';
-                fDept.value  = m.dept  || '';
-                fNote.value  = m.note  || '';
-                selectedStatus = m.status || 'active';
                 btnDelete.classList.add('visible');
+
+                // Try to find in picker list
+                var found = pickerMachines.find(function (pm) { return pm.id === m.machineId; });
+                if (found) {
+                    // Pre-select in picker tab
+                    switchTab('pick');
+                    renderPickerList('');
+                    selectPickerMachine(found);
+                    // Set note and status for pick tab
+                    fNoteExist.value = m.note || '';
+                    var sp = statusStr(found.status);
+                    selectedStatusPick = m.status || sp;
+                    document.getElementById('mldStatusPickerPick').querySelectorAll('.mld-status-opt').forEach(function (o) {
+                        o.classList.toggle('selected', o.dataset.val === selectedStatusPick);
+                    });
+                } else {
+                    // Not in picker (e.g. was newly created) → show new tab
+                    switchTab('new');
+                    fName.value  = m.name  || '';
+                    fNote.value  = m.note  || '';
+                    selectedStatusNew = m.status || 'active';
+                    document.getElementById('mldStatusPickerNew').querySelectorAll('.mld-status-opt').forEach(function (o) {
+                        o.classList.toggle('selected', o.dataset.val === selectedStatusNew);
+                    });
+                }
             } else {
+                // Ô trống → tab Pick
                 modalTitle.textContent = 'Thêm máy vào ô';
                 modalSub.textContent   = posLabel;
-                fName.value  = '';
-                fDept.value  = '';
-                fNote.value  = '';
-                selectedStatus = 'active';
                 btnDelete.classList.remove('visible');
+                switchTab('pick');
+                renderPickerList('');
+                fName.value  = ''; fNote.value  = ''; fNoteExist.value = '';
+                selectedStatusPick = 'active'; selectedStatusNew = 'active';
+                document.querySelectorAll('.mld-status-opt').forEach(function (o) {
+                    o.classList.toggle('selected', o.dataset.val === 'active');
+                });
             }
 
-            // Sync status picker UI
-            document.querySelectorAll('.mld-status-opt').forEach(function (o) {
-                o.classList.toggle('selected', o.dataset.val === selectedStatus);
-            });
-
+            fDept.value = currentDeptId;
             backdrop.classList.add('open');
-            setTimeout(function () { fName.focus(); }, 300);
+            setTimeout(function () { pickerSearch.focus(); }, 300);
         }
 
         function closeModal() {
             backdrop.classList.remove('open');
-            currentCellIndex = null;
+            currentCellKey = null;
+            pickedMachine  = null;
         }
 
         /* =====================================================
            SAVE
            ===================================================== */
         btnSave.addEventListener('click', function () {
-            var name = fName.value.trim();
-            var dept = fDept.value;
-            if (!name) { fName.focus(); fName.classList.add('shake'); setTimeout(function(){fName.classList.remove('shake');},500); return; }
+            var key    = currentCellKey;
+            var parts  = key.split('-');
+            var row    = parseInt(parts[0]);
+            var col    = parseInt(parts[1]);
+            var existing = machines[key] || {};
 
-            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
-            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
+            if (activeTab === 'pick') {
+                // ---- Tab: Chọn máy có sẵn ----
+                if (!pickedMachine) {
+                    toast('Vui lòng chọn một máy từ danh sách.', false);
+                    return;
+                }
+                machines[key] = {
+                    itemId:    existing.itemId    || null,
+                    machineId: pickedMachine.id,
+                    name:      pickedMachine.machineNumber || '—',
+                    deptId:    currentDeptId,
+                    dept:      currentDeptName,
+                    status:    selectedStatusPick,
+                    note:      fNoteExist.value.trim(),
+                    keyword:   fNoteExist.value.trim()
+                };
+            } else {
+                // ---- Tab: Tạo máy mới ----
+                var name = fName.value.trim();
+                if (!name) {
+                    fName.focus();
+                    fName.classList.add('shake');
+                    setTimeout(function () { fName.classList.remove('shake'); }, 500);
+                    return;
+                }
+                machines[key] = {
+                    itemId:    existing.itemId    || null,
+                    machineId: existing.machineId || null,  // sẽ được tạo mới khi SaveLayout
+                    name:      name,
+                    deptId:    currentDeptId,
+                    dept:      currentDeptName,
+                    status:    selectedStatusNew,
+                    note:      fNote.value.trim(),
+                    keyword:   fNote.value.trim()
+                };
+            }
 
-            machines[currentCellIndex] = {
-                name: name,
-                dept: dept,
-                status: selectedStatus,
-                note: fNote.value.trim()
-            };
-
-            renderCell(currentCellIndex, rows, cols);
+            renderCell(row, col);
             updateStats();
             closeModal();
         });
 
         /* =====================================================
-           DELETE
+           DELETE MACHINE FROM CELL
            ===================================================== */
         btnDelete.addEventListener('click', function () {
             if (!confirm('Xóa máy khỏi ô này?')) return;
-            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
-            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
-            delete machines[currentCellIndex];
-            renderCell(currentCellIndex, rows, cols);
-            updateStats();
-            closeModal();
+            var key = currentCellKey;
+            var parts = key.split('-');
+            var row = parseInt(parts[0]); var col = parseInt(parts[1]);
+            var m = machines[key];
+
+            if (m && m.itemId) {
+                fetch('/MachineLayoutDesigner/DeleteItem?itemId=' + m.itemId, { method: 'DELETE' })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        delete machines[key];
+                        renderCell(row, col); updateStats(); closeModal();
+                        toast('Đã xóa máy khỏi ô.', true);
+                    })
+                    .catch(function (e) { toast('Lỗi xóa: ' + e.message, false); });
+            } else {
+                delete machines[key];
+                renderCell(row, col); updateStats(); closeModal();
+            }
         });
 
         /* =====================================================
@@ -1235,23 +1737,18 @@
            ===================================================== */
         clearBtn.addEventListener('click', function () {
             if (!confirm('Xóa toàn bộ layout và dữ liệu máy?')) return;
-            machines = {};
-            gridEl.innerHTML = '';
-            emptyState.style.display = '';
+            machines = {}; currentLayoutId = null;
+            gridEl.innerHTML = ''; emptyState.style.display = '';
             updateStats();
         });
 
         /* =====================================================
-           CLOSE MODAL (backdrop / button)
+           CLOSE MODAL
            ===================================================== */
         modalClose.addEventListener('click', closeModal);
         btnCancel.addEventListener('click', closeModal);
-        backdrop.addEventListener('click', function (e) {
-            if (e.target === backdrop) closeModal();
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') closeModal();
-        });
+        backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
         /* =====================================================
            APPLY BTN
@@ -1259,30 +1756,88 @@
         applyBtn.addEventListener('click', buildGrid);
 
         /* =====================================================
-           EXPORT (simple JSON to console for demo)
+           LƯU LAYOUT → POST API
            ===================================================== */
         document.getElementById('mldExportBtn').addEventListener('click', function () {
-            var rows = parseInt(rowsEl.value) || 3;
-            var cols = parseInt(colsEl.value) || 4;
-            var payload = { rows: rows, cols: cols, gap: parseInt(gapEl.value)||12, machines: machines };
-            console.log('[MachineLayout] Saved payload:', JSON.stringify(payload, null, 2));
-            // Show toast-like feedback
-            var btn = this;
-            var orig = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã lưu!';
-            btn.style.background = 'linear-gradient(135deg,var(--success) 0%,#1e7a57 100%)';
-            setTimeout(function () {
-                btn.innerHTML = orig;
-                btn.style.background = '';
-            }, 2000);
+            if (!currentDeptId) { toast('Vui lòng chọn bộ phận trước.', false); return; }
+
+            var rows = clamp(parseInt(rowsEl.value) || 3, 1, 30);
+            var cols = clamp(parseInt(colsEl.value) || 4, 1, 20);
+            var gap  = clamp(parseFloat(gapEl.value) || 12, 0, 60);
+            var isCustom = (currentMode === 'custom');
+
+            var items = Object.keys(machines).map(function (key) {
+                var m = machines[key]; var p = key.split('-');
+                return {
+                    itemId:      m.itemId    || null,
+                    machineId:   m.machineId || null,
+                    rowIndex:    parseInt(p[0]), columnIndex: parseInt(p[1]),
+                    machineName: m.name, remark: m.note || null, keyword: m.keyword || null,
+                    status:      statusCode(m.status)
+                };
+            });
+
+            var payload = {
+                layoutId: currentLayoutId || null, departmentId: currentDeptId,
+                name: 'Layout ' + currentDeptName,
+                rowCount: rows, columnCount: cols, gap: gap,
+                cellWidth:  isCustom ? (parseFloat(cellWEl.value) || null) : null,
+                cellHeight: isCustom ? (parseFloat(cellHEl.value) || null) : null,
+                items: items
+            };
+
+            var btn = document.getElementById('mldExportBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+
+            fetch('/MachineLayoutDesigner/SaveLayout', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(function (r) {
+                    if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || 'Lỗi lưu'); });
+                    return r.json();
+                })
+                .then(function (result) {
+                    currentLayoutId = result.layoutId;
+                    toast('Lưu layout thành công!', true);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu layout';
+                    if (currentDeptId) {
+                        // Reload song song rồi sync status
+                        Promise.all([
+                            fetchLayoutForDept(currentDeptId),
+                            fetchPickerMachines(currentDeptId)
+                        ]).then(function (res) {
+                            applyLayout(res[0], currentDeptId);
+                            pickerMachines = res[1];
+                            renderPickerList('');
+                            syncMachineStatuses();
+                        });
+                    }
+                })
+
+                .catch(function (e) {
+                    toast('Lỗi: ' + e.message, false);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu layout';
+                });
         });
 
         /* =====================================================
-           SHAKE animation for validation
+           SHAKE animation
            ===================================================== */
         var shakeStyle = document.createElement('style');
         shakeStyle.textContent = '@@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}.shake{animation:shake .4s ease;}';
         document.head.appendChild(shakeStyle);
 
+        /* =====================================================
+           INIT
+           ===================================================== */
+        document.addEventListener('DOMContentLoaded', function () {
+            loadDepartments();
+        });
+
     }());
 </script>
+

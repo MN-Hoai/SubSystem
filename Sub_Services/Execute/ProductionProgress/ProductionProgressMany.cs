@@ -229,7 +229,13 @@ namespace Sub_Services.Execute
             return await query
                 .Select(p => p.Line)
                 .Distinct()
-                .OrderBy(l => l)
+                .OrderBy(l => 
+                    l == "63" ? "043.5" : 
+                    l == null ? "" :
+                    l.Length == 1 ? "00" + l : 
+                    l.Length == 2 ? "0" + l : 
+                    l
+                )
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -306,7 +312,14 @@ namespace Sub_Services.Execute
             }
 
             // --- Sap xep ---
-            var orderedQuery = query.OrderBy(p => p.Line);
+            // Sắp xếp tự nhiên (số), xếp Line "63" chen giữa "43" và "44"
+            var orderedQuery = query.OrderBy(p => 
+                p.Line == "63" ? "043.5" : 
+                p.Line == null ? "" :
+                p.Line.Length == 1 ? "00" + p.Line : 
+                p.Line.Length == 2 ? "0" + p.Line : 
+                p.Line
+            );
 
             // ----------------------------------------------------------------
             // 4. Dem tong so ban ghi (truoc khi phan trang) — 1 round-trip DB

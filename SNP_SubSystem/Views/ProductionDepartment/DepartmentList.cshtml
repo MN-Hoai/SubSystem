@@ -37,6 +37,7 @@
                         <th style="width:40px;">#</th>
                         <th>Tên bộ phận</th>
                         <th>Keyword</th>
+                        <th style="width:130px;text-align:center;">Tổng số mã</th>
                         <th style="width:130px;text-align:center;">Mã đang SX</th>
                         <th style="width:130px;text-align:center;">Trạng thái</th>
                         <th style="width:160px;">Cập nhật</th>
@@ -334,7 +335,7 @@
         const tbody = document.getElementById('deptTbody');
         tbody.innerHTML = '';
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--ink-400);">Không có bộ phận nào.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--ink-400);">Không có bộ phận nào.</td></tr>';
             document.getElementById('deptTable').style.display = 'table';
             return;
         }
@@ -348,6 +349,7 @@
                 + '<td style="color:var(--ink-400);font-size:12px;">'+(i+1)+'</td>'
                 + '<td><strong>'+esc(d.departmentName)+'</strong></td>'
                 + '<td><code style="font-size:12px;background:var(--bg-canvas);padding:2px 7px;border-radius:4px;">'+esc(d.keyword||'')+'</code></td>'
+                + '<td style="text-align:center;"><span style="font-size:17px;font-weight:700;color:var(--ink-500);">'+d.totalCodes+'</span></td>'
                 + '<td style="text-align:center;"><span style="font-size:17px;font-weight:800;color:var(--primary);">'+d.activeCodes+'</span></td>'
                 + '<td>'+badge+'</td>'
                 + '<td style="font-size:12px;color:var(--ink-500);">'+upd+'</td>'

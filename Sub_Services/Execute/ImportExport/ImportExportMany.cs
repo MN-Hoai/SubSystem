@@ -462,6 +462,7 @@ namespace Sub_Services.Execute
                         MachineId        = machine.Id,
                         Date             = row.Date,
                         Time             = row.Time,
+                        Keyword          = "excel",
                         Details          = new List<RecordOutput_DetailEntry>
                         {
                             new RecordOutput_DetailEntry

@@ -121,6 +121,7 @@ namespace Sub_Services.Execute
             public Guid   MachineId        { get; set; }
             public string Date             { get; set; }   // "yyyy-MM-dd"
             public string Time             { get; set; }   // "HH:mm"
+            public string Keyword          { get; set; }   // Nguồn dữ liệu (ví dụ: "excel")
             public List<RecordOutput_DetailEntry> Details { get; set; } = new();
         }
 

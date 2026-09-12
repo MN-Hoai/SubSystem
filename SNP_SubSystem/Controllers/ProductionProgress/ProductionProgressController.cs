@@ -19,6 +19,10 @@ namespace SNP_SubSystem.Controllers.ProductionProgress
         {
             return View("~/Views/ProductionProgress/Index.cshtml");
         }
+        public IActionResult LineProgress()
+        {
+            return View("~/Views/ProductionProgress/LineProgress.cshtml");
+        }
 
         /// <summary>Trang form tạo / chỉnh sửa mã hàng. Id = null → tạo mới.</summary>
         public IActionResult ProductionInfoForm(Guid? id = null)

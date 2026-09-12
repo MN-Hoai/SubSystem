@@ -177,6 +177,20 @@
                 <option value="">Tất cả</option>
             </select>
         </div>
+        <div class="oh-filter-grp">
+            <div class="oh-filter-lbl">Tổ</div>
+            <select class="oh-inp" id="ohLineFilter" style="min-width:100px;">
+                <option value="">Tất cả</option>
+            </select>
+        </div>
+        <div class="oh-filter-grp">
+            <div class="oh-filter-lbl">Nguồn</div>
+            <select class="oh-inp" id="ohSourceFilter" style="min-width:120px;">
+                <option value="">Tất cả</option>
+                <option value="excel">Excel</option>
+                <option value="manual">Thủ công</option>
+            </select>
+        </div>
         <div class="oh-filter-grp" style="align-self:flex-end;">
             <button class="btn btn-primary btn-sm" id="ohApplyBtn">
                 <i class="fa-solid fa-filter"></i> Lọc
@@ -237,7 +251,9 @@
                         <th>Máy</th>
                         <th>Mã SP</th>
                         <th>Style</th>
-                        <th>Công đoạn</th>
+                        <th class="sortable" data-col="detailName">
+                            Công đoạn <i class="fa-solid fa-sort fa-xs"></i>
+                        </th>
                         <th class="sortable" data-col="qty" style="text-align:right;">
                             Sản lượng <i class="fa-solid fa-sort fa-xs"></i>
                         </th>
@@ -406,6 +422,8 @@
     var ohTo         = document.getElementById('ohTo');
     var ohSearch     = document.getElementById('ohSearch');
     var ohDept       = document.getElementById('ohDeptFilter');
+    var ohLine       = document.getElementById('ohLineFilter');
+    var ohSource     = document.getElementById('ohSourceFilter');
     var ohTbody      = document.getElementById('ohTbody');
     var ohPaging     = document.getElementById('ohPaging');
     var ohPageInfo   = document.getElementById('ohPageInfo');
@@ -455,8 +473,24 @@
             })
             .then(function (list) {
                 allRows = list;
+
+                // Tự động nạp danh sách Tổ từ dữ liệu trả về
+                var currentLine = ohLine.value;
+                var lines = [...new Set(list.map(function(r) { return r.line; }).filter(Boolean))];
+                lines.sort(function(a, b) {
+                    var av = a === "63" ? 43.5 : (parseInt(a) || 9999);
+                    var bv = b === "63" ? 43.5 : (parseInt(b) || 9999);
+                    return av - bv;
+                });
+                ohLine.innerHTML = '<option value="">Tất cả</option>';
+                lines.forEach(function(l) {
+                    var o = document.createElement('option');
+                    o.value = l; o.textContent = 'Tổ ' + l;
+                    ohLine.appendChild(o);
+                });
+                ohLine.value = currentLine;
+
                 applyFilterSort();
-                renderSummary();
                 document.getElementById('ohSummary').style.display = 'flex';
             })
             .catch(function (e) {
@@ -466,10 +500,10 @@
 
     /* ── SUMMARY ── */
     function renderSummary() {
-        var total = allRows.reduce(function (s, r) { return s + (r.outputNumber || 0); }, 0);
-        var avg   = allRows.length ? Math.round(total / allRows.length) : 0;
-        var days  = new Set(allRows.map(function (r) { return (r.createDate || '').split('T')[0]; })).size;
-        document.getElementById('sumRows').textContent  = fmt(allRows.length);
+        var total = filtered.reduce(function (s, r) { return s + (r.outputNumber || 0); }, 0);
+        var avg   = filtered.length ? Math.round(total / filtered.length) : 0;
+        var days  = new Set(filtered.map(function (r) { return (r.createDate || '').split('T')[0]; })).size;
+        document.getElementById('sumRows').textContent  = fmt(filtered.length);
         document.getElementById('sumTotal').textContent = fmt(total);
         document.getElementById('sumAvg').textContent   = fmt(avg);
         document.getElementById('sumDays').textContent  = days;
@@ -478,7 +512,12 @@
     /* ── FILTER + SORT ── */
     function applyFilterSort() {
         var kw = (ohSearch.value || '').toLowerCase().trim();
+        var sv = ohSource.value;
+        var lv = ohLine.value;
+
         filtered = allRows.filter(function (r) {
+            if (sv && r.source !== sv) return false;
+            if (lv && r.line !== lv) return false;
             if (!kw) return true;
             return (r.machineName || '').toLowerCase().includes(kw)
                 || (r.spmain      || '').toLowerCase().includes(kw)
@@ -494,6 +533,9 @@
             } else if (sortCol === 'time') {
                 av = a.inputTime || '';
                 bv = b.inputTime || '';
+            } else if (sortCol === 'detailName') {
+                av = (a.detailName || '').toLowerCase();
+                bv = (b.detailName || '').toLowerCase();
             } else {
                 av = a.outputNumber || 0;
                 bv = b.outputNumber || 0;
@@ -504,6 +546,7 @@
         });
         curPage = 1;
         renderTable();
+        renderSummary(); // Cập nhật thống kê dựa trên dữ liệu đã lọc
     }
 
     /* ── RENDER TABLE ── */
@@ -613,6 +656,7 @@
     document.getElementById('ohResetBtn').addEventListener('click', function () {
         ohFrom.value = todayStr(); ohTo.value = todayStr();
         ohSearch.value = ''; ohDept.value = '';
+        ohLine.value = ''; ohSource.value = '';
         curPage = 1; loadHistory();
     });
     var searchTimer;
@@ -626,6 +670,8 @@
         renderTable();
     });
     ohDept.addEventListener('change', function () { curPage = 1; loadHistory(); });
+    ohLine.addEventListener('change', function () { curPage = 1; applyFilterSort(); });
+    ohSource.addEventListener('change', function () { curPage = 1; applyFilterSort(); });
 
     /* ── CONTEXT MENU ── */
     function showCtxMenu(x, y) {

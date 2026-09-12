@@ -720,6 +720,7 @@ namespace Sub_Services.Execute
                     StyleDetailId = entry.StyleDetailId,
                     OutputNumber  = entry.OutputNumber,
                     InputTime     = time,
+                    Keyword       = req.Keyword,
                     Status        = 1,
                     CreateDate    = now,
                     UpdateDate    = now
@@ -758,6 +759,7 @@ namespace Sub_Services.Execute
             public string InputTime    { get; set; }   // HH:mm
             public string MachineName  { get; set; }
             public string DeptName     { get; set; }
+            public string Line         { get; set; }
             public string Spmain       { get; set; }
             public string Style        { get; set; }
             public string DetailName   { get; set; }
@@ -800,6 +802,7 @@ namespace Sub_Services.Execute
                                    ? d.DailyOutput.ProductionMachine.MachineNumber
                                    : d.DailyOutput.ProductionMachine.Remark,
                     DeptName     = d.DailyOutput.ProductionMachine.ProductionDepartment.DepartmentName,
+                    Line         = d.DailyOutput.ProductionInfo.Line,
                     Spmain       = d.DailyOutput.ProductionInfo.Spmain,
                     Style        = d.DailyOutput.ProductionInfo.Style,
                     DetailName   = d.StyleDetail.DetailName,
@@ -875,7 +878,8 @@ namespace Sub_Services.Execute
             public string DepartmentName { get; set; }
             public string Keyword        { get; set; }
             public int    Status         { get; set; }
-            public int    ActiveCodes    { get; set; }  // Số mã hàng status >= 0
+            public int    ActiveCodes    { get; set; }  // Số mã hàng status == 1
+            public int    TotalCodes     { get; set; }  // Số mã hàng status >= -1
             public DateTime CreateDate   { get; set; }
             public DateTime UpdateDate   { get; set; }
         }
@@ -896,12 +900,16 @@ namespace Sub_Services.Execute
                 .OrderBy(d => d.DepartmentName)
                 .ToListAsync();
 
-            // Count mã hàng theo từng bộ phận (status >= 0 = đang hoạt động)
-            var counts = await _context.ProductionInfos
-                .Where(p => p.Status >= 0)
+            // Count mã hàng theo từng bộ phận
+            var stats = await _context.ProductionInfos
+                .Where(p => p.Status >= -1)
                 .GroupBy(p => p.ProductionDepartmentId)
-                .Select(g => new { DeptId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.DeptId, x => x.Count);
+                .Select(g => new { 
+                    DeptId = g.Key, 
+                    Total = g.Count(),
+                    Active = g.Count(p => p.Status == 1) 
+                })
+                .ToDictionaryAsync(x => x.DeptId, x => x);
 
             return depts.Select(d => new DepartmentListItem
             {
@@ -909,7 +917,8 @@ namespace Sub_Services.Execute
                 DepartmentName = d.DepartmentName,
                 Keyword        = d.Keyword,
                 Status         = d.Status,
-                ActiveCodes    = counts.TryGetValue(d.Id, out var c) ? c : 0,
+                ActiveCodes    = stats.TryGetValue(d.Id, out var s) ? s.Active : 0,
+                TotalCodes     = stats.TryGetValue(d.Id, out var st) ? st.Total : 0,
                 CreateDate     = d.CreateDate,
                 UpdateDate     = d.UpdateDate,
             }).ToList();

@@ -1,0 +1,317 @@
+@model Guid?
+@{
+    var editId = Model;
+    var isEdit = editId.HasValue && editId.Value != Guid.Empty;
+    ViewData["Title"] = isEdit ? "Cập nhật" : "Thêm mới";
+}
+<div class="content-area">
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <a asp-controller="ProductionProgress" asp-action="ATProgress">Thông tin mã hàng</a>
+                <span class="sep">/</span>
+                <span class="current">@(isEdit ? "Cập nhật" : "Thêm mới")</span>
+            </div>
+            <h1 class="page-title">@(isEdit ? "Cập nhật" : "Thêm mới")</h1>
+        </div>
+        <div class="page-actions">
+           
+            @if (!isEdit)
+            {
+                <button class="btn btn-ghost btn-sm" id="btnOpenExcelImport" style="border-color:#1f7a3a;color:#1a9e65;">
+                    <i class="fa-solid fa-file-import"></i>Nhập từ Excel
+                </button>
+            }
+            <button class="btn btn-primary" id="btnSaveForm">
+                <i class="fa-solid fa-floppy-disk"></i>@(isEdit ? "Lưu thay đổi" : "Tạo mã hàng")
+            </button>
+        </div>
+    </div>
+    <div id="formAlert" style="display:none; margin-bottom:16px;"></div>
+    <div class="form-layout">
+        <div class="panel form-panel">
+            <div class="panel-head"><div class="panel-title"><i class="fa-solid fa-tag" style="color:var(--primary);"></i> Thông tin mã hàng</div></div>
+            <div class="panel-body">
+                <div class="form-group">
+                    <label class="form-label" for="fDept">Bộ phận <span class="req">*</span></label>
+                    <select id="fDept" class="form-control"><option value="">-- Chọn bộ phận --</option></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="fLine">Line <span class="req">*</span></label>
+                        <input type="text" id="fLine" class="form-control" placeholder="VD: 01,02,11,...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="fStyle">Style <span class="req">*</span></label>
+                        <input type="text" id="fStyle" class="form-control" placeholder="VD: IM1234">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="fSp">SP#  <span class="req">*</span></label>
+                        <input type="text" id="fSp" class="form-control" placeholder="VD: 26080123SP">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="fColor">Color <span class="req">*</span></label>
+                        <input type="text" id="fColor" class="form-control" placeholder="VD: 010">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="fTotalQty">Total Qty</label>
+                        <input type="number" id="fTotalQty" class="form-control" placeholder="Tong so luong" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="fTarget">Target</label>
+                        <input type="number" id="fTarget" class="form-control" placeholder="300" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="fInlineLine">Inline Line</label>
+                        <input type="date" id="fInlineLine" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="fInlineDept">Inline Department</label>
+                        <input type="date" id="fInlineDept" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="fRemark">Ghi chú</label>
+                    <textarea id="fRemark" class="form-control" rows="3" placeholder="Ghi chú thêm..."></textarea>
+                </div>
+                @if (isEdit)
+                {
+                    <div class="form-group">
+                        <label class="form-label" for="fStatus">Trạng thái</label>
+                        <select id="fStatus" class="form-control">
+                            <option value="0">Chờ sản xuất</option>
+                            <option value="1">Đang hoạt động</option>
+                            <option value="2">Hoàn thành</option>
+                        </select>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="form-side">
+            <div class="panel" style="margin-bottom:16px;">
+                <div class="panel-head"><div class="panel-title"><i class="fa-solid fa-key" style="color:var(--accent-gold);"></i> Keyword</div></div>
+                <div class="panel-body">
+                    <div id="keywordPreview" class="keyword-box" style="margin-bottom:10px;">--</div>
+                    <p style="font-size:11.5px; color:var(--ink-400); margin:0 0 10px;">Keyword tự động = Line+Style+SP+Color (viết hoa). Bạn có thể chỉnh sửa thủ công bên dưới:</p>
+                    <input type="text" id="fKeyword" class="form-control" placeholder="Tự động tạo (có thể sửa)" style="font-family:monospace;letter-spacing:.5px;">
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="modalExcelImport" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="fa-solid fa-file-import" style="color:var(--primary);"></i> Nhập mã hàng từ Excel</h2>
+            <button class="modal-close" id="btnCloseExcel">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="background:var(--surface-alt,#f4f6fb); border-left:3px solid var(--primary); padding:12px 14px; border-radius:6px; margin-bottom:16px; font-size:13px;">
+                <strong>Lưu ý:</strong> Chọn bộ phận và file Excel.
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Bộ phận <span class="req">*</span></label>
+                <select id="excelDeptSel" class="form-control" style="width:100%;"><option value="">-- Chọn bộ phận --</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">File Excel (.xlsx)</label>
+                <div id="excelDropZone" style="border:2px dashed var(--border,#d1d5e0); border-radius:8px; padding:20px; text-align:center; cursor:pointer;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:26px; color:var(--ink-400);"></i>
+                    <div style="margin:6px 0 3px; font-weight:600; color:var(--ink-600);">Keo tha hoac click chon file</div>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none;">
+                </div>
+                <div id="excelFileName" style="margin-top:6px; font-size:13px; color:var(--ink-500);"></div>
+            </div>
+            <div style="text-align:right; margin-bottom:4px;">
+                <a href="/ImportExport/DownloadProductionInfoTemplate" class="btn btn-ghost" style="font-size:12px; padding:4px 10px;"><i class="fa-solid fa-download"></i> Tai file mau</a>
+            </div>
+            <div id="excelResult" style="display:none; margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="btnCancelExcel">Huỷ</button>
+            <button class="btn btn-primary" id="btnDoExcel" disabled><i class="fa-solid fa-upload"></i> Xác nhận nhập</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+    .form-panel .panel-body { padding: 20px; }
+    .form-group { margin-bottom: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-700-solid); margin-bottom: 5px; }
+    .req { color: var(--danger); }
+    .form-control { width: 100%; box-sizing: border-box; border: 1.5px solid var(--border); border-radius: 7px; padding: 8px 11px; font-size: 13.5px; color: var(--ink-900); background: var(--bg-surface); transition: border-color .2s, box-shadow .2s; font-family: inherit; }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+    .keyword-box { background: var(--accent-navy-soft); color: var(--accent-navy); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 800; font-family: monospace; letter-spacing: 1px; word-break: break-all; min-height: 40px; }
+    .form-side .panel .panel-body { padding: 16px; }
+    /* Modal overlay */
+    .modal-backdrop { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:80px; }
+    .modal-backdrop.open { display:flex !important; }
+    .modal-box { background:var(--bg-surface); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:100%; max-height:calc(100vh - 140px); overflow-y:auto; animation:mbIn .22s cubic-bezier(.4,0,.2,1); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); }
+    .modal-title { font-size:16px; font-weight:700; margin:0; color:var(--ink-900); display:flex; align-items:center; gap:8px; }
+    .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 6px; border-radius:6px; transition:background .15s; }
+    .modal-close:hover { background:var(--surface-alt,#f0f2f8); color:var(--ink-900); }
+    .modal-body { padding:20px 22px; }
+    .modal-footer { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    @@keyframes mbIn { from { opacity:0; transform:translateY(-16px) scale(.97); } to { opacity:1; transform:none; } }
+    @@media (max-width: 900px) { .form-layout { grid-template-columns: 1fr; } }
+</style>
+<script>
+(function () {
+    'use strict';
+    const EDIT_ID = '@(isEdit ? editId!.Value.ToString() : "")';
+    const IS_EDIT = EDIT_ID !== '';
+    const fDept = document.getElementById('fDept');
+    const fLine = document.getElementById('fLine');
+    const fStyle = document.getElementById('fStyle');
+    const fSp = document.getElementById('fSp');
+    const fColor = document.getElementById('fColor');
+    const fTotalQty = document.getElementById('fTotalQty');
+    const fTarget = document.getElementById('fTarget');
+    const fInline = document.getElementById('fInlineLine');
+    const fInlineDept = document.getElementById('fInlineDept');
+    const fRemark = document.getElementById('fRemark');
+    const fStatus = document.getElementById('fStatus');
+    const kPreview = document.getElementById('keywordPreview');
+    const fKeyword  = document.getElementById('fKeyword');
+    const btnSave = document.getElementById('btnSaveForm');
+    const alertEl = document.getElementById('formAlert');
+    let _kwManual = false; // true khi user tự gõ keyword
+
+    function updateKeyword() {
+        const auto = (fLine.value + fStyle.value + fSp.value + fColor.value).toUpperCase().replace(/\s/g, '');
+        kPreview.textContent = auto || '--';
+        if (!_kwManual) { fKeyword.value = auto; } // chỉ tự điền nếu user chưa sửa
+    }
+    [fLine, fStyle, fSp, fColor].forEach(el => el.addEventListener('input', updateKeyword));
+    fKeyword.addEventListener('input', () => { _kwManual = fKeyword.value.trim() !== ''; });
+    fKeyword.addEventListener('focus', () => { if (!fKeyword.value) fKeyword.placeholder = 'Tự động nếu để trống'; });
+
+    async function loadDepts() {
+        try {
+            const res = await fetch('/ProductionProgress/GetDepartments');
+            const list = await res.json();
+            list.forEach(d => {
+                [fDept, document.getElementById('excelDeptSel')].forEach(sel => {
+                    if (!sel) return;
+                    const o = document.createElement('option');
+                    o.value = d.id; o.textContent = d.departmentName;
+                    sel.appendChild(o);
+                });
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadExisting() {
+        if (!IS_EDIT) return;
+        try {
+            const res = await fetch('/ProductionProgress/GetById?id=' + EDIT_ID);
+            if (!res.ok) { showAlert(false, 'Khong tim thay ma hang.'); return; }
+            const d = await res.json();
+            fDept.value = d.productionDepartmentId || '';
+            fLine.value = d.line || '';
+            fStyle.value = d.style || '';
+            fSp.value = d.spmain || '';
+            fColor.value = d.color || '';
+            fTotalQty.value = d.totalQty != null ? d.totalQty : '';
+            fTarget.value = d.target != null ? d.target : '';
+            fInline.value = d.inlineLine ? String(d.inlineLine).substring(0, 10) : '';
+            fInlineDept.value = d.inlineDepartment ? String(d.inlineDepartment).substring(0, 10) : '';
+            fRemark.value = d.remark || '';
+            if (fStatus) fStatus.value = d.status ?? 0;
+            _kwManual = !!(d.keyword);
+            fKeyword.value = d.keyword || '';
+            updateKeyword();
+        } catch(e) { console.error(e); }
+    }
+
+    btnSave.addEventListener('click', async () => {
+        const payload = {
+            id: IS_EDIT ? EDIT_ID : null,
+            productionDepartmentId: fDept.value,
+            line: fLine.value.trim(), style: fStyle.value.trim(),
+            spmain: fSp.value.trim(), color: fColor.value.trim(),
+            totalQty: fTotalQty.value !== '' ? parseInt(fTotalQty.value) : null,
+            target: fTarget.value !== '' ? parseInt(fTarget.value) : null,
+            inlineLine: fInline.value || null,
+            inlineDepartment: fInlineDept.value || null,
+            remark: fRemark.value.trim() || null,
+            status: fStatus ? parseInt(fStatus.value) : null,
+            keyword: fKeyword.value.trim() || null
+        };
+        if (!payload.productionDepartmentId) { showAlert(false, 'Vui long chon bo phan.'); return; }
+        if (!payload.line || !payload.style || !payload.spmain || !payload.color) { showAlert(false, 'Line, Style, SP va Color la bat buoc.'); return; }
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Dang luu...';
+        try {
+            const res = await fetch('/ProductionProgress/Upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const data = await res.json();
+            showAlert(res.ok && data.success, data.message || 'Co loi xay ra.');
+        } catch(e) { showAlert(false, 'Loi ket noi: ' + e.message); }
+        finally {
+            btnSave.disabled = false;
+            btnSave.innerHTML = IS_EDIT ? '<i class="fa-solid fa-floppy-disk"></i> Luu thay doi' : '<i class="fa-solid fa-floppy-disk"></i> Tao ma hang';
+        }
+    });
+
+    function showAlert(ok, msg) {
+        const c = ok ? 'var(--success,#18c16e)' : 'var(--danger,#e53935)';
+        const icon = ok ? 'fa-circle-check' : 'fa-circle-xmark';
+        alertEl.style.display = 'block';
+        alertEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:8px;border:1px solid ' + c + ';background:' + (ok?'rgba(24,193,110,.07)':'rgba(229,57,53,.07)') + ';font-weight:600;color:' + c + ';"><i class="fa-solid ' + icon + '"></i><span>' + String(msg ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span></div>';
+        alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    const btnOpenExcel = document.getElementById('btnOpenExcelImport');
+    const modalExcel = document.getElementById('modalExcelImport');
+    const excelDeptSel = document.getElementById('excelDeptSel');
+    const excelDrop = document.getElementById('excelDropZone');
+    const excelInput = document.getElementById('excelFileInput');
+    const excelNameEl = document.getElementById('excelFileName');
+    const excelResult = document.getElementById('excelResult');
+    const btnDoExcel = document.getElementById('btnDoExcel');
+    let excelFile = null;
+
+    if (btnOpenExcel) {
+        btnOpenExcel.addEventListener('click', () => { modalExcel.classList.add('open'); excelFile = null; excelInput.value = ''; excelNameEl.innerHTML = ''; excelResult.style.display = 'none'; btnDoExcel.disabled = true; });
+        document.getElementById('btnCloseExcel').addEventListener('click', () => modalExcel.classList.remove('open'));
+        document.getElementById('btnCancelExcel').addEventListener('click', () => modalExcel.classList.remove('open'));
+        modalExcel.addEventListener('click', e => { if (e.target === modalExcel) modalExcel.classList.remove('open'); });
+        excelDrop.addEventListener('click', () => excelInput.click());
+        excelDrop.addEventListener('dragover', e => { e.preventDefault(); excelDrop.style.borderColor = 'var(--primary)'; });
+        excelDrop.addEventListener('dragleave', () => { excelDrop.style.borderColor = 'var(--border,#d1d5e0)'; });
+        excelDrop.addEventListener('drop', e => { e.preventDefault(); excelDrop.style.borderColor = 'var(--border,#d1d5e0)'; if (e.dataTransfer.files[0]) setExcelFile(e.dataTransfer.files[0]); });
+        excelInput.addEventListener('change', () => { if (excelInput.files[0]) setExcelFile(excelInput.files[0]); });
+        excelDeptSel.addEventListener('change', () => { btnDoExcel.disabled = !(excelDeptSel.value && excelFile); });
+        function setExcelFile(f) { excelFile = f; excelNameEl.innerHTML = '<i class="fa-solid fa-file-excel" style="color:#1d6f42;"></i> <strong>' + f.name + '</strong>'; excelResult.style.display = 'none'; btnDoExcel.disabled = !(excelDeptSel.value && excelFile); }
+        btnDoExcel.addEventListener('click', async () => {
+            if (!excelFile || !excelDeptSel.value) return;
+            btnDoExcel.disabled = true; btnDoExcel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Dang xu ly...';
+            const fd = new FormData(); fd.append('file', excelFile); fd.append('departmentId', excelDeptSel.value);
+            try {
+                const res = await fetch('/ImportExport/ImportProductionInfoExcel', { method: 'POST', body: fd });
+                const data = await res.json();
+                const ok = res.ok && data.success;
+                const c = ok ? 'var(--success)' : 'var(--danger)';
+                excelResult.style.display = 'block';
+                excelResult.innerHTML = '<div style="border:1px solid ' + c + ';border-radius:8px;padding:12px 14px;"><strong style="color:' + c + ';">' + (data.message||'') + '</strong><div style="font-size:12px;margin-top:6px;">Tao moi: ' + data.importedRows + ' / Cap nhat: ' + data.updatedRows + ' / Bo qua: ' + data.skippedRows + '</div></div>';
+            } catch(e) { excelResult.style.display = 'block'; excelResult.innerHTML = '<div style="color:var(--danger)">Loi: ' + e.message + '</div>'; }
+            finally { btnDoExcel.innerHTML = '<i class="fa-solid fa-upload"></i> Bat dau nhap'; btnDoExcel.disabled = false; }
+        });
+    }
+    loadDepts().then(() => loadExisting());
+})();
+</script>

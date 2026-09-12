@@ -1,0 +1,842 @@
+@{
+    ViewData["Title"] = "Lịch sử ghi sản lượng";
+}
+<style>
+    :root {
+        --accent-navy:      #1f3a67;
+        --accent-navy-700:  #16305a;
+        --accent-navy-soft: #e8edf5;
+        --accent-gold:      #c9972a;
+        --accent-gold-soft: #fef3d0;
+        --success:          #1a9e65;
+        --danger:           #d64040;
+        --border:           #e2e6ef;
+        --border-soft:      #f0f2f8;
+        --bg-canvas:        #ffffff;
+        --bg-surface:       #f7f8fc;
+        --ink-900:          #1a1d29;
+        --ink-700-solid:    #2e3349;
+        --ink-500:          #64697f;
+        --ink-400:          #8e93a8;
+        --ink-300:          #b4b9cc;
+    }
+
+    /* PAGE */
+    .oh-page { display:flex; flex-direction:column; height:calc(100vh - var(--header-h,60px)); overflow:hidden; font-family:'Inter','Segoe UI',system-ui,sans-serif; background:var(--bg-surface); }
+
+    /* TOP BAR */
+    .oh-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 24px 12px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; gap:14px; flex-wrap:wrap; }
+    .oh-topbar-left { display:flex; align-items:center; gap:14px; }
+    .oh-icon { width:42px; height:42px; border-radius:11px; background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; box-shadow:0 4px 14px rgba(31,58,103,.28); }
+    .oh-page-title { font-size:20px; font-weight:800; background:linear-gradient(135deg,var(--accent-navy) 0%,#3a5fa8 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .oh-page-sub { font-size:12.5px; color:var(--ink-400); margin-top:1px; }
+    .oh-date-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--ink-400); background:var(--bg-surface); border:1px solid var(--border); padding:4px 10px; border-radius:999px; }
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s,transform .15s; text-decoration:none; }
+    .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+    .btn-ghost:hover { background:var(--border-soft); }
+    .btn-primary { background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-sm { padding:7px 13px; font-size:12.5px; border-radius:8px; }
+
+    /* FILTER BAR */
+    .oh-filter { display:flex; align-items:flex-end; gap:10px; padding:12px 24px 13px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+    .oh-filter-grp { display:flex; flex-direction:column; gap:3px; }
+    .oh-filter-lbl { font-size:10.5px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.4px; }
+    .oh-inp { padding:7px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; transition:border-color .18s,box-shadow .18s; }
+    .oh-inp:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
+    .oh-search-wrap { position:relative; }
+    .oh-search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ink-300); font-size:12px; }
+    .oh-search-wrap .oh-inp { padding-left:30px; min-width:200px; }
+
+    /* SUMMARY CHIPS */
+    .oh-summary { display:flex; gap:10px; padding:10px 24px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+    .oh-sum-chip { display:flex; flex-direction:column; align-items:center; gap:1px; background:var(--bg-surface); border:1.5px solid var(--border); border-radius:10px; padding:8px 18px; min-width:80px; }
+    .oh-sum-chip .s-num { font-size:18px; font-weight:800; color:var(--ink-900); line-height:1.1; }
+    .oh-sum-chip .s-lbl { font-size:10px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.5px; }
+    .oh-sum-chip.accent-purple { border-color:var(--accent-navy); }
+    .oh-sum-chip.accent-purple .s-num { color:var(--accent-navy); }
+    .oh-sum-chip.accent-green .s-num { color:var(--success); }
+
+    /* BODY: TABLE */
+    .oh-body { flex:1; overflow-y:auto; min-height:0; }
+    .oh-table-wrap { overflow-x:auto; }
+    .oh-table { width:100%; border-collapse:collapse; font-size:13px; user-select:none; }
+    .oh-table thead tr { background:var(--bg-surface); position:sticky; top:0; z-index:2; }
+    .oh-table thead th { padding:9px 14px; text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-400); white-space:nowrap; border-bottom:2px solid var(--border); }
+    .oh-table thead th.sortable { cursor:pointer; transition:color .15s; }
+    .oh-table thead th.sortable:hover { color:var(--accent-navy); }
+    .oh-table thead th.sort-active { color:var(--accent-navy); }
+    .oh-table tbody tr { border-bottom:1px solid var(--border-soft); transition:background .12s; }
+    .oh-table tbody tr:hover { background:var(--accent-navy-soft); }
+    .oh-table tbody td { padding:9px 14px; vertical-align:middle; }
+    .oh-num-cell { font-size:14px; font-weight:800; color:var(--accent-navy); cursor:cell; border-radius:5px; padding:2px 6px; display:inline-block; transition:background .1s; }
+    .oh-num-cell.selecting { background:var(--accent-navy-soft); color:var(--accent-navy); }
+    .oh-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; }
+    .oh-badge.manual { background:var(--accent-navy-soft); color:var(--accent-navy); }
+    .oh-badge.excel  { background:#e0f7ef; color:var(--success); }
+    .oh-empty { text-align:center; padding:60px; color:var(--ink-300); }
+    .oh-empty i { font-size:40px; display:block; margin-bottom:12px; }
+    .oh-empty p { font-size:14px; font-weight:600; color:var(--ink-400); }
+
+    /* FOOTER: PAGINATION */
+    .oh-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 24px; border-top:1px solid var(--border); background:var(--bg-canvas); flex-shrink:0; flex-wrap:wrap; }
+    .oh-page-info { font-size:12px; color:var(--ink-400); font-weight:600; }
+    .oh-paging { display:flex; align-items:center; gap:5px; }
+    .oh-paging-btn { padding:5px 11px; border-radius:7px; border:1.5px solid var(--border); background:var(--bg-canvas); font-size:12.5px; font-weight:700; color:var(--ink-700-solid); cursor:pointer; transition:background .14s,border-color .14s; }
+    .oh-paging-btn:hover:not([disabled]) { background:var(--accent-navy-soft); border-color:var(--accent-navy); color:var(--accent-navy); }
+    .oh-paging-btn[disabled] { opacity:.35; pointer-events:none; }
+    .oh-paging-btn.active { background:var(--accent-navy); color:#fff; border-color:var(--accent-navy); }
+    .oh-page-size { padding:5px 10px; border:1.5px solid var(--border); border-radius:7px; font-family:inherit; font-size:12.5px; color:var(--ink-700-solid); background:var(--bg-canvas); outline:none; cursor:pointer; }
+
+    /* DRAG-SELECT STATUS BAR */
+    .oh-sel-bar { position:fixed; bottom:20px; right:28px; z-index:500; background:#1e1e2e; color:#fff; border-radius:12px; padding:10px 20px; display:none; align-items:center; gap:18px; box-shadow:0 8px 28px rgba(0,0,0,.35); font-size:12.5px; animation:ohIn .18s ease; }
+    .oh-sel-bar.visible { display:flex; }
+    .oh-sel-stat { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .oh-sel-stat .s-lbl { font-size:10px; font-weight:700; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.5px; }
+    .oh-sel-stat .s-val { font-size:15px; font-weight:800; color:#93c5fd; }
+    .oh-sel-divider { width:1px; height:32px; background:rgba(255,255,255,.15); }
+    .oh-sel-close { background:none; border:none; color:rgba(255,255,255,.4); cursor:pointer; font-size:14px; margin-left:4px; padding:2px; transition:color .15s; }
+    .oh-sel-close:hover { color:#fff; }
+
+    /* CONTEXT MENU */
+    .oh-ctx { position:fixed; background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.18); z-index:600; padding:5px; min-width:160px; display:none; animation:ohIn .12s ease; }
+    .oh-ctx.visible { display:block; }
+    .oh-ctx-item { display:flex; align-items:center; gap:9px; padding:9px 13px; border-radius:7px; font-size:13px; font-weight:600; color:var(--ink-700-solid); cursor:pointer; transition:background .12s; }
+    .oh-ctx-item:hover { background:var(--bg-surface); }
+    .oh-ctx-item.danger { color:var(--danger); }
+    .oh-ctx-item.danger:hover { background:#fdecea; }
+    .oh-ctx-sep { height:1px; background:var(--border-soft); margin:4px 5px; }
+
+    /* EDIT MODAL — pattern chuẩn hệ thống */
+    .oh-edit-bd { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:70px; }
+    .oh-edit-bd.open { display:flex !important; }
+    .oh-edit-modal { background:var(--bg-canvas); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:480px; max-width:95vw; max-height:calc(100vh - 120px); overflow-y:auto; animation:ohIn .22s cubic-bezier(.4,0,.2,1); }
+    .oh-edit-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); }
+    .oh-edit-title { font-size:16px; font-weight:700; color:var(--ink-900); display:flex; align-items:center; gap:8px; margin:0; }
+    .oh-edit-body { padding:20px 22px; display:flex; flex-direction:column; gap:16px; }
+    .oh-edit-lbl { display:block; font-size:13px; font-weight:600; color:var(--ink-700-solid); margin-bottom:5px; }
+    .oh-edit-val { font-size:13px; color:var(--ink-500); background:var(--bg-surface); border-radius:8px; padding:8px 12px; border:1px solid var(--border); }
+    .oh-edit-foot { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    .oh-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 7px; border-radius:6px; transition:background .15s; }
+    .oh-modal-close:hover { background:var(--bg-surface); color:var(--danger); }
+
+    @@keyframes ohIn {
+        from { opacity:0; transform:translateY(10px) scale(.97); }
+        to   { opacity:1; transform:translateY(0)    scale(1); }
+    }
+
+    .oh-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:10px; font-size:13.5px; font-weight:700; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); animation:ohIn .2s ease; }
+
+    /* CONFIRM MODAL — pattern chuẩn hệ thống */
+    .oh-cfm-bd { display:none; position:fixed; inset:0; z-index:9100; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:70px; }
+    .oh-cfm-bd.open { display:flex !important; }
+    .oh-cfm-box { background:var(--bg-canvas); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:400px; max-width:95vw; overflow:hidden; animation:ohIn .22s cubic-bezier(.4,0,.2,1); }
+    .oh-cfm-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); border-top:4px solid var(--danger); }
+    .oh-cfm-title { font-size:16px; font-weight:700; color:var(--danger); display:flex; align-items:center; gap:8px; margin:0; }
+    .oh-cfm-body { padding:18px 22px; }
+    .oh-cfm-msg { font-size:14px; color:var(--ink-700-solid); line-height:1.6; }
+    .oh-cfm-foot { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    .btn-danger { background:var(--danger); color:#fff; box-shadow:0 4px 12px rgba(214,64,64,.22); }
+    .btn-danger:hover { opacity:.88; transform:translateY(-1px); }
+</style>
+
+<!-- PAGE -->
+<div class="oh-page">
+
+    <!-- TOP BAR -->
+    <div class="oh-topbar">
+        <div class="oh-topbar-left">
+            <a href="/ProductionDepartment/RecordOutput" class="btn btn-ghost btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại
+            </a>
+            <div class="oh-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+            <div>
+                <div class="oh-page-title">Lịch sử ghi sản lượng</div>
+                <div class="oh-page-sub">Tra cứu, cập nhật và xoá các lần ghi</div>
+            </div>
+        </div>
+        <div class="oh-date-chip">
+            <i class="fa-regular fa-calendar"></i>
+            <span id="ohTodayLabel">—</span>
+        </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="oh-filter">
+        <div class="oh-filter-grp">
+            <div class="oh-filter-lbl">Từ ngày</div>
+            <input type="date" class="oh-inp" id="ohFrom">
+        </div>
+        <div class="oh-filter-grp">
+            <div class="oh-filter-lbl">Đến ngày</div>
+            <input type="date" class="oh-inp" id="ohTo">
+        </div>
+        <div class="oh-filter-grp">
+            <div class="oh-filter-lbl">Bộ phận</div>
+            <select class="oh-inp" id="ohDeptFilter" style="min-width:140px;">
+                <option value="">Tất cả</option>
+            </select>
+        </div>
+        <div class="oh-filter-grp" style="align-self:flex-end;">
+            <button class="btn btn-primary btn-sm" id="ohApplyBtn">
+                <i class="fa-solid fa-filter"></i> Lọc
+            </button>
+        </div>
+        <div class="oh-filter-grp" style="align-self:flex-end;">
+            <button class="btn btn-ghost btn-sm" id="ohResetBtn">
+                <i class="fa-solid fa-rotate-left"></i> Đặt lại
+            </button>
+        </div>
+        <div class="oh-filter-grp" style="flex:1;align-self:flex-end;">
+            <div class="oh-filter-lbl">Tìm kiếm</div>
+            <div class="oh-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="oh-inp" id="ohSearch"
+                       placeholder="Style, mã SP, máy, công đoạn..." style="width:100%;box-sizing:border-box;min-width:220px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- SUMMARY CHIPS -->
+    <div class="oh-summary" id="ohSummary" style="display:none;">
+        <div class="oh-sum-chip accent-purple">
+            <div class="s-num" id="sumRows">0</div>
+            <div class="s-lbl">Bản ghi</div>
+        </div>
+        <div class="oh-sum-chip accent-green">
+            <div class="s-num" id="sumTotal">0</div>
+            <div class="s-lbl">Tổng SL</div>
+        </div>
+        <div class="oh-sum-chip">
+            <div class="s-num" id="sumAvg">0</div>
+            <div class="s-lbl">TB/lần</div>
+        </div>
+        <div class="oh-sum-chip">
+            <div class="s-num" id="sumDays">0</div>
+            <div class="s-lbl">Số ngày</div>
+        </div>
+        <div style="margin-left:auto;align-self:center;">
+            <span id="ohRecordCount" style="font-size:12px;color:var(--ink-400);font-weight:600;"></span>
+        </div>
+    </div>
+
+    <!-- TABLE BODY -->
+    <div class="oh-body">
+        <div class="oh-table-wrap">
+            <table class="oh-table">
+                <thead>
+                    <tr>
+                        <th style="width:38px;">#</th>
+                        <th class="sortable sort-active" data-col="date">
+                            Ngày <i class="fa-solid fa-sort-down fa-xs"></i>
+                        </th>
+                        <th class="sortable" data-col="time">
+                            Giờ nhập <i class="fa-solid fa-sort fa-xs"></i>
+                        </th>
+                        <th>Bộ phận</th>
+                        <th>Máy</th>
+                        <th>Mã SP</th>
+                        <th>Style</th>
+                        <th>Công đoạn</th>
+                        <th class="sortable" data-col="qty" style="text-align:right;">
+                            Sản lượng <i class="fa-solid fa-sort fa-xs"></i>
+                        </th>
+                        <th>Nguồn</th>
+                    </tr>
+                </thead>
+                <tbody id="ohTbody">
+                    <tr>
+                        <td colspan="10" class="oh-empty">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <p>Chọn khoảng ngày và nhấn <strong>Lọc</strong> để tải dữ liệu</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- FOOTER: PAGINATION -->
+    <div class="oh-foot">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="oh-page-info" id="ohPageInfo"></span>
+            <select class="oh-page-size" id="ohPageSize">
+                <option value="50" selected>50 / trang</option>
+                <option value="100">100 / trang</option>
+                <option value="200">200 / trang</option>
+                <option value="500">500 / trang</option>
+            </select>
+        </div>
+        <div class="oh-paging" id="ohPaging"></div>
+    </div>
+
+</div><!-- /oh-page -->
+
+<!-- Context menu (right-click) -->
+<div class="oh-ctx" id="ohCtxMenu">
+    <div class="oh-ctx-item" id="ohCtxEdit">
+        <i class="fa-solid fa-pen" style="color:var(--accent-navy);"></i> Cập nhật
+    </div>
+    <div class="oh-ctx-sep"></div>
+    <div class="oh-ctx-item danger" id="ohCtxDelete">
+        <i class="fa-solid fa-trash"></i> Xoá
+    </div>
+</div>
+
+<!-- Drag-select stats bar -->
+<div class="oh-sel-bar" id="ohSelBar">
+    <div class="oh-sel-stat">
+        <span class="s-lbl">Số ô chọn</span>
+        <span class="s-val" id="ohSelCount">0</span>
+    </div>
+    <div class="oh-sel-divider"></div>
+    <div class="oh-sel-stat">
+        <span class="s-lbl">Tổng</span>
+        <span class="s-val" id="ohSelSum">0</span>
+    </div>
+    <div class="oh-sel-divider"></div>
+    <div class="oh-sel-stat">
+        <span class="s-lbl">Trung bình</span>
+        <span class="s-val" id="ohSelAvg">0</span>
+    </div>
+    <button class="oh-sel-close" id="ohSelClose" title="Bỏ chọn">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+
+<!-- Edit modal -->
+<div id="ohEditBd" class="oh-edit-bd">
+    <div class="oh-edit-modal">
+        <div class="oh-edit-head">
+            <h2 class="oh-edit-title">
+                <i class="fa-solid fa-pen-to-square" style="color:var(--accent-navy);"></i>
+                Cập nhật sản lượng
+            </h2>
+            <button class="oh-modal-close" id="ohEditClose">&times;</button>
+        </div>
+        <div class="oh-edit-body">
+            <div>
+                <label class="oh-edit-lbl">Công đoạn · Mã SP</label>
+                <div class="oh-edit-val" id="ohEditInfo">—</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label class="oh-edit-lbl">Ngày <span style="color:var(--danger);">*</span></label>
+                    <input type="date" class="oh-inp" id="ohEditDate" style="width:100%;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label class="oh-edit-lbl">Giờ nhập</label>
+                    <input type="time" class="oh-inp" id="ohEditTime" style="width:100%;box-sizing:border-box;">
+                </div>
+            </div>
+            <div>
+                <label class="oh-edit-lbl">Sản lượng <span style="color:var(--danger);">*</span></label>
+                <input type="number" class="oh-inp" id="ohEditQty" min="0"
+                       style="width:100%;box-sizing:border-box;font-size:22px;font-weight:800;text-align:right;color:var(--accent-navy);height:52px;">
+            </div>
+        </div>
+        <div class="oh-edit-foot">
+            <button class="btn btn-ghost btn-sm" id="ohEditCancel">Hủy</button>
+            <button class="btn btn-primary" id="ohEditSave">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm modal -->
+<div id="ohCfmBd" class="oh-cfm-bd">
+    <div class="oh-cfm-box">
+        <div class="oh-cfm-head">
+            <h2 class="oh-cfm-title">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="ohCfmTitle">Xác nhận xóa</span>
+            </h2>
+            <button class="oh-modal-close" id="ohCfmClose">&times;</button>
+        </div>
+        <div class="oh-cfm-body">
+            <div class="oh-cfm-msg" id="ohCfmMsg"></div>
+        </div>
+        <div class="oh-cfm-foot">
+            <button class="btn btn-ghost btn-sm" id="ohCfmCancel">Hủy</button>
+            <button class="btn btn-danger btn-sm" id="ohCfmOk">
+                <i class="fa-solid fa-trash"></i> Xóa
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    /* ── HELPERS ── */
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function fmt(n) { return Number(n || 0).toLocaleString('vi-VN'); }
+    function todayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function fmtDateVN(s) {
+        if (!s) return '—';
+        var p = (s.split('T')[0]).split('-');
+        return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+    }
+    function toast(msg, ok) {
+        var t = document.createElement('div');
+        t.className = 'oh-toast';
+        t.style.background = ok ? 'var(--success)' : 'var(--danger)';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function () { t.remove(); }, 3000);
+    }
+
+    /* ── STATE ── */
+    var allRows    = [];
+    var filtered   = [];
+    var pageSize   = 50;
+    var curPage    = 1;
+    var sortCol    = 'date';
+    var sortDir    = 'desc';
+    var ctxRow     = null;
+    var editRow    = null;
+
+    /* ── DOM ── */
+    var ohFrom       = document.getElementById('ohFrom');
+    var ohTo         = document.getElementById('ohTo');
+    var ohSearch     = document.getElementById('ohSearch');
+    var ohDept       = document.getElementById('ohDeptFilter');
+    var ohTbody      = document.getElementById('ohTbody');
+    var ohPaging     = document.getElementById('ohPaging');
+    var ohPageInfo   = document.getElementById('ohPageInfo');
+    var ohPageSizeEl = document.getElementById('ohPageSize');
+    var ohCtxMenu    = document.getElementById('ohCtxMenu');
+    var ohEditBd     = document.getElementById('ohEditBd');
+    var ohSelBar     = document.getElementById('ohSelBar');
+
+    /* ── INIT ── */
+    (function init() {
+        var today = todayStr();
+        ohFrom.value = today;
+        ohTo.value   = today;
+        document.getElementById('ohTodayLabel').textContent = fmtDateVN(today);
+        loadDepts();
+        loadHistory();
+    })();
+
+    /* ── LOAD DEPARTMENTS ── */
+    function loadDepts() {
+        fetch('/ProductionDepartment/GetDepartments')
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                list.forEach(function (d) {
+                    var o = document.createElement('option');
+                    o.value = d.id; o.textContent = d.departmentName;
+                    ohDept.appendChild(o);
+                });
+            });
+    }
+
+    /* ── LOAD HISTORY ── */
+    function loadHistory() {
+        ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><p>Đang tải...</p></td></tr>';
+        document.getElementById('ohSummary').style.display = 'none';
+
+        var params = [];
+        if (ohFrom.value) params.push('from=' + encodeURIComponent(ohFrom.value));
+        if (ohTo.value)   params.push('to='   + encodeURIComponent(ohTo.value));
+        if (ohDept.value) params.push('deptId=' + encodeURIComponent(ohDept.value));
+        var url = '/ProductionDepartment/GetOutputHistory?' + params.join('&');
+
+        fetch(url)
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (list) {
+                allRows = list;
+                applyFilterSort();
+                renderSummary();
+                document.getElementById('ohSummary').style.display = 'flex';
+            })
+            .catch(function (e) {
+                ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>' + esc(e.message) + '</p></td></tr>';
+            });
+    }
+
+    /* ── SUMMARY ── */
+    function renderSummary() {
+        var total = allRows.reduce(function (s, r) { return s + (r.outputNumber || 0); }, 0);
+        var avg   = allRows.length ? Math.round(total / allRows.length) : 0;
+        var days  = new Set(allRows.map(function (r) { return (r.createDate || '').split('T')[0]; })).size;
+        document.getElementById('sumRows').textContent  = fmt(allRows.length);
+        document.getElementById('sumTotal').textContent = fmt(total);
+        document.getElementById('sumAvg').textContent   = fmt(avg);
+        document.getElementById('sumDays').textContent  = days;
+    }
+
+    /* ── FILTER + SORT ── */
+    function applyFilterSort() {
+        var kw = (ohSearch.value || '').toLowerCase().trim();
+        filtered = allRows.filter(function (r) {
+            if (!kw) return true;
+            return (r.machineName || '').toLowerCase().includes(kw)
+                || (r.spmain      || '').toLowerCase().includes(kw)
+                || (r.style       || '').toLowerCase().includes(kw)
+                || (r.detailName  || '').toLowerCase().includes(kw)
+                || (r.deptName    || '').toLowerCase().includes(kw);
+        });
+        filtered.sort(function (a, b) {
+            var av, bv;
+            if (sortCol === 'date') {
+                av = ((a.createDate || '').split('T')[0]) + (a.inputTime || '');
+                bv = ((b.createDate || '').split('T')[0]) + (b.inputTime || '');
+            } else if (sortCol === 'time') {
+                av = a.inputTime || '';
+                bv = b.inputTime || '';
+            } else {
+                av = a.outputNumber || 0;
+                bv = b.outputNumber || 0;
+            }
+            if (av < bv) return sortDir === 'asc' ? -1 : 1;
+            if (av > bv) return sortDir === 'asc' ?  1 : -1;
+            return 0;
+        });
+        curPage = 1;
+        renderTable();
+    }
+
+    /* ── RENDER TABLE ── */
+    function renderTable() {
+        document.getElementById('ohRecordCount').textContent = fmt(filtered.length) + ' bản ghi hiển thị';
+        if (!filtered.length) {
+            ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-inbox"></i><p>Không có dữ liệu phù hợp</p></td></tr>';
+            ohPageInfo.textContent = '';
+            ohPaging.innerHTML = '';
+            return;
+        }
+
+        var totalPages = Math.ceil(filtered.length / pageSize);
+        if (curPage > totalPages) curPage = totalPages;
+        var start    = (curPage - 1) * pageSize;
+        var end      = Math.min(start + pageSize, filtered.length);
+        var pageRows = filtered.slice(start, end);
+
+        ohTbody.innerHTML = '';
+        pageRows.forEach(function (r, idx) {
+            var tr = document.createElement('tr');
+            tr.dataset.id = r.id || '';
+            var source = r.source === 'excel'
+                ? '<span class="oh-badge excel"><i class="fa-solid fa-file-excel fa-xs"></i>Excel</span>'
+                : '<span class="oh-badge manual"><i class="fa-solid fa-pencil fa-xs"></i>Thủ công</span>';
+            tr.innerHTML =
+                '<td style="font-size:11px;color:var(--ink-300);font-weight:600;">' + (start + idx + 1) + '</td>' +
+                '<td style="font-size:12.5px;font-weight:700;white-space:nowrap;">' + fmtDateVN(r.createDate) + '</td>' +
+                '<td style="font-size:12.5px;color:var(--ink-500);font-weight:600;">' + esc(r.inputTime || '—') + '</td>' +
+                '<td style="font-size:12px;color:var(--ink-500);">' + esc(r.deptName || '—') + '</td>' +
+                '<td style="font-size:12.5px;">' + esc(r.machineName || '—') + '</td>' +
+                '<td><span style="font-family:Courier New;font-size:12px;font-weight:700;color:var(--accent-navy);background:var(--accent-navy-soft);padding:2px 8px;border-radius:5px;">' + esc(r.spmain || '—') + '</span></td>' +
+                '<td style="font-size:12.5px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.style || '') + '">' + esc(r.style || '—') + '</td>' +
+                '<td style="font-size:12.5px;">' + esc(r.detailName || '—') + '</td>' +
+                '<td style="text-align:right;"><span class="oh-num-cell" data-val="' + (r.outputNumber || 0) + '">' + fmt(r.outputNumber) + '</span></td>' +
+                '<td>' + source + '</td>';
+
+            /* right-click */
+            tr.addEventListener('contextmenu', function (e) {
+                e.preventDefault();
+                ctxRow = r;
+                showCtxMenu(e.clientX, e.clientY);
+            });
+            ohTbody.appendChild(tr);
+        });
+
+        ohPageInfo.textContent = 'Hiển thị ' + (start + 1) + '–' + end + ' / ' + filtered.length;
+        renderPagination(totalPages);
+        initDragSelect();
+    }
+
+    /* ── PAGINATION ── */
+    function renderPagination(totalPages) {
+        ohPaging.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        function mkBtn(label, page, isActive, disabled) {
+            var btn = document.createElement('button');
+            btn.className = 'oh-paging-btn' + (isActive ? ' active' : '');
+            btn.textContent = label;
+            if (disabled) btn.setAttribute('disabled', '');
+            btn.addEventListener('click', function () { curPage = page; renderTable(); });
+            return btn;
+        }
+
+        ohPaging.appendChild(mkBtn('‹', Math.max(1, curPage - 1), false, curPage === 1));
+
+        var rangeStart = Math.max(1, curPage - 2);
+        var rangeEnd   = Math.min(totalPages, rangeStart + 4);
+
+        if (rangeStart > 1) {
+            ohPaging.appendChild(mkBtn('1', 1, false, false));
+            if (rangeStart > 2) { var e1 = document.createElement('span'); e1.textContent = '…'; e1.style.padding = '0 4px'; ohPaging.appendChild(e1); }
+        }
+        for (var i = rangeStart; i <= rangeEnd; i++) {
+            ohPaging.appendChild(mkBtn(i, i, i === curPage, false));
+        }
+        if (rangeEnd < totalPages) {
+            if (rangeEnd < totalPages - 1) { var e2 = document.createElement('span'); e2.textContent = '…'; e2.style.padding = '0 4px'; ohPaging.appendChild(e2); }
+            ohPaging.appendChild(mkBtn(totalPages, totalPages, false, false));
+        }
+
+        ohPaging.appendChild(mkBtn('›', Math.min(totalPages, curPage + 1), false, curPage === totalPages));
+    }
+
+    /* ── SORT HEADERS ── */
+    document.querySelectorAll('.oh-table thead th.sortable').forEach(function (th) {
+        th.addEventListener('click', function () {
+            var col = this.dataset.col;
+            if (sortCol === col) {
+                sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortCol = col;
+                sortDir = 'desc';
+            }
+            /* update header styles */
+            document.querySelectorAll('.oh-table thead th').forEach(function (h) { h.classList.remove('sort-active'); });
+            this.classList.add('sort-active');
+            applyFilterSort();
+        });
+    });
+
+    /* ── FILTER EVENTS ── */
+    document.getElementById('ohApplyBtn').addEventListener('click', function () {
+        curPage = 1; loadHistory();
+    });
+    document.getElementById('ohResetBtn').addEventListener('click', function () {
+        ohFrom.value = todayStr(); ohTo.value = todayStr();
+        ohSearch.value = ''; ohDept.value = '';
+        curPage = 1; loadHistory();
+    });
+    var searchTimer;
+    ohSearch.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(applyFilterSort, 250);
+    });
+    ohPageSizeEl.addEventListener('change', function () {
+        pageSize = parseInt(this.value) || 50;
+        curPage = 1;
+        renderTable();
+    });
+    ohDept.addEventListener('change', function () { curPage = 1; loadHistory(); });
+
+    /* ── CONTEXT MENU ── */
+    function showCtxMenu(x, y) {
+        var mw = 170, mh = 90;
+        ohCtxMenu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
+        ohCtxMenu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
+        ohCtxMenu.classList.add('visible');
+    }
+    function closeCtxMenu() { ohCtxMenu.classList.remove('visible'); ctxRow = null; }
+    document.addEventListener('click', function (e) {
+        if (!ohCtxMenu.contains(e.target)) closeCtxMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeCtxMenu(); closeEditModal(); closeConfirm(); }
+    });
+
+    /* ── CONFIRM MODAL ── */
+    var cfmCallback = null;
+    var ohCfmBd = document.getElementById('ohCfmBd');
+    function showConfirm(title, msg, cb) {
+        document.getElementById('ohCfmTitle').textContent = title;
+        document.getElementById('ohCfmMsg').innerHTML = msg;
+        cfmCallback = cb;
+        ohCfmBd.classList.add('open');
+    }
+    function closeConfirm() { ohCfmBd.classList.remove('open'); cfmCallback = null; }
+    document.getElementById('ohCfmCancel').addEventListener('click', closeConfirm);
+    document.getElementById('ohCfmClose') && document.getElementById('ohCfmClose').addEventListener('click', closeConfirm);
+    document.getElementById('ohCfmOk').addEventListener('click', function () {
+        var cb = cfmCallback;   // lưu trước khi closeConfirm() gán cfmCallback = null
+        closeConfirm();
+        if (cb) cb();
+    });
+    ohCfmBd.addEventListener('click', function (e) { if (e.target === ohCfmBd) closeConfirm(); });
+
+    document.getElementById('ohCtxEdit').addEventListener('click', function () {
+        if (!ctxRow) return;
+        var row = ctxRow;   // lưu trước khi closeCtxMenu() gán ctxRow = null
+        closeCtxMenu();
+        openEditModal(row);
+    });
+    document.getElementById('ohCtxDelete').addEventListener('click', function () {
+        if (!ctxRow) return;
+        var row = ctxRow; closeCtxMenu();
+        showConfirm(
+            'Xóa bản ghi',
+            '<strong>' + esc(row.detailName || '') + '</strong> &mdash; ' + fmt(row.outputNumber) + ' SP<br>' +
+            '<span style="color:var(--ink-400);font-size:12px;">Ngày: ' + fmtDateVN(row.createDate) + ' ' + (row.inputTime || '') + '</span>',
+            function () { deleteRecord(row); }
+        );
+    });
+
+    /* ── DELETE ── */
+    function deleteRecord(row) {
+        fetch('/ProductionDepartment/DeleteOutputRecord', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: row.id })
+        })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (data) {
+            if (!data.success) { toast(data.message || 'Lỗi xoá', false); return; }
+            toast('Đã xoá bản ghi', true);
+            allRows = allRows.filter(function (x) { return x.id !== row.id; });
+            applyFilterSort();
+            renderSummary();
+        })
+        .catch(function (e) { toast('Lỗi xoá: ' + e.message, false); });
+    }
+
+    /* ── EDIT MODAL ── */
+    function openEditModal(row) {
+        editRow = row;
+        document.getElementById('ohEditInfo').textContent = (row.detailName || '—') + '  ·  ' + (row.spmain || '');
+        document.getElementById('ohEditDate').value = (row.createDate || '').split('T')[0];
+        document.getElementById('ohEditTime').value = row.inputTime || '';
+        document.getElementById('ohEditQty').value  = row.outputNumber || 0;
+        ohEditBd.classList.add('open');
+        setTimeout(function () { document.getElementById('ohEditQty').focus(); document.getElementById('ohEditQty').select(); }, 200);
+    }
+    function closeEditModal() { ohEditBd.classList.remove('open'); editRow = null; }
+
+    document.getElementById('ohEditClose').addEventListener('click', closeEditModal);
+    document.getElementById('ohEditCancel').addEventListener('click', closeEditModal);
+    ohEditBd.addEventListener('click', function (e) { if (e.target === ohEditBd) closeEditModal(); });
+
+    document.getElementById('ohEditSave').addEventListener('click', function () {
+        if (!editRow) return;
+        var qty = parseInt(document.getElementById('ohEditQty').value) || 0;
+        if (qty < 0) { toast('Sản lượng không hợp lệ', false); return; }
+        var btn = this, orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Lưu...';
+
+        fetch('/ProductionDepartment/UpdateOutputRecord', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id:           editRow.id,
+                outputNumber: qty,
+                date:         document.getElementById('ohEditDate').value,
+                time:         document.getElementById('ohEditTime').value
+            })
+        })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (data) {
+            btn.disabled = false; btn.innerHTML = orig;
+            if (!data.success) { toast(data.message || 'Lỗi cập nhật', false); return; }
+            toast('Đã cập nhật', true);
+            allRows.forEach(function (x) {
+                if (x.id === editRow.id) {
+                    x.outputNumber = qty;
+                    x.inputTime    = document.getElementById('ohEditTime').value;
+                    x.createDate   = document.getElementById('ohEditDate').value;
+                }
+            });
+            closeEditModal();
+            applyFilterSort();
+            renderSummary();
+        })
+        .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; toast('Lỗi: ' + e.message, false); });
+    });
+
+    /* ── DRAG-SELECT (cột Sản lượng) ── */
+    var isDragging   = false;
+    var dragStartIdx = -1;
+    var selectedIdxs = new Set();
+    var autoScrollRaf = null;
+    var lastMouseY = 0;
+    var SCROLL_ZONE = 60;   // px from edge triggers scroll
+    var SCROLL_SPD  = 8;    // px per frame
+
+    function initDragSelect() {
+        var cells = ohTbody.querySelectorAll('.oh-num-cell');
+        cells.forEach(function (cell, idx) {
+            cell.addEventListener('mousedown', function (e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                clearSelection();
+                isDragging = true; dragStartIdx = idx;
+                selectCell(cells, idx);
+            });
+            cell.addEventListener('mouseenter', function () {
+                if (!isDragging) return;
+                clearSelection();
+                var lo = Math.min(dragStartIdx, idx), hi = Math.max(dragStartIdx, idx);
+                for (var i = lo; i <= hi; i++) selectCell(cells, i);
+            });
+        });
+    }
+
+    /* Auto-scroll: track mouse Y on ohBody container */
+    var ohBodyEl = document.querySelector('.oh-body');
+    document.addEventListener('mousemove', function (e) {
+        lastMouseY = e.clientY;
+        if (!isDragging) return;
+        if (!autoScrollRaf) autoScrollRaf = requestAnimationFrame(doAutoScroll);
+    });
+
+    function doAutoScroll() {
+        autoScrollRaf = null;
+        if (!isDragging || !ohBodyEl) return;
+        var rect = ohBodyEl.getBoundingClientRect();
+        var rel  = lastMouseY - rect.top;
+        var h    = rect.height;
+        if (rel < SCROLL_ZONE) {
+            /* scroll up */
+            var speed = Math.round(SCROLL_SPD * (1 - rel / SCROLL_ZONE));
+            ohBodyEl.scrollTop -= speed;
+            autoScrollRaf = requestAnimationFrame(doAutoScroll);
+        } else if (rel > h - SCROLL_ZONE) {
+            /* scroll down */
+            var speed2 = Math.round(SCROLL_SPD * (1 - (h - rel) / SCROLL_ZONE));
+            ohBodyEl.scrollTop += speed2;
+            autoScrollRaf = requestAnimationFrame(doAutoScroll);
+        }
+    }
+
+    document.addEventListener('mouseup', function () {
+        if (isDragging) {
+            isDragging = false;
+            if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = null; }
+            updateSelBar();
+        }
+    });
+
+    function selectCell(cells, idx) {
+        selectedIdxs.add(idx);
+        if (cells[idx]) cells[idx].classList.add('selecting');
+    }
+
+    function clearSelection() {
+        selectedIdxs.clear();
+        ohTbody.querySelectorAll('.oh-num-cell.selecting').forEach(function (c) { c.classList.remove('selecting'); });
+        ohSelBar.classList.remove('visible');
+    }
+
+    function updateSelBar() {
+        if (!selectedIdxs.size) { ohSelBar.classList.remove('visible'); return; }
+        var cells = ohTbody.querySelectorAll('.oh-num-cell');
+        var total = 0, count = 0;
+        selectedIdxs.forEach(function (i) {
+            if (cells[i]) { total += parseFloat(cells[i].dataset.val) || 0; count++; }
+        });
+        document.getElementById('ohSelCount').textContent = count;
+        document.getElementById('ohSelSum').textContent   = fmt(total);
+        document.getElementById('ohSelAvg').textContent   = count > 0 ? fmt(Math.round(total / count)) : '0';
+        ohSelBar.classList.add('visible');
+    }
+
+    document.getElementById('ohSelClose').addEventListener('click', clearSelection);
+
+}());
+</script>

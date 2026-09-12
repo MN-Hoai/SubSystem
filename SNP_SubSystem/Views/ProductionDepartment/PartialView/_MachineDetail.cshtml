@@ -55,7 +55,7 @@
     .md-section-title { font-size:15px; font-weight:800; color:var(--ink-900); }
     .md-table-wrap { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
     .md-table { width:100%; border-collapse:collapse; font-size:13.5px; }
-    .md-table thead tr { background:var(--bg-canvas); border-bottom:1.5px solid var(--border); }
+    .md-table thead tr { background:var(--bg-canvas); border-bottom:1.5px solid var(--border); position:sticky; top:0; z-index:2; }
     .md-table thead th { padding:10px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--ink-500); white-space:nowrap; }
     .md-table tbody tr { border-bottom:1px solid var(--border-soft); transition:background .15s; cursor:pointer; }
     .md-table tbody tr:last-child { border-bottom:none; }
@@ -112,7 +112,13 @@
     .md-date-sep { font-size:12px; color:var(--ink-300); font-weight:600; }
     .md-date-count { font-size:12px; font-weight:700; color:var(--ink-500); margin-left:auto; }
     .md-modal-body { flex:1; overflow-y:auto; min-height:0; padding:16px 22px 20px; display:flex; flex-direction:column; gap:14px; }
+    /* Detail summary cards inside modal — must not grow/shrink so body gets scroll space */
+    #detailCards { flex-shrink:0 !important; }
+    /* Scroll container cho bảng danh sách mã sản xuất */
+    .md-table-wrap { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
+    .md-table-scroll { max-height:calc(100vh - 320px); overflow-y:auto; }
     .md-day-card { background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+    .md-day-card-content { /* không giới hạn chiều cao — cuộn toàn bộ qua md-modal-body */ }
     .md-day-card-head { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--bg-surface); border-bottom:1px solid var(--border-soft); }
     .md-day-date { font-size:13px; font-weight:700; color:var(--ink-900); display:flex; align-items:center; gap:7px; }
     .md-day-date i { color:var(--ink-300); font-size:12px; }
@@ -262,6 +268,7 @@
             <span id="mdRecordCount" style="font-size:12px;color:var(--ink-400);font-weight:600;"></span>
         </div>
         <div class="md-table-wrap">
+            <div class="md-table-scroll">
             <table class="md-table">
                 <thead>
                     <tr>
@@ -279,6 +286,7 @@
                     <tr><td colspan="8" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải dữ liệu...</p></td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
     </div><!-- end body -->
@@ -317,7 +325,7 @@
             <span class="md-date-count" id="detailDateCount"></span>
         </div>
 
-        <div class="md-summary-row" style="padding: 16px 22px 0; grid-template-columns: 1fr 1fr; flex-shrink: 0;" id="detailCards">
+        <div class="md-summary-row" style="padding: 16px 22px 12px; grid-template-columns: 1fr 1fr; flex-shrink: 0;" id="detailCards">
             <div class="md-sum-card accent-navy">
                 <div class="md-sum-label">Tổng sản lượng</div>
                 <div class="md-sum-value" id="detailTotalOutput">—</div>
@@ -839,39 +847,94 @@
         ['fInlineLine','fInlineDept'].forEach(function (id) { document.getElementById(id).value = ''; });
     }
 
-    // Save (stub — ghi log, trong tương lai gọi API)
+    // Save — gọi API thực
     document.getElementById('addModalSave').addEventListener('click', function () {
-        var payload;
+        var saveBtn = this;
+        var origHtml = saveBtn.innerHTML;
+
         if (addActiveTab === 'pick') {
-            if (!pickedInfo) { toast('Vui lòng chọn một mã sản xuất', false); return; }
-            payload = { productionInfoId: pickedInfo.id, machineId: MACHINE_ID };
+            // ── Tab "Chọn có sẵn": gán ProductionInfo đã có vào máy ──────────
+            if (!pickedInfo) {
+                toast('Vui lòng chọn một mã sản xuất', false);
+                return;
+            }
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+
+            fetch('/ProductionDepartment/AssignProductionInfo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    productionInfoId: pickedInfo.id,
+                    machineId: MACHINE_ID
+                })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = origHtml;
+                if (!res.ok || !res.data.success) {
+                    toast(res.data.message || 'Lỗi khi gán mã vào máy', false);
+                    return;
+                }
+                toast(res.data.message || 'Đã gán mã sản xuất vào máy', true);
+                closeAddModal();
+                loadProductionInfos();
+            })
+            .catch(function (e) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = origHtml;
+                toast('Lỗi kết nối: ' + e.message, false);
+            });
+
         } else {
+            // ── Tab "Tạo mới": tạo ProductionInfo mới rồi gán vào máy ────────
             var sp = document.getElementById('fSpmain').value.trim();
             var st = document.getElementById('fStyle').value.trim();
             if (!sp || !st) {
                 toast('Vui lòng nhập Mã SP và Tên Style', false);
                 return;
             }
-            payload = {
-                productionInfoId: null,
-                spmain: sp, style: st,
-                line:   document.getElementById('fLine').value.trim(),
-                color:  document.getElementById('fColor').value.trim(),
-                target:    parseInt(document.getElementById('fTarget').value) || null,
-                totalQty:  parseInt(document.getElementById('fTotalQty').value) || null,
-                inlineLine: document.getElementById('fInlineLine').value || null,
-                inlineDept: document.getElementById('fInlineDept').value || null,
-                remark: document.getElementById('fRemark').value.trim(),
-                machineId: MACHINE_ID, deptId: DEPT_ID
-            };
-        }
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tạo...';
 
-        console.log('[MachineDetail] Save payload:', payload);
-        // TODO: fetch('/ProductionDepartment/AssignProductionInfo', { method:'POST', ... })
-        toast('Đã lưu! (chức năng lưu DB sẽ hoàn thiện sau)', true);
-        closeAddModal();
-        loadProductionInfos();
+            fetch('/ProductionDepartment/CreateProductionInfo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    spmain:    sp,
+                    style:     st,
+                    line:      document.getElementById('fLine').value.trim() || null,
+                    color:     document.getElementById('fColor').value.trim() || null,
+                    target:    parseInt(document.getElementById('fTarget').value)   || null,
+                    totalQty:  parseInt(document.getElementById('fTotalQty').value) || null,
+                    inlineLine: document.getElementById('fInlineLine').value || null,
+                    inlineDept: document.getElementById('fInlineDept').value || null,
+                    remark:    document.getElementById('fRemark').value.trim() || null,
+                    machineId: MACHINE_ID,
+                    deptId:    DEPT_ID
+                })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = origHtml;
+                if (!res.ok || !res.data.success) {
+                    toast(res.data.message || 'Lỗi khi tạo mã sản xuất', false);
+                    return;
+                }
+                toast(res.data.message || 'Đã tạo và gán mã sản xuất vào máy', true);
+                closeAddModal();
+                loadProductionInfos();
+            })
+            .catch(function (e) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = origHtml;
+                toast('Lỗi kết nối: ' + e.message, false);
+            });
+        }
     });
+
 
     /* =====================================================
        FILTER EVENTS

@@ -1,0 +1,26 @@
+@* Partial: Form thêm/cập nhật StyleInfo — được render trong modal *@
+<div class="si-form-group">
+    <label class="si-form-label">Bộ phận <span style="color:var(--danger);">*</span></label>
+    <select id="sifDept" class="si-form-control">
+        <option value="">-- Chọn bộ phận --</option>
+    </select>
+</div>
+<div class="si-form-group">
+    <label class="si-form-label">Style Code <span style="color:var(--danger);">*</span></label>
+    <input type="text" id="sifCode" class="si-form-control" placeholder="VD: ST001, ABC-123">
+</div>
+<div class="si-form-group">
+    <label class="si-form-label">Keyword <small style="color:var(--ink-400);font-weight:400;">(tự động nếu để trống)</small></label>
+    <input type="text" id="sifKeyword" class="si-form-control" placeholder="Tự động từ StyleCode">
+</div>
+<div class="si-form-group">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label class="si-form-label" style="margin:0;">Danh sách công đoạn (StyleDetail)</label>
+        <button type="button" id="btnAddDetail" class="si-btn-sm si-btn-add">
+            <i class="fa-solid fa-plus"></i> Thêm công đoạn
+        </button>
+    </div>
+    <div id="siDetailList" class="si-detail-list">
+        <div class="si-detail-empty">Chưa có công đoạn. Nhấn "+ Thêm công đoạn" để thêm.</div>
+    </div>
+</div>

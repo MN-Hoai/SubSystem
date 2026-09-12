@@ -18,7 +18,7 @@ namespace Sub_Services.Execute
         public async Task<List<MachineLayout_DepartmentItem>> GetDepartmentsForLayout()
         {
             return await _context.ProductionDepartments
-                .Where(d => d.Status == 1)
+                .Where(d => d.Status >= 0)   // >= 0: hoạt động, không lấy tạm khoá (-1) hay xóa (-2)
                 .OrderBy(d => d.DepartmentName)
                 .AsNoTracking()
                 .Select(d => new MachineLayout_DepartmentItem

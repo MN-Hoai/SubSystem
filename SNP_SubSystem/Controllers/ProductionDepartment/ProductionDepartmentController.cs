@@ -3,6 +3,7 @@ using Sub_Services.Execute;
 using System;
 using System.Threading.Tasks;
 
+
 namespace SNP_SubSystem.Controllers.ProductionDepartment
 {
     public class ProductionDepartmentController : Controller
@@ -163,6 +164,65 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
         }
 
         // ---------------------------------------------------------------
+        // GET: Trang lịch sử ghi sản lượng
+        // GET /ProductionDepartment/OutputHistory
+        // ---------------------------------------------------------------
+
+        public IActionResult OutputHistory()
+        {
+            return View("~/Views/ProductionDepartment/PartialView/_OutputHistory.cshtml");
+        }
+
+        // ---------------------------------------------------------------
+        // GET: Lịch sử ghi sản lượng
+        // GET /ProductionDepartment/GetOutputHistory?from=yyyy-MM-dd&to=yyyy-MM-dd&deptId=
+        // ---------------------------------------------------------------
+
+        [HttpGet]
+        public async Task<IActionResult> GetOutputHistory(
+            string from = null, string to = null, Guid? deptId = null)
+        {
+            DateOnly? fromDate = null, toDate = null;
+            if (!string.IsNullOrEmpty(from) && DateOnly.TryParse(from, out var f)) fromDate = f;
+            if (!string.IsNullOrEmpty(to)   && DateOnly.TryParse(to,   out var t)) toDate   = t;
+            var list = await _service.GetOutputHistory(fromDate, toDate, deptId);
+            return Ok(list);
+        }
+
+        // ---------------------------------------------------------------
+        // PUT: Cập nhật một lần ghi sản lượng
+        // PUT /ProductionDepartment/UpdateOutputRecord
+        // Body: { id, outputNumber, date, time }
+        // ---------------------------------------------------------------
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateOutputRecord(
+            [FromBody] SubSystemService.UpdateOutputRecord_Request req)
+        {
+            if (req == null || req.Id == Guid.Empty)
+                return BadRequest(new { success = false, message = "Thiếu dữ liệu." });
+            var (ok, msg) = await _service.UpdateOutputRecord(req);
+            if (!ok) return BadRequest(new { success = false, message = msg });
+            return Ok(new { success = true, message = msg });
+        }
+
+        // ---------------------------------------------------------------
+        // DELETE: Xóa mềm một lần ghi sản lượng
+        // DELETE /ProductionDepartment/DeleteOutputRecord?id={guid}
+        // ---------------------------------------------------------------
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteOutputRecord([FromBody] System.Text.Json.JsonElement body)
+        {
+            if (!body.TryGetProperty("id", out var idEl) || !Guid.TryParse(idEl.GetString(), out var id) || id == Guid.Empty)
+                return BadRequest(new { success = false, message = "Id không hợp lệ." });
+            var (ok, msg) = await _service.DeleteOutputRecord(id);
+            if (!ok) return NotFound(new { success = false, message = msg });
+            return Ok(new { success = true, message = msg });
+        }
+
+
+        // ---------------------------------------------------------------
         // GET: Danh sách máy (cho RecordOutput)
         // GET /ProductionDepartment/GetMachinesForRecording?deptId=&keyword=
         // ---------------------------------------------------------------
@@ -218,5 +278,93 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
             if (!ok) return BadRequest(new { success = false, message = msg });
             return Ok(new { success = true, message = msg });
         }
+
+        // ---------------------------------------------------------------
+        // GET: Trang danh sách bộ phận
+        // ---------------------------------------------------------------
+        public IActionResult DepartmentList()
+        {
+            return View("~/Views/ProductionDepartment/DepartmentList.cshtml");
+        }
+
+        // ---------------------------------------------------------------
+        // GET: Danh sách bộ phận (JSON) kèm số mã hàng
+        // GET /ProductionDepartment/GetDepartmentList
+        // ---------------------------------------------------------------
+        [HttpGet]
+        public async Task<IActionResult> GetDepartmentList()
+        {
+            var list = await _service.GetDepartmentListWithCount();
+            return Ok(list);
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Tạo mới bộ phận
+        // POST /ProductionDepartment/CreateDepartment
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> CreateDepartment(
+            [FromBody] SubSystemService.DepartmentUpsert_Request req)
+        {
+            if (req == null) return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+            var (ok, msg, id) = await _service.CreateDepartment(req);
+            return ok ? Ok(new { success = true, message = msg, id })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Cập nhật thông tin bộ phận
+        // POST /ProductionDepartment/UpdateDepartment
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> UpdateDepartment(
+            [FromBody] SubSystemService.DepartmentUpsert_Request req)
+        {
+            if (req == null) return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+            var (ok, msg) = await _service.UpdateDepartment(req);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Tạm khoá bộ phận (Status = -1)
+        // POST /ProductionDepartment/SuspendDepartment
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> SuspendDepartment([FromBody] DeptIdRequest req)
+        {
+            if (req?.Id == Guid.Empty) return BadRequest(new { success = false, message = "Id không hợp lệ." });
+            var (ok, msg) = await _service.SuspendDepartment(req.Id);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Mở khoá bộ phận (Status = 1)
+        // POST /ProductionDepartment/UnlockDepartment
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> UnlockDepartment([FromBody] DeptIdRequest req)
+        {
+            if (req?.Id == Guid.Empty) return BadRequest(new { success = false, message = "Id không hợp lệ." });
+            var (ok, msg) = await _service.UnlockDepartment(req.Id);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Xoá mềm bộ phận (Status = -2)
+        // POST /ProductionDepartment/SoftDeleteDepartment
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> SoftDeleteDepartment([FromBody] DeptIdRequest req)
+        {
+            if (req?.Id == Guid.Empty) return BadRequest(new { success = false, message = "Id không hợp lệ." });
+            var (ok, msg) = await _service.SoftDeleteDepartment(req.Id);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        public class DeptIdRequest { public Guid Id { get; set; } }
     }
 }

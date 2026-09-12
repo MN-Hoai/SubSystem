@@ -1,0 +1,509 @@
+@{
+    ViewData["Title"] = "Quản lý bộ phận";
+}
+
+<div class="content-area">
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <span class="current">Danh sách bộ phận</span>
+            </div>
+            <h1 class="page-title">Quản lý bộ phận sản xuất</h1>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-primary" id="btnNewDept"><i class="fa-solid fa-plus"></i>Thêm bộ phận</button>
+        </div>
+    </div>
+
+    <!-- Stats summary -->
+    <div id="deptStats" style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;"></div>
+
+    <!-- Table panel -->
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title"><i class="fa-solid fa-building-user" style="color:var(--primary);"></i> Danh sách bộ phận</div>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <input type="text" id="deptSearch" class="dept-search" placeholder="Tìm kiếm...">
+                <button class="btn btn-ghost" id="btnRefresh" style="padding:6px 14px;"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+            <div id="tableLoadingDept" style="padding:40px;text-align:center;color:var(--ink-400);"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i><br>Đang tải dữ liệu...</div>
+            <table class="dept-table" id="deptTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Tên bộ phận</th>
+                        <th>Keyword</th>
+                        <th style="width:130px;text-align:center;">Mã đang SX</th>
+                        <th style="width:130px;text-align:center;">Trạng thái</th>
+                        <th style="width:160px;">Cập nhật</th>
+                    </tr>
+                </thead>
+                <tbody id="deptTbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<div id="deptCtxMenu" class="dept-ctx-menu">
+    <button id="ctxUpdateDept" class="ctx-btn"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);width:20px;"></i> Cập nhật</button>
+    <div class="ctx-sep"></div>
+    <button id="ctxUnlockDept" class="ctx-btn ctx-success" style="display:none;"><i class="fa-solid fa-lock-open" style="width:20px;"></i> Mở khoá</button>
+    <button id="ctxSuspendDept" class="ctx-btn ctx-warn"><i class="fa-solid fa-lock" style="width:20px;"></i> Tạm khoá</button>
+    <button id="ctxDeleteDept" class="ctx-btn ctx-danger"><i class="fa-solid fa-trash" style="width:20px;"></i> Xoá bộ phận</button>
+</div>
+
+<!-- Modal: Tạo mới / Cập nhật -->
+<div id="modalDeptForm" class="dept-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dept-modal-box" style="max-width:480px;">
+        <div class="dept-modal-header">
+            <h2 class="dept-modal-title" id="modalDeptTitle"><i class="fa-solid fa-building-user" style="color:var(--primary);"></i> Bộ phận</h2>
+            <button class="dept-modal-close" id="btnCloseDeptForm" title="Đóng">&times;</button>
+        </div>
+        <div class="dept-modal-body">
+            <div class="dept-form-group">
+                <label class="dept-form-label">Tên bộ phận <span style="color:var(--danger);">*</span></label>
+                <input type="text" id="fdName" class="dept-form-input" placeholder="VD: Bộ phận may, Bộ phận cắt...">
+            </div>
+            <div class="dept-form-group">
+                <label class="dept-form-label">Keyword <small style="color:var(--ink-400); font-weight:400;">(tự động tạo từ tên nếu để trống)</small></label>
+                <input type="text" id="fdKeyword" class="dept-form-input" placeholder="Tự động tạo từ Tên bộ phận">
+            </div>
+        </div>
+        <div class="dept-modal-footer">
+            <button class="dept-btn dept-btn-ghost" id="btnCancelDeptForm">Huỷ</button>
+            <button class="dept-btn dept-btn-primary" id="btnSaveDeptForm"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Xác nhận Tạm khoá -->
+<div id="modalSuspend" class="dept-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dept-modal-box" style="max-width:420px;">
+        <div class="dept-modal-header" style="border-top:4px solid #d97706;">
+            <h2 class="dept-modal-title" style="color:#d97706;"><i class="fa-solid fa-lock"></i> Xác nhận tạm khoá</h2>
+            <button class="dept-modal-close" id="btnCloseSuspend">&times;</button>
+        </div>
+        <div class="dept-modal-body">
+            <p style="font-size:14px;color:var(--ink-700-solid);line-height:1.6;">Bộ phận sẽ bị tạm khoá và không hiển thị trong các danh sách hoạt động. Bạn có thể kích hoạt lại sau.</p>
+            <div id="suspendInfoBox" class="confirm-info-box confirm-warn"></div>
+        </div>
+        <div class="dept-modal-footer">
+            <button class="dept-btn dept-btn-ghost" id="btnCancelSuspend">Huỷ</button>
+            <button class="dept-btn dept-btn-warn" id="btnConfirmSuspend"><i class="fa-solid fa-lock"></i> Tạm khoá</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Xác nhận Xoá -->
+<div id="modalDeleteDept" class="dept-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dept-modal-box" style="max-width:420px;">
+        <div class="dept-modal-header" style="border-top:4px solid var(--danger);">
+            <h2 class="dept-modal-title" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Xác nhận xoá</h2>
+            <button class="dept-modal-close" id="btnCloseDelDept">&times;</button>
+        </div>
+        <div class="dept-modal-body">
+            <p style="font-size:14px;color:var(--ink-700-solid);line-height:1.6;">Hành động này sẽ xoá mềm bộ phận. Dữ liệu của bộ phận sẽ không còn hiển thị.</p>
+            <div id="deleteInfoBox" class="confirm-info-box confirm-danger"></div>
+        </div>
+        <div class="dept-modal-footer">
+            <button class="dept-btn dept-btn-ghost" id="btnCancelDelDept">Huỷ</button>
+            <button class="dept-btn dept-btn-danger" id="btnConfirmDelDept"><i class="fa-solid fa-trash"></i> Xoá</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Xác nhận Mở khoá -->
+<div id="modalUnlockDept" class="dept-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dept-modal-box" style="max-width:420px;">
+        <div class="dept-modal-header" style="border-top:4px solid var(--success);">
+            <h2 class="dept-modal-title" style="color:var(--success);"><i class="fa-solid fa-lock-open"></i> Xác nhận mở khoá</h2>
+            <button class="dept-modal-close" id="btnCloseUnlockDept">&times;</button>
+        </div>
+        <div class="dept-modal-body">
+            <p style="font-size:14px;color:var(--ink-700-solid);line-height:1.6;">Bộ phận sẽ được kích hoạt trở lại và hiển thị trong các danh sách hoạt động.</p>
+            <div id="unlockInfoBox" class="confirm-info-box" style="background:#E8F7F0;border:1px solid #6EE7B7;color:#065f46;"></div>
+        </div>
+        <div class="dept-modal-footer">
+            <button class="dept-btn dept-btn-ghost" id="btnCancelUnlockDept">Huỷ</button>
+            <button class="dept-btn dept-btn-success" id="btnConfirmUnlockDept"><i class="fa-solid fa-lock-open"></i> Mở khoá</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
+
+<style>
+    /* ── Modal Overlay ──────────────────────────────────────────────── */
+    .dept-modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        background: rgba(10,14,26,.45);
+        backdrop-filter: blur(3px);
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 80px;
+    }
+    .dept-modal-backdrop.show { display: flex !important; }
+
+    .dept-modal-box {
+        background: var(--bg-surface);
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.22);
+        width: 100%;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+        animation: deptModalIn .22s cubic-bezier(.4,0,.2,1);
+    }
+    @@keyframes deptModalIn { from { opacity:0; transform:translateY(-16px) scale(.97); } to { opacity:1; transform:none; } }
+
+    .dept-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px 14px;
+        border-bottom: 1px solid var(--border);
+        border-radius: 14px 14px 0 0;
+    }
+    .dept-modal-title { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink-900); display:flex; align-items:center; gap:8px; }
+    .dept-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 6px; border-radius:6px; transition:background .15s,color .15s; }
+    .dept-modal-close:hover { background:var(--surface-alt,#f0f2f8); color:var(--ink-900); }
+
+    .dept-modal-body { padding: 20px 22px; }
+    .dept-modal-footer { padding: 14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    .dept-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 8px 18px; border-radius: 8px; font-size: 13.5px;
+        font-weight: 600; font-family: inherit; cursor: pointer;
+        transition: all .18s ease; border: 2px solid transparent;
+    }
+    .dept-btn-ghost {
+        background: transparent;
+        border-color: var(--border);
+        color: var(--ink-700-solid);
+    }
+    .dept-btn-ghost:hover { background: var(--surface-alt,#f4f6fb); border-color: var(--ink-300); }
+    .dept-btn-primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+    .dept-btn-primary:hover { filter: brightness(1.1); }
+    .dept-btn-warn { background:#d97706; border-color:#d97706; color:#fff; }
+    .dept-btn-warn:hover { background:#b45309; border-color:#b45309; }
+    .dept-btn-danger { background:var(--danger); border-color:var(--danger); color:#fff; }
+    .dept-btn-danger:hover { filter:brightness(1.1); }
+    .dept-btn-success { background:var(--success); border-color:var(--success); color:#fff; }
+    .dept-btn-success:hover { filter:brightness(1.1); }
+
+    /* ── Context Menu ───────────────────────────────────────────────── */
+    .dept-ctx-menu {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 8px 30px rgba(0,0,0,.14);
+        padding: 6px 0;
+        min-width: 190px;
+    }
+    .ctx-btn { display:block; width:100%; text-align:left; padding:9px 16px; background:none; border:none; cursor:pointer; font-size:13.5px; font-family:inherit; color:var(--ink-900); transition:background .12s; }
+    .ctx-btn:hover { background:var(--surface-alt,#f4f6fb); }
+    .ctx-warn { color:#d97706 !important; }
+    .ctx-danger { color:var(--danger) !important; }
+    .ctx-success { color:var(--success) !important; }
+    .ctx-sep { height:1px; background:var(--border); margin:4px 0; }
+
+    /* ── Form inputs ────────────────────────────────────────────────── */
+    .dept-form-group { margin-bottom:16px; }
+    .dept-form-label { display:block; font-size:13px; font-weight:600; color:var(--ink-700-solid); margin-bottom:5px; }
+    .dept-form-input { width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:7px; padding:9px 12px; font-size:13.5px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); transition:border-color .18s,box-shadow .18s; }
+    .dept-form-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(59,130,246,.14); }
+
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .dept-search { border:1.5px solid var(--border); border-radius:7px; padding:7px 12px; font-size:13px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); outline:none; width:200px; transition:border-color .18s; }
+    .dept-search:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(59,130,246,.10); }
+    .dept-table { width:100%; border-collapse:collapse; }
+    .dept-table th { padding:11px 14px; font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-500); background:var(--bg-canvas); border-bottom:1px solid var(--border); text-align:left; }
+    .dept-table td { padding:13px 14px; font-size:13.5px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+    .dept-table tbody tr:last-child td { border-bottom:none; }
+    .dept-table tbody tr:hover td { background:rgba(59,130,246,.04); }
+    .dept-table tbody tr.ctx-active td { background:rgba(59,130,246,.09) !important; }
+
+    /* ── Confirm info boxes ─────────────────────────────────────────── */
+    .confirm-info-box { border-radius:7px; padding:11px 15px; margin-top:14px; font-size:14px; font-weight:700; color:var(--ink-900); }
+    .confirm-warn    { background:#FEF3C7; border:1px solid #FCD34D; color:#92400e; }
+    .confirm-danger  { background:#FEF2F2; border:1px solid #FECACA; color:#991b1b; }
+
+    /* ── Stats ──────────────────────────────────────────────────────── */
+    .stat-mini { background:var(--bg-surface); border:1px solid var(--border); border-radius:10px; padding:12px 18px; font-size:13px; display:flex; align-items:center; gap:12px; min-width:160px; transition:box-shadow .18s; }
+    .stat-mini:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .stat-mini-icon { width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+
+    /* ── Toast ──────────────────────────────────────────────────────── */
+    .dept-toast { background:var(--bg-surface); border:1px solid var(--border); border-radius:10px; padding:13px 16px; box-shadow:0 8px 30px rgba(0,0,0,.12); display:flex; align-items:flex-start; gap:12px; pointer-events:auto; border-left:4px solid; animation:deptToastIn .28s ease; }
+    @@keyframes deptToastIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:none; } }
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ===== TOAST ============================================================== */
+    const toastCt = document.getElementById('toastContainer');
+    function showToast(type, msg, ms) {
+        ms = ms || 3500;
+        const icons  = { success:'fa-circle-check', error:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
+        const colors = { success:'var(--success)', error:'var(--danger)', warn:'#d97706', info:'var(--primary)' };
+        const c = colors[type] || colors.info;
+        const el = document.createElement('div');
+        el.className = 'dept-toast';
+        el.style.borderLeftColor = c;
+        el.innerHTML = '<i class="fa-solid '+(icons[type]||'fa-circle-info')+'" style="color:'+c+';font-size:18px;margin-top:1px;flex-shrink:0;"></i>'
+            + '<div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink-900);">' + String(msg).replace(/</g,'&lt;') + '</div>'
+            + '<button style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--ink-400);padding:0;line-height:1;pointer-events:auto;" onclick="this.parentNode.remove()">&times;</button>';
+        toastCt.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity .25s, transform .25s';
+            el.style.opacity = '0'; el.style.transform = 'translateX(30px)';
+            setTimeout(() => el.remove(), 280);
+        }, ms);
+    }
+
+    /* ===== MODAL HELPERS ====================================================== */
+    function openModal(id)  { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    function onClose(id, btnId) {
+        document.getElementById(btnId).addEventListener('click', () => closeModal(id));
+        document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        ['modalDeptForm','modalSuspend','modalDeleteDept','modalUnlockDept'].forEach(closeModal);
+    });
+
+    /* ===== DATA =============================================================== */
+    let allDepts = [];
+    let activeRow = null;
+    let editingId = null;
+
+    async function loadDepts() {
+        document.getElementById('tableLoadingDept').style.display = 'block';
+        document.getElementById('tableLoadingDept').innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink-400);"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i><br>Đang tải dữ liệu...</div>';
+        document.getElementById('deptTable').style.display = 'none';
+        try {
+            const res = await fetch('/ProductionDepartment/GetDepartmentList');
+            if (!res.ok) { showToast('error', 'Không tải được danh sách.'); return; }
+            allDepts = await res.json();
+            renderStats(allDepts);
+            renderTable(allDepts);
+        } catch(e) { showToast('error', 'Lỗi kết nối: ' + e.message); }
+        finally { document.getElementById('tableLoadingDept').style.display = 'none'; }
+    }
+
+    function renderStats(list) {
+        const total  = list.length;
+        const active = list.filter(d => d.status === 1).length;
+        const codes  = list.reduce((a,d) => a + d.activeCodes, 0);
+        document.getElementById('deptStats').innerHTML =
+            statCard('fa-building', '#EEF2FF', 'var(--accent-navy)', total + ' Bộ phận', 'Tổng cộng') +
+            statCard('fa-circle-check', '#E8F7F0', 'var(--success)', active + ' Hoạt động', 'Đang hoạt động') +
+            statCard('fa-tag', '#EDE9FE', '#7c3aed', codes + ' Mã hàng', 'Tổng mã đang SX');
+    }
+    function statCard(icon, bg, color, val, lbl) {
+        return '<div class="stat-mini"><div class="stat-mini-icon" style="background:'+bg+';color:'+color+'"><i class="fa-solid '+icon+'"></i></div>'
+            + '<div><div style="font-weight:800;font-size:16px;color:var(--ink-900);">'+val+'</div>'
+            + '<div style="font-size:11px;color:var(--ink-500);">'+lbl+'</div></div></div>';
+    }
+
+    function renderTable(list) {
+        const kw = document.getElementById('deptSearch').value.toLowerCase();
+        const filtered = kw
+            ? list.filter(d => d.departmentName.toLowerCase().includes(kw) || (d.keyword||'').toLowerCase().includes(kw))
+            : list;
+        const tbody = document.getElementById('deptTbody');
+        tbody.innerHTML = '';
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--ink-400);">Không có bộ phận nào.</td></tr>';
+            document.getElementById('deptTable').style.display = 'table';
+            return;
+        }
+        filtered.forEach((d, i) => {
+            const badge = d.status === 1
+                ? '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#E8F7F0;color:var(--success);"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;"></span>Hoạt động</span>'
+                : '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#FEF3C7;color:#d97706;"><span style="width:6px;height:6px;border-radius:50%;background:#d97706;display:inline-block;"></span>Tạm khoá</span>';
+            const upd = new Date(d.updateDate).toLocaleDateString('vi-VN');
+            tbody.insertAdjacentHTML('beforeend',
+                '<tr data-id="'+d.id+'" data-name="'+esc(d.departmentName)+'" data-status="'+d.status+'">'
+                + '<td style="color:var(--ink-400);font-size:12px;">'+(i+1)+'</td>'
+                + '<td><strong>'+esc(d.departmentName)+'</strong></td>'
+                + '<td><code style="font-size:12px;background:var(--bg-canvas);padding:2px 7px;border-radius:4px;">'+esc(d.keyword||'')+'</code></td>'
+                + '<td style="text-align:center;"><span style="font-size:17px;font-weight:800;color:var(--primary);">'+d.activeCodes+'</span></td>'
+                + '<td>'+badge+'</td>'
+                + '<td style="font-size:12px;color:var(--ink-500);">'+upd+'</td>'
+                + '</tr>');
+        });
+        document.getElementById('deptTable').style.display = 'table';
+    }
+
+    /* ===== SEARCH ============================================================= */
+    document.getElementById('deptSearch').addEventListener('input', () => renderTable(allDepts));
+    document.getElementById('btnRefresh').addEventListener('click', loadDepts);
+
+    /* ===== CONTEXT MENU ======================================================= */
+    const ctxMenu = document.getElementById('deptCtxMenu');
+
+    document.getElementById('deptTbody').addEventListener('contextmenu', e => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        e.preventDefault();
+        activeRow = tr;
+        document.querySelectorAll('#deptTbody tr').forEach(r => r.classList.remove('ctx-active'));
+        tr.classList.add('ctx-active');
+        const { clientX: x, clientY: y } = e;
+        const mW = 200, mH = 140;
+        ctxMenu.style.left = (x + mW > window.innerWidth ? x - mW : x) + 'px';
+        ctxMenu.style.top  = (y + mH > window.innerHeight ? y - mH : y) + 'px';
+        ctxMenu.style.display = 'block';
+        updateCtxMenuByStatus(parseInt(tr.dataset.status));
+    });
+    document.addEventListener('click', hideCtx);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtx(); });
+    function hideCtx() {
+        ctxMenu.style.display = 'none';
+        if (activeRow) activeRow.classList.remove('ctx-active');
+    }
+
+    // Tùy chỉnh context menu theo status
+    function updateCtxMenuByStatus(status) {
+        const isSuspended = status === -1;
+        document.getElementById('ctxUnlockDept').style.display  = isSuspended ? 'block' : 'none';
+        document.getElementById('ctxSuspendDept').style.display = isSuspended ? 'none'  : 'block';
+    }
+
+    // Cập nhật
+    document.getElementById('ctxUpdateDept').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        const dept = allDepts.find(d => d.id === activeRow.dataset.id);
+        if (dept) openDeptForm(dept);
+    });
+    // Tạm khoá
+    document.getElementById('ctxSuspendDept').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        document.getElementById('suspendInfoBox').textContent = activeRow.dataset.name;
+        openModal('modalSuspend');
+    });
+    // Mở khoá
+    document.getElementById('ctxUnlockDept').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        document.getElementById('unlockInfoBox').textContent = activeRow.dataset.name;
+        openModal('modalUnlockDept');
+    });
+    // Xoá
+    document.getElementById('ctxDeleteDept').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        document.getElementById('deleteInfoBox').textContent = activeRow.dataset.name;
+        openModal('modalDeleteDept');
+    });
+
+    // Đóng modals
+    onClose('modalDeptForm', 'btnCloseDeptForm');
+    onClose('modalSuspend', 'btnCloseSuspend');
+    onClose('modalDeleteDept', 'btnCloseDelDept');
+    onClose('modalUnlockDept', 'btnCloseUnlockDept');
+    document.getElementById('btnCancelDeptForm').addEventListener('click', () => closeModal('modalDeptForm'));
+    document.getElementById('btnCancelSuspend').addEventListener('click', () => closeModal('modalSuspend'));
+    document.getElementById('btnCancelDelDept').addEventListener('click', () => closeModal('modalDeleteDept'));
+    document.getElementById('btnCancelUnlockDept').addEventListener('click', () => closeModal('modalUnlockDept'));
+
+    /* ===== CONFIRM ACTIONS ==================================================== */
+    document.getElementById('btnConfirmSuspend').addEventListener('click', async () => {
+        await doAction('/ProductionDepartment/SuspendDepartment', activeRow.dataset.id,
+            'btnConfirmSuspend', '<i class="fa-solid fa-lock"></i> Tạm khoá', 'Đang khoá...', 'modalSuspend', 'warn');
+    });
+    document.getElementById('btnConfirmUnlockDept').addEventListener('click', async () => {
+        await doAction('/ProductionDepartment/UnlockDepartment', activeRow.dataset.id,
+            'btnConfirmUnlockDept', '<i class="fa-solid fa-lock-open"></i> Mở khoá', 'Đang mở...', 'modalUnlockDept', 'success');
+    });
+    document.getElementById('btnConfirmDelDept').addEventListener('click', async () => {
+        await doAction('/ProductionDepartment/SoftDeleteDepartment', activeRow.dataset.id,
+            'btnConfirmDelDept', '<i class="fa-solid fa-trash"></i> Xoá', 'Đang xoá...', 'modalDeleteDept', 'error');
+    });
+
+    async function doAction(url, id, btnId, origLabel, loadLabel, modalId, toastType) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + loadLabel;
+        try {
+            const res  = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast(toastType, data.message);
+                closeModal(modalId);
+                activeRow = null;
+                await loadDepts();
+            } else { showToast('error', data.message || 'Có lỗi xảy ra.'); }
+        } catch(e) { showToast('error', 'Lỗi kết nối: ' + e.message); }
+        finally { btn.disabled = false; btn.innerHTML = origLabel; }
+    }
+
+    /* ===== FORM: Tạo mới / Cập nhật ========================================== */
+    function openDeptForm(dept) {
+        editingId = dept ? dept.id : null;
+        const isEdit = !!dept;
+        document.getElementById('modalDeptTitle').innerHTML = isEdit
+            ? '<i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Cập nhật bộ phận'
+            : '<i class="fa-solid fa-plus" style="color:var(--primary);"></i> Thêm bộ phận';
+        document.getElementById('fdName').value    = dept ? dept.departmentName : '';
+        document.getElementById('fdKeyword').value = dept ? (dept.keyword || '') : '';
+        openModal('modalDeptForm');
+        setTimeout(() => document.getElementById('fdName').focus(), 80);
+    }
+
+    document.getElementById('btnNewDept').addEventListener('click', () => openDeptForm(null));
+
+    document.getElementById('btnSaveDeptForm').addEventListener('click', async () => {
+        const name = document.getElementById('fdName').value.trim();
+        const kw   = document.getElementById('fdKeyword').value.trim();
+        if (!name) { showToast('error', 'Tên bộ phận không được để trống.'); document.getElementById('fdName').focus(); return; }
+        const btn = document.getElementById('btnSaveDeptForm');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        const url  = editingId ? '/ProductionDepartment/UpdateDepartment' : '/ProductionDepartment/CreateDepartment';
+        const body = { id: editingId || null, departmentName: name, keyword: kw };
+        try {
+            const res  = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast('success', data.message);
+                closeModal('modalDeptForm');
+                await loadDepts();
+            } else { showToast('error', data.message || 'Có lỗi xảy ra.'); }
+        } catch(e) { showToast('error', 'Lỗi kết nối: ' + e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu'; }
+    });
+
+    // Enter để submit
+    ['fdName','fdKeyword'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('btnSaveDeptForm').click();
+        });
+    });
+
+    /* ===== HELPER ============================================================= */
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    /* ===== INIT =============================================================== */
+    loadDepts();
+})();
+</script>

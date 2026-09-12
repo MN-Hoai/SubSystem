@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
         1) DESIGN TOKENS
         Toàn bộ biến màu sắc, khoảng cách, bo góc, đổ bóng dùng chung.
         Đổi theme (màu, độ rộng sidebar, chiều cao header...) chỉ cần
@@ -22,6 +22,11 @@
     --accent-gold-soft: #F6ECD9;
     --danger: #D2594F;
     --success: #2E9E71;
+    /* Aliases for compatibility with component styles */
+    --primary: var(--accent-navy);
+    --ink-400: #A8B0C4;          /* alias = --ink-300 */
+    --ink-600: #566280;
+    --surface-alt: #F4F6FB;
     --shadow-sm: 0 1px 2px rgba(22,33,62,0.04), 0 1px 1px rgba(22,33,62,0.03);
     --shadow-md: 0 8px 24px rgba(22,33,62,0.08);
     --shadow-lg: 0 16px 40px rgba(22,33,62,0.12);
@@ -305,6 +310,7 @@ ul {
 
 .sidebar-scroll {
     flex: 1;
+    min-height: 0;          /* fix flex child không bị giới hạn chiều cao */
     overflow-y: auto;
     overflow-x: hidden;
     padding: 18px 14px 18px;
@@ -544,6 +550,16 @@ ul {
         color: var(--ink-300);
     }
 
+    .breadcrumb a {
+        color: var(--ink-500);
+        text-decoration: none;
+        transition: color .15s;
+    }
+    .breadcrumb a:hover {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
     .breadcrumb .current {
         color: var(--accent-navy);
     }
@@ -594,6 +610,24 @@ ul {
         transform: translateY(-1px);
         box-shadow: var(--shadow-md);
     }
+
+.btn-secondary {
+    background: rgba(31,58,103,.10);
+    color: var(--accent-navy);
+    border: 1.5px solid var(--accent-navy);
+}
+    .btn-secondary:hover {
+        background: var(--accent-navy);
+        color: #fff;
+    }
+
+.btn-danger {
+    background: var(--danger);
+    color: #fff;
+    border: 1.5px solid var(--danger);
+}
+    .btn-danger:hover { filter: brightness(1.1); }
+
 /* ---- hết MAIN CONTENT LAYOUT ---- */
 
 /* ============================================================

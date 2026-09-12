@@ -13,36 +13,23 @@
     <!-- Tiêu đề trang + breadcrumb + nút hành động -->
     <div class="page-head">
         <div>
-            <div class="breadcrumb">Quản lý <span class="sep">/</span><span class="current">Tiến độ sản xuất</span></div>
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <span class="current">Tiến độ sản xuất</span>
+            </div>
             <h1 class="page-title">Tiến độ sản xuất</h1>
         </div>
         <div class="page-actions">
-            <button class="btn btn-ghost"><i class="fa-solid fa-download"></i>Xuất báo cáo</button>
-            <button class="btn btn-primary"><i class="fa-solid fa-plus"></i>Ghi nhận sản lượng</button>
-        </div>
-    </div>
-
-    <!-- 4 thẻ KPI tổng quan sản xuất -->
-    <div class="stat-grid">
-        <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-industry"></i></div><span class="stat-trend up">18/20</span></div>
-            <div class="stat-value">18 Chuyền</div>
-            <div class="stat-label">Đang hoạt động</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div><span class="stat-trend up">+8.2%</span></div>
-            <div class="stat-value">24.680</div>
-            <div class="stat-label">Sản lượng hôm nay</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><span class="stat-trend down">−2</span></div>
-            <div class="stat-value">5 Đơn</div>
-            <div class="stat-label">Trễ tiến độ</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-gauge-high"></i></div><span class="stat-trend up">+1.5%</span></div>
-            <div class="stat-value">92%</div>
-            <div class="stat-label">Hiệu suất trung bình</div>
+         
+            <a asp-controller="ProductionProgress" asp-action="ProductionInfoHistory" class="btn btn-ghost">
+                <i class="fa-solid fa-clock-rotate-left"></i>Lịch sử mã hàng
+            </a>
+            <a asp-controller="ProductionProgress" asp-action="ProductionInfoForm" class="btn btn-primary">
+                <i class="fa-solid fa-plus"></i>Thêm mã hàng
+            </a>
+    
+           
         </div>
     </div>
 
@@ -78,9 +65,10 @@
         <div class="filter-group">
             <label class="filter-label">Trạng thái</label>
             <select id="statusSelect">
-                <option value="">Tất cả</option>
+                <option value="">Tất cả (trừ xóa)</option>
                 <option value="1" selected>Đang hoạt động</option>
-                <option value="0">Ngừng hoạt động</option>
+                <option value="0">Chờ sản xuất</option>
+                <option value="2">Hoàn thành</option>
             </select>
         </div>
 
@@ -158,6 +146,258 @@
     </div>
 
 </div>
+
+<!-- =================================================================
+     MODAL: Nhập mã hàng từ Excel
+     ================================================================= -->
+<div id="modalImportInfo" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalImportInfoTitle">
+    <div class="modal-box" style="max-width:560px;">
+
+        <!-- Header -->
+        <div class="modal-header">
+            <h2 class="modal-title" id="modalImportInfoTitle">
+                <i class="fa-solid fa-file-import" style="color:var(--primary);"></i>
+                Nhập thông tin mã hàng từ Excel
+            </h2>
+            <button class="modal-close" id="btnCloseImportInfo" aria-label="Đóng">&times;</button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+
+
+
+            <!-- Chọn bộ phận -->
+            <div class="filter-group" style="margin-bottom:14px;">
+                <label class="form-label" for="importInfoDeptSelect">Bộ phận <span style="color:var(--danger);">*</span></label>
+                <select id="importInfoDeptSelect" class="form-control" style="width:100%;">
+                    <option value="">-- Chọn bộ phận --</option>
+                </select>
+            </div>
+
+            <!-- Chọn file -->
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label" for="importInfoFileInput">File Excel (.xlsx / .xls) <span style="color:var(--danger);">*</span></label>
+                <div class="file-drop-zone" id="importInfoDropZone"
+                     style="border:2px dashed var(--border,#d1d5e0); border-radius:8px; padding:24px; text-align:center; cursor:pointer; transition:border-color .2s;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px; color:var(--ink-400);"></i>
+                    <div style="margin:8px 0 4px; font-weight:600; color:var(--ink-600);">Kéo thả file vào đây</div>
+                    <div style="font-size:12px; color:var(--ink-400);">hoặc click để chọn file Excel</div>
+                    <input type="file" id="importInfoFileInput" accept=".xlsx,.xls" style="display:none;">
+                </div>
+                <div id="importInfoFileName" style="margin-top:6px; font-size:13px; color:var(--ink-500);"></div>
+            </div>
+
+            <!-- Tải mẫu -->
+            <div style="text-align:right; margin-bottom:4px;">
+                <a href="/ImportExport/DownloadProductionInfoTemplate" class="btn btn-ghost" style="font-size:12px; padding:4px 10px;">
+                    <i class="fa-solid fa-download"></i> Tải file mẫu
+                </a>
+            </div>
+
+            <!-- Kết quả import -->
+            <div id="importInfoResult" style="display:none; margin-top:16px;"></div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="btnCancelImportInfo">Hủy</button>
+            <button class="btn btn-primary" id="btnDoImportInfo" disabled>
+                <i class="fa-solid fa-upload"></i> Bắt đầu nhập
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================================================================
+     SCRIPT: Modal Import Mã Hàng
+     =================================================================== -->
+<script>
+(function () {
+    'use strict';
+
+    // ── DOM refs ──────────────────────────────────────────────────────
+    const modal         = document.getElementById('modalImportInfo');
+    const btnOpen       = document.getElementById('btnOpenImportInfo');
+    const btnClose      = document.getElementById('btnCloseImportInfo');
+    const btnCancel     = document.getElementById('btnCancelImportInfo');
+    const btnDo         = document.getElementById('btnDoImportInfo');
+    const deptSel       = document.getElementById('importInfoDeptSelect');
+    const fileInput     = document.getElementById('importInfoFileInput');
+    const dropZone      = document.getElementById('importInfoDropZone');
+    const fileNameEl    = document.getElementById('importInfoFileName');
+    const resultEl      = document.getElementById('importInfoResult');
+
+    let selectedFile = null;
+
+    // ── Open / Close ──────────────────────────────────────────────────
+    function openModal() {
+        modal.classList.add('open');
+        resetModal();
+        loadDepts();
+    }
+
+    function closeModal() {
+        modal.classList.remove('open');
+    }
+
+    btnOpen.addEventListener('click', openModal);
+    btnClose.addEventListener('click', closeModal);
+    btnCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+    // ── Load bộ phận ──────────────────────────────────────────────────
+    async function loadDepts() {
+        if (deptSel.options.length > 1) return; // đã load rồi
+        try {
+            const res  = await fetch('/ProductionProgress/GetDepartments');
+            if (!res.ok) return;
+            const list = await res.json();
+            list.forEach(d => {
+                const opt       = document.createElement('option');
+                opt.value       = d.id;
+                opt.textContent = d.departmentName;
+                deptSel.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('[ImportInfo] Lỗi load dept:', e);
+        }
+    }
+
+    // ── Validate → enable/disable nút Import ─────────────────────────
+    function validate() {
+        btnDo.disabled = !(deptSel.value && selectedFile);
+    }
+    deptSel.addEventListener('change', validate);
+
+    // ── File pick ─────────────────────────────────────────────────────
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--primary)';
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = 'var(--border,#d1d5e0)';
+    });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--border,#d1d5e0)';
+        const f = e.dataTransfer.files[0];
+        if (f) setFile(f);
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+
+    function setFile(f) {
+        const ext = f.name.split('.').pop().toLowerCase();
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            showResult(false, 'Chỉ hỗ trợ file .xlsx hoặc .xls.');
+            return;
+        }
+        selectedFile = f;
+        fileNameEl.innerHTML = `<i class="fa-solid fa-file-excel" style="color:#1d6f42;"></i> <strong>${escHtml(f.name)}</strong> (${(f.size / 1024).toFixed(1)} KB)`;
+        resultEl.style.display = 'none';
+        validate();
+    }
+
+    // ── Reset ─────────────────────────────────────────────────────────
+    function resetModal() {
+        selectedFile   = null;
+        fileInput.value = '';
+        fileNameEl.innerHTML = '';
+        resultEl.style.display = 'none';
+        deptSel.value  = '';
+        btnDo.disabled = true;
+        btnDo.innerHTML = '<i class="fa-solid fa-upload"></i> Bắt đầu nhập';
+        btnDo.disabled = true;
+    }
+
+    // ── Import ────────────────────────────────────────────────────────
+    btnDo.addEventListener('click', async () => {
+        if (!selectedFile || !deptSel.value) return;
+
+        btnDo.disabled = true;
+        btnDo.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xử lý...';
+        resultEl.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('departmentId', deptSel.value);
+
+        try {
+            const res = await fetch('/ImportExport/ImportProductionInfoExcel', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                showResult(false, data.message || 'Lỗi không xác định.');
+            } else {
+                showImportResult(data);
+            }
+        } catch (e) {
+            showResult(false, 'Lỗi kết nối: ' + e.message);
+        } finally {
+            btnDo.innerHTML = '<i class="fa-solid fa-upload"></i> Bắt đầu nhập';
+            btnDo.disabled = !(deptSel.value && selectedFile);
+        }
+    });
+
+    // ── Render kết quả ────────────────────────────────────────────────
+    function showImportResult(data) {
+        const isOk = data.success;
+        const color = isOk ? 'var(--success,#18c16e)' : 'var(--danger,#e53935)';
+        const icon  = isOk ? 'fa-circle-check' : 'fa-circle-xmark';
+
+        let errHtml = '';
+        if (data.errors && data.errors.length > 0) {
+            const items = data.errors.map(e => `<li style="margin-bottom:2px;">${escHtml(e)}</li>`).join('');
+            errHtml = `
+                <details style="margin-top:10px;">
+                    <summary style="cursor:pointer; font-size:12px; color:var(--danger);">Xem ${data.errors.length} lỗi chi tiết</summary>
+                    <ul style="font-size:12px; margin:6px 0 0 16px; padding:0; color:var(--danger);">${items}</ul>
+                </details>`;
+        }
+
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `
+            <div style="border:1px solid ${color}; border-radius:8px; padding:14px 16px; background:${isOk ? 'rgba(24,193,110,.07)' : 'rgba(229,57,53,.07)'}">
+                <div style="display:flex; align-items:center; gap:8px; font-weight:700; color:${color}; margin-bottom:8px;">
+                    <i class="fa-solid ${icon}"></i>
+                    <span>${escHtml(data.message)}</span>
+                </div>
+                <div style="display:flex; gap:18px; font-size:13px; flex-wrap:wrap;">
+                    <span>📋 Tổng: <strong>${data.totalRows}</strong></span>
+                    <span style="color:var(--success);">✅ Tạo mới: <strong>${data.importedRows}</strong></span>
+                    <span style="color:var(--primary);">🔄 Cập nhật: <strong>${data.updatedRows}</strong></span>
+                    <span style="color:var(--danger);">⛔ Bỏ qua: <strong>${data.skippedRows}</strong></span>
+                </div>
+                ${errHtml}
+            </div>`;
+    }
+
+    function showResult(ok, msg) {
+        const color = ok ? 'var(--success)' : 'var(--danger)';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `<div style="padding:10px 14px; border-radius:6px; border:1px solid ${color}; color:${color}; font-size:13px; font-weight:600;">${escHtml(msg)}</div>`;
+    }
+
+    function escHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+})();
+</script>
 
 <!-- ===================================================================
      SCRIPT TỔNG HỢP: Load filter + Fetch danh sách + Render bảng + Phân trang
@@ -376,10 +616,13 @@
 
             const statusBadge = p.status === 1
                 ? '<span class="badge-status success">Đang HĐ</span>'
-                : '<span class="badge-status warning">Ngừng HĐ</span>';
+                : p.status === 0
+                ? '<span class="badge-status warning">Chờ SX</span>'
+                : '<span class="badge-status">Hoàn thành</span>';
 
             tbody.insertAdjacentHTML('beforeend', `
-                <tr>
+                <tr data-id="${p.id}" data-line="${escHtml(p.line??'')}"
+                    data-style="${escHtml(p.style??'')}" data-sp="${escHtml(p.spmain??'')}">
                     <td class="cell-strong">${escHtml(p.line ?? '—')}</td>
                     <td>${escHtml(p.style ?? '—')}</td>
                     <td class="cell-mono">${escHtml(p.spmain ?? '—')}</td>
@@ -532,19 +775,17 @@
     }, 1500);
 
     searchInput.addEventListener('input', handleSearchInput);
+    searchInput.addEventListener('input', handleSearchInput);
     
-    // Nút Tìm kiếm (vẫn giữ nếu người dùng muốn bấm ngay)
+    // Nút Tìm kiếm
     btnSearch.addEventListener('click', () => {
         currentPage = 1;
         fetchList(1);
     });
 
-    // Enter trong ô tìm kiếm gọi ngay không cần chờ debounce
+    // Enter trong ô tìm kiếm
     searchInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { 
-            currentPage = 1; 
-            fetchList(1); 
-        }
+        if (e.key === 'Enter') { currentPage = 1; fetchList(1); }
     });
 
     // Khi chọn Bộ phận → reload Line + reset page → fetch
@@ -555,10 +796,7 @@
 
     // Tự động gọi fetch khi đổi Line, Status, Từ ngày, Đến ngày
     [lineSelect, statusSelect, fromDateInput, toDateInput].forEach(el => {
-        el.addEventListener('change', () => {
-            currentPage = 1;
-            fetchList(1);
-        });
+        el.addEventListener('change', () => { currentPage = 1; fetchList(1); });
     });
 
     // Nút Đặt lại
@@ -576,9 +814,7 @@
     // Nút Làm mới
     btnRefresh.addEventListener('click', () => fetchList(currentPage));
 
-    // ---------------------------------------------------------------
-    // 8. Khởi tạo khi DOM sẵn sàng
-    // ---------------------------------------------------------------
+    // Khởi tạo khi DOM sẵn sàng
     document.addEventListener('DOMContentLoaded', async () => {
         await loadDepartments();
         await loadLines(null);
@@ -587,3 +823,156 @@
 
 })();
 </script>
+
+<!-- Toast Container -->
+<div id="ppToastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
+
+<!-- Context Menu -->
+<div id="ctxMenu" style="display:none;position:fixed;z-index:9999;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px 0;min-width:180px;">
+    <button id="ctxEdit" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-pen-to-square" style="color:var(--primary);width:18px;"></i> Cập nhật
+    </button>
+    <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+    <button id="ctxDelete" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--danger);font-family:inherit;">
+        <i class="fa-solid fa-trash" style="width:18px;"></i> Xóa mã hàng
+    </button>
+</div>
+
+<!-- Modal xác nhận xóa -->
+<div id="modalConfirmDelete" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+            <h2 class="modal-title" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Xác nhận xóa</h2>
+            <button class="modal-close" id="btnCloseDel">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:14px;color:var(--ink-700-solid);">Bạn có chắc muốn xóa mã hàng này không? Hành động này sẽ đổi trạng thái thành "Đã xóa" và không hiển thị trong danh sách.</p>
+            <div id="delInfoBox" style="background:var(--surface-alt,#f4f6fb);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-top:12px;font-size:13px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="btnCancelDel">Hủy</button>
+            <button class="btn" style="background:var(--danger);color:#fff;" id="btnConfirmDel"><i class="fa-solid fa-trash"></i> Xóa</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── Toast system ──────────────────────────────────────────────────
+    const _tc = document.getElementById('ppToastContainer');
+    function toast(type, msg, ms) {
+        ms = ms || 3500;
+        const icons  = { success:'fa-circle-check', error:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
+        const colors = { success:'var(--success)', error:'var(--danger)', warn:'#d97706', info:'var(--primary)' };
+        const c = colors[type] || colors.info;
+        const el = document.createElement('div');
+        el.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:13px 15px;box-shadow:var(--shadow-md);display:flex;align-items:flex-start;gap:12px;border-left:4px solid '+c+';animation:ppToastIn .28s ease;pointer-events:auto;';
+        el.innerHTML = '<i class="fa-solid '+(icons[type]||icons.info)+'" style="color:'+c+';font-size:18px;margin-top:1px;"></i>'
+            + '<div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink-900);">'+ String(msg).replace(/</g,'&lt;') +'</div>'
+            + '<button style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink-400);padding:0;pointer-events:auto;" onclick="this.parentNode.remove()">&times;</button>';
+        _tc.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity .25s,transform .25s';
+            el.style.opacity = '0'; el.style.transform = 'translateX(30px)';
+            setTimeout(() => el.remove(), 280);
+        }, ms);
+    }
+
+    // ── Context Menu ──────────────────────────────────────────────────
+    const ctxMenu   = document.getElementById('ctxMenu');
+    const ctxEdit   = document.getElementById('ctxEdit');
+    const ctxDelete = document.getElementById('ctxDelete');
+    const delModal  = document.getElementById('modalConfirmDelete');
+    const delInfoBox= document.getElementById('delInfoBox');
+    const btnConfDel= document.getElementById('btnConfirmDel');
+    let activeRow   = null;
+
+    document.getElementById('progressTableBody').addEventListener('contextmenu', e => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        e.preventDefault();
+        activeRow = tr;
+        const { clientX: x, clientY: y } = e;
+        const mW = 190, mH = 90;
+        ctxMenu.style.left = (x + mW > window.innerWidth  ? x - mW : x) + 'px';
+        ctxMenu.style.top  = (y + mH > window.innerHeight ? y - mH : y) + 'px';
+        ctxMenu.style.display = 'block';
+        document.querySelectorAll('#progressTableBody tr').forEach(r => r.classList.remove('ctx-active'));
+        tr.classList.add('ctx-active');
+    });
+
+    document.addEventListener('click', () => hideCtx());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtx(); });
+    function hideCtx() {
+        ctxMenu.style.display = 'none';
+        if (activeRow) activeRow.classList.remove('ctx-active');
+    }
+
+    ctxEdit.addEventListener('click', () => {
+        if (!activeRow) return;
+        window.location.href = `/ProductionProgress/ProductionInfoForm?id=${activeRow.dataset.id}`;
+    });
+
+    ctxDelete.addEventListener('click', () => {
+        if (!activeRow) return;
+        hideCtx();
+        delInfoBox.innerHTML =
+            '<strong>Line:</strong> ' + (activeRow.dataset.line || '--') + ' &nbsp;|&nbsp; ' +
+            '<strong>Style:</strong> ' + (activeRow.dataset.style || '--') + ' &nbsp;|&nbsp; ' +
+            '<strong>SP:</strong> ' + (activeRow.dataset.sp || '--');
+        delModal.style.display = 'flex';
+    });
+
+    document.getElementById('btnCloseDel').addEventListener('click', () => { delModal.style.display = 'none'; });
+    document.getElementById('btnCancelDel').addEventListener('click', () => { delModal.style.display = 'none'; });
+    delModal.addEventListener('click', e => { if (e.target === delModal) delModal.style.display = 'none'; });
+
+    btnConfDel.addEventListener('click', async () => {
+        if (!activeRow) return;
+        const id = activeRow.dataset.id;
+        btnConfDel.disabled = true;
+        btnConfDel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xóa...';
+        try {
+            const res  = await fetch('/ProductionProgress/SoftDelete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast('warn', 'Đã xóa mã hàng thành công.');
+                activeRow.style.transition = 'opacity .3s';
+                activeRow.style.opacity = '0';
+                setTimeout(() => { activeRow.remove(); activeRow = null; }, 320);
+                delModal.style.display = 'none';
+            } else {
+                toast('error', 'Lỗi: ' + (data.message || 'Không xóa được.'));
+            }
+        } catch (err) {
+            toast('error', 'Lỗi kết nối: ' + err.message);
+        } finally {
+            btnConfDel.disabled = false;
+            btnConfDel.innerHTML = '<i class="fa-solid fa-trash"></i> Xóa';
+        }
+    });
+
+})();
+</script>
+
+<style>
+    #progressTableBody tr.ctx-active td { background: rgba(59,130,246,.08) !important; }
+    #ctxMenu button:hover { background: var(--surface-alt, #f4f6fb); }
+    @@keyframes ppToastIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:none; } }
+    /* Modal overlay */
+    .modal-backdrop { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:80px; }
+    .modal-backdrop.open { display:flex !important; }
+    .modal-box { background:var(--bg-surface); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:100%; max-height:calc(100vh - 140px); overflow-y:auto; animation:mbIn .22s cubic-bezier(.4,0,.2,1); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); }
+    .modal-title { font-size:16px; font-weight:700; margin:0; color:var(--ink-900); display:flex; align-items:center; gap:8px; }
+    .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 6px; border-radius:6px; transition:background .15s; }
+    .modal-close:hover { background:var(--surface-alt,#f0f2f8); color:var(--ink-900); }
+    .modal-body { padding:20px 22px; }
+    .modal-footer { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    @@keyframes mbIn { from { opacity:0; transform:translateY(-16px) scale(.97); } to { opacity:1; transform:none; } }
+</style>

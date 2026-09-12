@@ -1,0 +1,592 @@
+@{
+    ViewData["Title"] = "Chi tiết mã hàng";
+}
+
+<div class="content-area">
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <span class="current">Chi tiết mã hàng</span>
+            </div>
+            <h1 class="page-title">Chi tiết mã hàng</h1>
+        </div>
+        <div class="page-actions">
+            <button id="btnImportExcel" class="btn btn-ghost btn-sm" style="border-color:#1f7a3a;color:#1a9e65;"><i class="fa-solid fa-file-import" ></i>Nhập Excel</button>
+            <button id="btnNewStyle" class="btn btn-primary"><i class="fa-solid fa-plus"></i>Thêm mã hàng</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-body" style="padding:14px 20px;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="font-size:13px;font-weight:600;color:var(--ink-600);white-space:nowrap;">Bộ phận:</label>
+                    <select id="filterDept" class="si-filter-ctrl" style="min-width:160px;">
+                        <option value="">Tất cả</option>
+                    </select>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;">
+                    <label style="font-size:13px;font-weight:600;color:var(--ink-600);white-space:nowrap;">Tìm kiếm: </label>
+                    <input type="text" id="filterKw" class="si-filter-ctrl" placeholder="StyleCode, Keyword..." style="flex:1;">
+                </div>
+                <button id="btnSearch" class="btn btn-primary" style="padding:7px 18px;"><i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm</button>
+                <button id="btnReset" class="btn btn-ghost" style="padding:7px 14px;"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table panel -->
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title"><i class="fa-solid fa-tag" style="color:var(--primary);"></i> Danh sách StyleInfo</div>
+            <div id="siTotalLabel" style="font-size:13px;color:var(--ink-500);"></div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+            <div id="siLoading" style="padding:44px;text-align:center;color:var(--ink-400);">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i><br>Đang tải...
+            </div>
+            <table class="si-table" id="siTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th style="width:44px;">#</th>
+                        <th>Style Code</th>
+                        <th>Bộ phận</th>
+                        <th>Keyword</th>
+                        <th style="width:120px;text-align:center;">Công đoạn</th>
+                        <th style="width:120px;text-align:center;">Trạng thái</th>
+                        <th style="width:140px;">Cập nhật</th>
+                    </tr>
+                </thead>
+                <tbody id="siTbody"></tbody>
+            </table>
+        </div>
+        <!-- Pagination -->
+        <div id="siPagination" style="display:none;padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div id="siPagInfo" style="font-size:13px;color:var(--ink-500);"></div>
+            <div id="siPagControls" style="display:flex;gap:6px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<div id="siCtxMenu" class="si-ctx-menu">
+    <button id="ctxEditStyle" class="ctx-si-btn"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);width:20px;"></i> Cập nhật</button>
+    <div class="ctx-si-sep"></div>
+    <button id="ctxDeleteStyle" class="ctx-si-btn ctx-si-danger"><i class="fa-solid fa-trash" style="width:20px;"></i> Xoá</button>
+</div>
+
+<!-- =====================================================================
+     MODAL: Thêm / Cập nhật StyleInfo
+     ===================================================================== -->
+<div id="modalSiForm" class="si-modal-backdrop">
+    <div class="si-modal-box" style="max-width:560px;">
+        <div class="si-modal-header">
+            <h2 class="si-modal-title" id="modalSiTitle"><i class="fa-solid fa-tag" style="color:var(--primary);"></i> Thêm mã hàng</h2>
+            <button class="si-modal-close" id="btnCloseSiForm">&times;</button>
+        </div>
+        <div class="si-modal-body">
+            @await Html.PartialAsync("Partial/_StyleInfoForm")
+        </div>
+        <div class="si-modal-footer">
+            <button class="si-btn si-btn-ghost" id="btnCancelSiForm">Huỷ</button>
+            <button class="si-btn si-btn-primary" id="btnSaveSiForm"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================================
+     MODAL: Xác nhận Xoá
+     ===================================================================== -->
+<div id="modalSiDelete" class="si-modal-backdrop">
+    <div class="si-modal-box" style="max-width:420px;">
+        <div class="si-modal-header" style="border-top:4px solid var(--danger);">
+            <h2 class="si-modal-title" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Xác nhận xoá</h2>
+            <button class="si-modal-close" id="btnCloseSiDelete">&times;</button>
+        </div>
+        <div class="si-modal-body">
+            <p style="font-size:14px;color:var(--ink-700-solid);line-height:1.6;">Hành động này sẽ xoá mềm StyleInfo và tất cả công đoạn liên quan. Dữ liệu sẽ không còn hiển thị.</p>
+            <div id="siDeleteInfoBox" class="si-confirm-box"></div>
+        </div>
+        <div class="si-modal-footer">
+            <button class="si-btn si-btn-ghost" id="btnCancelSiDelete">Huỷ</button>
+            <button class="si-btn si-btn-danger" id="btnConfirmSiDelete"><i class="fa-solid fa-trash"></i> Xoá</button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================================
+     MODAL: Nhập Excel
+     ===================================================================== -->
+<div id="modalSiExcel" class="si-modal-backdrop">
+    <div class="si-modal-box" style="max-width:540px;">
+        <div class="si-modal-header">
+            <h2 class="si-modal-title"><i class="fa-solid fa-file-import" style="color:var(--primary);"></i> Nhập StyleInfo từ Excel</h2>
+            <button class="si-modal-close" id="btnCloseSiExcel">&times;</button>
+        </div>
+        <div class="si-modal-body">
+          
+            <div class="si-form-group">
+                <label class="si-form-label">Bộ phận <span style="color:var(--danger);">*</span></label>
+                <select id="excelDeptSel" class="si-form-control">
+                    <option value="">-- Chọn bộ phận --</option>
+                </select>
+            </div>
+            <div class="si-form-group">
+                <label class="si-form-label">File Excel (.xlsx)</label>
+                <div id="siExcelDrop" class="si-drop-zone">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px;color:var(--ink-400);"></i>
+                    <div style="margin:8px 0 4px;font-weight:600;color:var(--ink-600);">Kéo thả hoặc click chọn file</div>
+                    <div style="font-size:12px;color:var(--ink-400);">Hỗ trợ .xlsx, .xls</div>
+                    <input type="file" id="siExcelFile" accept=".xlsx,.xls" style="display:none;">
+                </div>
+                <div id="siExcelFileName" style="margin-top:7px;font-size:13px;color:var(--ink-500);"></div>
+            </div>
+            <div style="text-align:right;margin-bottom:4px;">
+                <a href="/StyleInfo/DownloadTemplate" class="btn btn-ghost" style="font-size:12px;padding:4px 10px;">
+                    <i class="fa-solid fa-download"></i> Tải file mẫu
+                </a>
+            </div>
+            <div id="siExcelResult" style="display:none;margin-top:14px;"></div>
+        </div>
+        <div class="si-modal-footer">
+            <button class="si-btn si-btn-ghost" id="btnCancelSiExcel">Huỷ</button>
+            <button class="si-btn si-btn-primary" id="btnDoSiExcel" disabled><i class="fa-solid fa-upload"></i> Bắt đầu nhập</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="siToastCt" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
+
+<style>
+    /* ── Modal ──────────────────────────────────────────────────────── */
+    .si-modal-backdrop { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:70px; }
+    .si-modal-backdrop.open { display:flex !important; }
+    .si-modal-box { background:var(--bg-surface); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:100%; max-height:calc(100vh - 120px); overflow-y:auto; animation:siMbIn .22s cubic-bezier(.4,0,.2,1); }
+    @@keyframes siMbIn { from { opacity:0; transform:translateY(-14px) scale(.97); } to { opacity:1; transform:none; } }
+    .si-modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); }
+    .si-modal-title { font-size:16px; font-weight:700; margin:0; color:var(--ink-900); display:flex; align-items:center; gap:8px; }
+    .si-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 7px; border-radius:6px; transition:background .15s; }
+    .si-modal-close:hover { background:var(--surface-alt,#f0f2f8); }
+    .si-modal-body { padding:20px 22px; }
+    .si-modal-footer { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    .si-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 18px; border-radius:8px; font-size:13.5px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .18s; border:2px solid transparent; }
+    .si-btn-ghost { background:transparent; border-color:var(--border); color:var(--ink-700-solid); }
+    .si-btn-ghost:hover { background:var(--surface-alt,#f4f6fb); }
+    .si-btn-primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .si-btn-primary:hover { filter:brightness(1.1); }
+    .si-btn-danger { background:var(--danger); border-color:var(--danger); color:#fff; }
+    .si-btn-danger:hover { filter:brightness(1.1); }
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .si-table { width:100%; border-collapse:collapse; }
+    .si-table th { padding:11px 14px; font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-500); background:var(--bg-canvas); border-bottom:1px solid var(--border); text-align:left; }
+    .si-table td { padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+    .si-table tbody tr:last-child td { border-bottom:none; }
+    .si-table tbody tr:hover td { background:rgba(59,130,246,.04); }
+    .si-table tbody tr.si-ctx-active td { background:rgba(59,130,246,.09) !important; }
+    /* ── Filter controls ────────────────────────────────────────────── */
+    .si-filter-ctrl { border:1.5px solid var(--border); border-radius:7px; padding:7px 12px; font-size:13px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); outline:none; transition:border-color .18s; }
+    .si-filter-ctrl:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
+    /* ── Form inputs ────────────────────────────────────────────────── */
+    .si-form-group { margin-bottom:16px; }
+    .si-form-label { display:block; font-size:13px; font-weight:600; color:var(--ink-700-solid); margin-bottom:5px; }
+    .si-form-control { width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:7px; padding:8px 12px; font-size:13.5px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); transition:border-color .18s; }
+    .si-form-control:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+    /* ── Detail list ────────────────────────────────────────────────── */
+    .si-detail-list { display:flex; flex-direction:column; gap:6px; min-height:36px; }
+    .si-detail-empty { font-size:13px; color:var(--ink-400); padding:10px 0; }
+    .si-detail-row { display:flex; align-items:center; gap:8px; }
+    .si-detail-input { flex:1; border:1.5px solid var(--border); border-radius:6px; padding:6px 10px; font-size:13px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); transition:border-color .18s; }
+    .si-detail-input:focus { outline:none; border-color:var(--primary); }
+    .si-btn-sm { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:6px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; border:1.5px solid transparent; transition:all .15s; }
+    .si-btn-add { background:rgba(59,130,246,.1); border-color:var(--primary); color:var(--primary); }
+    .si-btn-add:hover { background:var(--primary); color:#fff; }
+    .si-btn-remove { background:none; border-color:var(--border); color:var(--ink-400); padding:5px 8px; }
+    .si-btn-remove:hover { border-color:var(--danger); color:var(--danger); }
+    /* ── Context menu ───────────────────────────────────────────────── */
+    .si-ctx-menu { display:none; position:fixed; z-index:9999; background:var(--bg-surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.14); padding:6px 0; min-width:180px; }
+    .ctx-si-btn { display:block; width:100%; text-align:left; padding:9px 16px; background:none; border:none; cursor:pointer; font-size:13.5px; font-family:inherit; color:var(--ink-900); transition:background .12s; }
+    .ctx-si-btn:hover { background:var(--surface-alt,#f4f6fb); }
+    .ctx-si-danger { color:var(--danger) !important; }
+    .ctx-si-sep { height:1px; background:var(--border); margin:4px 0; }
+    /* ── Confirm box ────────────────────────────────────────────────── */
+    .si-confirm-box { background:#FEF2F2; border:1px solid #FECACA; border-radius:7px; padding:11px 15px; margin-top:14px; font-size:14px; font-weight:700; color:#991b1b; }
+    /* ── Dropzone ───────────────────────────────────────────────────── */
+    .si-drop-zone { border:2px dashed var(--border); border-radius:8px; padding:22px; text-align:center; cursor:pointer; transition:border-color .2s; }
+    .si-drop-zone:hover, .si-drop-zone.dragover { border-color:var(--primary); }
+    /* ── Pagination ─────────────────────────────────────────────────── */
+    .si-pag-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:6px; border:1.5px solid var(--border); background:var(--bg-surface); color:var(--ink-700-solid); cursor:pointer; font-size:13px; transition:all .15s; }
+    .si-pag-btn:hover { border-color:var(--primary); color:var(--primary); }
+    .si-pag-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; font-weight:700; }
+    .si-pag-btn:disabled { opacity:.4; cursor:default; }
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ===== TOAST ============================================================= */
+    const toastCt = document.getElementById('siToastCt');
+    function toast(type, msg, ms) {
+        ms = ms || 3500;
+        const icons  = { success:'fa-circle-check', error:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
+        const colors = { success:'var(--success)', error:'var(--danger)', warn:'#d97706', info:'var(--primary)' };
+        const c = colors[type] || colors.info;
+        const el = document.createElement('div');
+        el.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:13px 16px;box-shadow:0 8px 30px rgba(0,0,0,.12);display:flex;align-items:flex-start;gap:12px;pointer-events:auto;border-left:4px solid ' + c + ';animation:siMbIn .28s ease;';
+        el.innerHTML = '<i class="fa-solid '+(icons[type]||'fa-circle-info')+'" style="color:'+c+';font-size:18px;margin-top:1px;flex-shrink:0;"></i>'
+            + '<div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink-900);">' + String(msg).replace(/</g,'&lt;') + '</div>'
+            + '<button style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--ink-400);padding:0;pointer-events:auto;" onclick="this.parentNode.remove()">&times;</button>';
+        toastCt.appendChild(el);
+        setTimeout(() => { el.style.transition='opacity .25s,transform .25s'; el.style.opacity='0'; el.style.transform='translateX(30px)'; setTimeout(()=>el.remove(),300); }, ms);
+    }
+
+    /* ===== MODAL ============================================================= */
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function onBkd(id) {
+        document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
+    }
+    ['modalSiForm','modalSiDelete','modalSiExcel'].forEach(id => {
+        onBkd(id);
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') ['modalSiForm','modalSiDelete','modalSiExcel'].forEach(closeModal);
+    });
+
+    /* ===== STATE ============================================================= */
+    let currentPage = 1;
+    const pageSize  = 20;
+    let activeRow   = null;
+    let editingId   = null;
+    let deptLoaded  = false;
+
+    /* ===== DEPARTMENTS ======================================================= */
+    let allDepts = [];
+    async function loadDepts() {
+        if (deptLoaded) return;
+        try {
+            const res  = await fetch('/StyleInfo/GetDepartments');
+            allDepts   = await res.json();
+            deptLoaded = true;
+            populateDeptSelects();
+        } catch(e) { console.error(e); }
+    }
+    function populateDeptSelects() {
+        const sels = ['filterDept','sifDept','excelDeptSel'];
+        sels.forEach(sid => {
+            const sel = document.getElementById(sid);
+            if (!sel) return;
+            // giữ option đầu (Tất cả / --Chọn--)
+            while (sel.options.length > 1) sel.remove(1);
+            allDepts.forEach(d => {
+                const o = document.createElement('option');
+                o.value = d.id; o.textContent = d.departmentName;
+                sel.appendChild(o);
+            });
+        });
+    }
+
+    /* ===== TABLE ============================================================= */
+    async function loadTable(page) {
+        page = page || currentPage;
+        const dept = document.getElementById('filterDept').value;
+        const kw   = document.getElementById('filterKw').value.trim();
+
+        document.getElementById('siLoading').style.display = 'block';
+        document.getElementById('siTable').style.display   = 'none';
+        document.getElementById('siPagination').style.display = 'none';
+
+        try {
+            const qs  = new URLSearchParams({ page, pageSize });
+            if (dept) qs.set('deptId', dept);
+            if (kw)   qs.set('kw', kw);
+            const res  = await fetch('/StyleInfo/GetList?' + qs);
+            if (!res.ok) { toast('error','Không tải được dữ liệu.'); return; }
+            const data = await res.json();
+            currentPage = data.page;
+            renderTable(data);
+            renderPagination(data);
+        } catch(e) { toast('error','Lỗi kết nối: ' + e.message); }
+        finally { document.getElementById('siLoading').style.display = 'none'; }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('siTbody');
+        tbody.innerHTML = '';
+        document.getElementById('siTotalLabel').textContent = 'Tổng: ' + data.total + ' mã hàng';
+
+        if (!data.items.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-400);">Không có dữ liệu.</td></tr>';
+            document.getElementById('siTable').style.display = 'table';
+            return;
+        }
+        const offset = (data.page - 1) * data.pageSize;
+        data.items.forEach((item, i) => {
+            const badge = item.status === 1
+                ? '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#E8F7F0;color:var(--success);">Hoạt động</span>'
+                : '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#FEF3C7;color:#d97706;">Không hoạt động</span>';
+            const upd = new Date(item.updateDate).toLocaleDateString('vi-VN');
+            tbody.insertAdjacentHTML('beforeend',
+                '<tr data-id="' + item.id + '" data-code="' + esc(item.styleCode) + '">'
+                + '<td style="color:var(--ink-400);font-size:12px;">'+(offset+i+1)+'</td>'
+                + '<td><strong style="font-family:monospace;">' + esc(item.styleCode) + '</strong></td>'
+                + '<td><span style="font-size:12px;background:var(--bg-canvas);padding:2px 8px;border-radius:4px;">' + esc(item.departmentName) + '</span></td>'
+                + '<td><code style="font-size:11.5px;color:var(--ink-500);">' + esc(item.keyword||'') + '</code></td>'
+                + '<td style="text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--primary);">' + item.detailCount + '</span></td>'
+                + '<td>' + badge + '</td>'
+                + '<td style="font-size:12px;color:var(--ink-500);">' + upd + '</td>'
+                + '</tr>');
+        });
+        document.getElementById('siTable').style.display = 'table';
+    }
+
+    function renderPagination(data) {
+        const pg = document.getElementById('siPagination');
+        if (data.totalPages <= 1 && data.total <= data.pageSize) { pg.style.display = 'none'; return; }
+        pg.style.display = 'flex';
+        document.getElementById('siPagInfo').textContent =
+            'Hiển thị ' + ((data.page-1)*data.pageSize+1) + '–' + Math.min(data.page*data.pageSize,data.total) + ' / ' + data.total;
+        const ctrl = document.getElementById('siPagControls');
+        ctrl.innerHTML = '';
+        const mkBtn = (label, p, disabled, active) => {
+            const b = document.createElement('button');
+            b.className = 'si-pag-btn' + (active?' active':'');
+            b.innerHTML = label; b.disabled = disabled || active;
+            b.onclick = () => loadTable(p);
+            ctrl.appendChild(b);
+        };
+        mkBtn('<i class="fa-solid fa-chevron-left"></i>', data.page-1, data.page<=1, false);
+        let start = Math.max(1, data.page-2), end = Math.min(data.totalPages, start+4);
+        if (end - start < 4) start = Math.max(1, end-4);
+        for (let p = start; p <= end; p++) mkBtn(p, p, false, p===data.page);
+        mkBtn('<i class="fa-solid fa-chevron-right"></i>', data.page+1, data.page>=data.totalPages, false);
+    }
+
+    /* ===== SEARCH / FILTER =================================================== */
+    document.getElementById('btnSearch').addEventListener('click', () => loadTable(1));
+    document.getElementById('btnReset').addEventListener('click', () => {
+        document.getElementById('filterDept').value = '';
+        document.getElementById('filterKw').value   = '';
+        loadTable(1);
+    });
+    document.getElementById('filterKw').addEventListener('keydown', e => {
+        if (e.key === 'Enter') loadTable(1);
+    });
+
+    /* ===== CONTEXT MENU ====================================================== */
+    const ctxMenu = document.getElementById('siCtxMenu');
+    document.getElementById('siTbody').addEventListener('contextmenu', e => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        e.preventDefault();
+        activeRow = tr;
+        document.querySelectorAll('#siTbody tr').forEach(r => r.classList.remove('si-ctx-active'));
+        tr.classList.add('si-ctx-active');
+        const mW = 190, mH = 100;
+        ctxMenu.style.left = (e.clientX + mW > window.innerWidth ? e.clientX - mW : e.clientX) + 'px';
+        ctxMenu.style.top  = (e.clientY + mH > window.innerHeight ? e.clientY - mH : e.clientY) + 'px';
+        ctxMenu.style.display = 'block';
+    });
+    document.addEventListener('click', hideCtx);
+    function hideCtx() { ctxMenu.style.display = 'none'; if (activeRow) activeRow.classList.remove('si-ctx-active'); }
+
+    document.getElementById('ctxEditStyle').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        openSiForm(activeRow.dataset.id);
+    });
+    document.getElementById('ctxDeleteStyle').addEventListener('click', () => {
+        if (!activeRow) return; hideCtx();
+        document.getElementById('siDeleteInfoBox').textContent = activeRow.dataset.code;
+        openModal('modalSiDelete');
+    });
+
+    /* ===== FORM: Create / Update ============================================= */
+    document.getElementById('btnNewStyle').addEventListener('click', () => openSiForm(null));
+
+    async function openSiForm(id) {
+        editingId = id || null;
+        await loadDepts();
+
+        const title = document.getElementById('modalSiTitle');
+        document.getElementById('sifDept').value    = '';
+        document.getElementById('sifCode').value    = '';
+        document.getElementById('sifKeyword').value = '';
+        clearDetails();
+
+        if (editingId) {
+            title.innerHTML = '<i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Cập nhật mã hàng';
+            try {
+                const res  = await fetch('/StyleInfo/GetById?id=' + editingId);
+                if (!res.ok) { toast('error','Không tải được dữ liệu.'); return; }
+                const data = await res.json();
+                document.getElementById('sifDept').value    = data.productionDepartmentId || '';
+                document.getElementById('sifCode').value    = data.styleCode || '';
+                document.getElementById('sifKeyword').value = data.keyword || '';
+                data.details.forEach(d => addDetailRow(d.detailName));
+            } catch(e) { toast('error', e.message); return; }
+        } else {
+            title.innerHTML = '<i class="fa-solid fa-plus" style="color:var(--primary);"></i> Thêm mã hàng';
+        }
+        openModal('modalSiForm');
+        setTimeout(() => document.getElementById('sifCode').focus(), 80);
+    }
+
+    // ── Detail rows ────────────────────────────────────────────────────
+    function clearDetails() {
+        const list = document.getElementById('siDetailList');
+        list.innerHTML = '<div class="si-detail-empty">Chưa có công đoạn. Nhấn "+ Thêm công đoạn" để thêm.</div>';
+    }
+    function addDetailRow(value) {
+        const list = document.getElementById('siDetailList');
+        const empty = list.querySelector('.si-detail-empty');
+        if (empty) empty.remove();
+        const row = document.createElement('div');
+        row.className = 'si-detail-row';
+        row.innerHTML = '<input type="text" class="si-detail-input" placeholder="Tên công đoạn..." value="' + esc(value||'') + '">'
+            + '<button type="button" class="si-btn-sm si-btn-remove" title="Xoá"><i class="fa-solid fa-xmark"></i></button>';
+        row.querySelector('.si-btn-remove').addEventListener('click', () => {
+            row.remove();
+            if (!list.querySelector('.si-detail-row')) clearDetails();
+        });
+        list.appendChild(row);
+    }
+    document.getElementById('btnAddDetail').addEventListener('click', () => {
+        addDetailRow('');
+        const inputs = document.querySelectorAll('.si-detail-input');
+        if (inputs.length) inputs[inputs.length-1].focus();
+    });
+
+    // ── Save ────────────────────────────────────────────────────────────
+    document.getElementById('btnSaveSiForm').addEventListener('click', async () => {
+        const dept    = document.getElementById('sifDept').value;
+        const code    = document.getElementById('sifCode').value.trim();
+        const keyword = document.getElementById('sifKeyword').value.trim();
+        if (!dept)  { toast('error','Vui lòng chọn bộ phận.'); return; }
+        if (!code)  { toast('error','StyleCode không được để trống.'); document.getElementById('sifCode').focus(); return; }
+
+        const detailNames = [...document.querySelectorAll('.si-detail-input')]
+            .map(i => i.value.trim())
+            .filter(Boolean);
+
+        const btn = document.getElementById('btnSaveSiForm');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+
+        try {
+            const res  = await fetch('/StyleInfo/Upsert', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ id: editingId, productionDepartmentId: dept, styleCode: code, keyword, detailNames })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast('success', data.message);
+                closeModal('modalSiForm');
+                loadTable(currentPage);
+            } else { toast('error', data.message || 'Có lỗi xảy ra.'); }
+        } catch(e) { toast('error','Lỗi kết nối: ' + e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu'; }
+    });
+
+    // Close form
+    document.getElementById('btnCloseSiForm').addEventListener('click', () => closeModal('modalSiForm'));
+    document.getElementById('btnCancelSiForm').addEventListener('click', () => closeModal('modalSiForm'));
+
+    /* ===== DELETE ============================================================= */
+    document.getElementById('btnCloseSiDelete').addEventListener('click', () => closeModal('modalSiDelete'));
+    document.getElementById('btnCancelSiDelete').addEventListener('click', () => closeModal('modalSiDelete'));
+    document.getElementById('btnConfirmSiDelete').addEventListener('click', async () => {
+        if (!activeRow) return;
+        const btn = document.getElementById('btnConfirmSiDelete');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xoá...';
+        try {
+            const res  = await fetch('/StyleInfo/SoftDelete', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ id: activeRow.dataset.id })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast('error', data.message);
+                closeModal('modalSiDelete');
+                activeRow = null;
+                loadTable(currentPage);
+            } else { toast('error', data.message || 'Lỗi.'); }
+        } catch(e) { toast('error', e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Xoá'; }
+    });
+
+    /* ===== EXCEL IMPORT ======================================================= */
+    let excelFile = null;
+    document.getElementById('btnImportExcel').addEventListener('click', async () => {
+        await loadDepts();
+        excelFile = null;
+        document.getElementById('siExcelFile').value = '';
+        document.getElementById('siExcelFileName').innerHTML = '';
+        document.getElementById('siExcelResult').style.display = 'none';
+        document.getElementById('btnDoSiExcel').disabled = true;
+        document.getElementById('excelDeptSel').value = '';
+        openModal('modalSiExcel');
+    });
+
+    const excelDrop = document.getElementById('siExcelDrop');
+    const excelInput = document.getElementById('siExcelFile');
+
+    excelDrop.addEventListener('click', () => excelInput.click());
+    excelDrop.addEventListener('dragover', e => { e.preventDefault(); excelDrop.classList.add('dragover'); });
+    excelDrop.addEventListener('dragleave', () => excelDrop.classList.remove('dragover'));
+    excelDrop.addEventListener('drop', e => {
+        e.preventDefault(); excelDrop.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) setExcelFile(e.dataTransfer.files[0]);
+    });
+    excelInput.addEventListener('change', () => { if (excelInput.files[0]) setExcelFile(excelInput.files[0]); });
+    document.getElementById('excelDeptSel').addEventListener('change', checkExcelReady);
+
+    function setExcelFile(f) {
+        excelFile = f;
+        document.getElementById('siExcelFileName').innerHTML =
+            '<i class="fa-solid fa-file-excel" style="color:#1d6f42;"></i> <strong>' + esc(f.name) + '</strong>';
+        checkExcelReady();
+    }
+    function checkExcelReady() {
+        document.getElementById('btnDoSiExcel').disabled =
+            !(excelFile && document.getElementById('excelDeptSel').value);
+    }
+
+    document.getElementById('btnDoSiExcel').addEventListener('click', async () => {
+        const deptId = document.getElementById('excelDeptSel').value;
+        if (!deptId || !excelFile) return;
+        const btn = document.getElementById('btnDoSiExcel');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang nhập...';
+
+        const fd = new FormData();
+        fd.append('deptId', deptId);
+        fd.append('file', excelFile);
+        try {
+            const res  = await fetch('/StyleInfo/ImportExcel', { method:'POST', body: fd });
+            const data = await res.json();
+            const resultEl = document.getElementById('siExcelResult');
+            resultEl.style.display = 'block';
+            const ok = data.success;
+            resultEl.innerHTML = '<div style="padding:12px 16px;border-radius:8px;border:1px solid '+(ok?'var(--success)':'var(--danger)')+';background:'+(ok?'rgba(24,193,110,.07)':'rgba(229,57,53,.07)')+';font-size:13.5px;">'
+                + '<strong>' + esc(data.message) + '</strong>'
+                + (data.errors&&data.errors.length ? '<ul style="margin:6px 0 0 18px;font-size:12px;">' + data.errors.map(e=>'<li>'+esc(e)+'</li>').join('') + '</ul>' : '')
+                + '</div>';
+            if (ok) { loadTable(1); }
+        } catch(e) { toast('error','Lỗi kết nối: ' + e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-upload"></i> Bắt đầu nhập'; }
+    });
+
+    document.getElementById('btnCloseSiExcel').addEventListener('click', () => closeModal('modalSiExcel'));
+    document.getElementById('btnCancelSiExcel').addEventListener('click', () => closeModal('modalSiExcel'));
+
+    /* ===== HELPER ============================================================= */
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    /* ===== INIT =============================================================== */
+    loadDepts().then(() => loadTable(1));
+})();
+</script>

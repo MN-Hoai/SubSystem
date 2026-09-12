@@ -12,9 +12,16 @@
         display: flex;
         flex-direction: column;
         gap: 0;
+        /*
+          app-main đã có padding-top = header-h (68px).
+          Dùng height = calc(100vh - header-h) để bù lại padding-top,
+          kết quả: trang chiếm đúng phần còn lại của màn hình.
+        */
         height: calc(100vh - var(--header-h));
         overflow: hidden;
     }
+    /* Cho phép scroll ở canvas — tắt overflow của app-main wrapper */
+    body:has(.mld-page) .app-main { overflow: hidden; min-height: unset; }
 
     /* ---- Page header ---- */
     .mld-topbar {
@@ -245,12 +252,13 @@
     /* ---- Canvas area ---- */
     .mld-canvas-wrap {
         flex: 1;
-        overflow: auto;
+        overflow: auto;          /* scroll cả 2 chiều */
         background: var(--bg-canvas);
         display: flex;
-        align-items: flex-start;
-        justify-content: center;
+        align-items: flex-start; /* không ép co chiều dọc */
+        justify-content: flex-start; /* không ép co chiều ngang */
         padding: 28px;
+        min-width: 0;            /* cho phép flex-child thu nhỏ đúng */
     }
 
     /* ---- Empty state ---- */
@@ -287,6 +295,7 @@
     .mld-grid {
         display: grid;
         animation: fadeIn .35s ease;
+        flex-shrink: 0;          /* không bị co khi nhỏ hơn canvas */
     }
 
     /* ---- Grid cell ---- */
@@ -714,16 +723,15 @@
     <!-- TOP BAR -->
     <div class="mld-topbar">
         <div class="mld-topbar-left">
-            <div class="mld-breadcrumb">
-                Quản lý <span class="sep">/</span>
-                <span class="current">Thiết kế layout máy</span>
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <span class="current">Thiết kế layout bộ phận</span>
             </div>
-            <h1 class="mld-page-title">Thiết kế layout máy</h1>
+            <h1 class="mld-page-title">Thiết kế layout bộ phận</h1>
         </div>
         <div class="mld-topbar-actions">
-            <button class="btn btn-ghost" id="mldClearBtn" title="Xóa toàn bộ layout">
-                <i class="fa-solid fa-trash-can"></i> Xóa layout
-            </button>
+
             <button class="btn btn-primary" id="mldExportBtn">
                 <i class="fa-solid fa-floppy-disk"></i> Lưu layout
             </button>
@@ -796,7 +804,7 @@
                 <div>
                     <div class="mld-section-title">Bộ phận</div>
                     <div class="mld-field">
-                        <label class="mld-label">Hiển thị bộ phận</label>
+                        <label class="mld-label">Chọn bộ phận</label>
                         <select id="mldDeptFilter" class="mld-input mld-select">
                             <option value="all">Tất cả bộ phận</option>
                         </select>
@@ -1499,6 +1507,8 @@
                 if (p) p.innerHTML = 'Bộ phận <strong>' + esc(currentDeptName) + '</strong> chưa có layout. Thiết lập số hàng, số cột rồi nhấn <strong>Tạo layout</strong>.';
                 updateStats(); return;
             }
+            // Có layout → ẩn empty state, hiện grid
+            emptyState.style.display = 'none';
             currentLayoutId = layout.id;
             rowsEl.value = layout.rowCount; colsEl.value = layout.columnCount; gapEl.value = layout.gap;
             currentRows = layout.rowCount; currentCols = layout.columnCount;
@@ -1733,14 +1743,16 @@
         });
 
         /* =====================================================
-           CLEAR ALL
+           CLEAR ALL  (clearBtn không có trong HTML hiện tại → skip)
            ===================================================== */
-        clearBtn.addEventListener('click', function () {
-            if (!confirm('Xóa toàn bộ layout và dữ liệu máy?')) return;
-            machines = {}; currentLayoutId = null;
-            gridEl.innerHTML = ''; emptyState.style.display = '';
-            updateStats();
-        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                if (!confirm('Xóa toàn bộ layout và dữ liệu máy?')) return;
+                machines = {}; currentLayoutId = null;
+                gridEl.innerHTML = ''; emptyState.style.display = '';
+                updateStats();
+            });
+        }
 
         /* =====================================================
            CLOSE MODAL
@@ -1834,9 +1846,8 @@
         /* =====================================================
            INIT
            ===================================================== */
-        document.addEventListener('DOMContentLoaded', function () {
-            loadDepartments();
-        });
+        // Gọi 1 lần duy nhất — IIFE đã chạy sau khi DOM sẵn sàng
+        loadDepartments();
 
     }());
 </script>

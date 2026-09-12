@@ -153,16 +153,21 @@
 <div class="ro-page">
     <!-- TOP BAR -->
     <div class="ro-topbar">
-        <div class="ro-topbar-left">
-            <button class="ro-back-btn" onclick="history.back()">
-                <i class="fa-solid fa-arrow-left"></i> Quay lại
-            </button>
-            <div class="ro-page-title">Ghi sản lượng</div>
+       <div class="mld-topbar-left">
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <span class="sep">/</span>
+                <span class="current">Ghi nhận sản lượng</span>
+            </div>
+            <h1 class="mld-page-title">Ghi nhận sản lượng</h1>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
             <button class="btn btn-ghost btn-sm" id="roExcelImportBtn" style="border-color:#1f7a3a;color:#1a9e65;">
                 <i class="fa-solid fa-file-excel"></i> Nhập bằng Excel
             </button>
+            <a href="/ProductionDepartment/OutputHistory" class="btn btn-ghost btn-sm">
+                <i class="fa-solid fa-clock-rotate-left"></i> Lịch sử ghi
+            </a>
             <div class="ro-date-chip">
                 <i class="fa-regular fa-calendar"></i>
                 <span id="roTodayLabel">—</span>
@@ -301,12 +306,24 @@
 
         <div style="padding:16px 22px;display:flex;flex-direction:column;gap:14px;">
 
+            <!-- Step 0: Chọn bộ phận -->
+            <div class="xl-step">
+                <div class="xl-step-num" style="background:var(--accent-navy);">0</div>
+                <div class="xl-step-content" style="flex:1;">
+                    <div class="xl-step-title">Chọn bộ phận <span style="color:var(--danger);">*</span></div>
+                    <div class="xl-step-desc">Hệ thống sẽ tìm máy và mã sản xuất trong bộ phận này</div>
+                    <select id="roImportDept" style="margin-top:8px;width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13.5px;color:var(--ink-900);background:var(--bg-canvas);outline:none;box-sizing:border-box;transition:border-color .2s;">
+                        <option value="">-- Chọn bộ phận --</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Step 1: Download template -->
             <div class="xl-step">
                 <div class="xl-step-num">1</div>
                 <div class="xl-step-content">
                     <div class="xl-step-title">Tải file mẫu</div>
-                    <div class="xl-step-desc">File Excel bao gồm format chuẩn và hướng dẫn nhập liệu chi tiết</div>
+                    <div class="xl-step-desc">File Excel 9 cột: Ngày, Giờ, Tên máy, <strong style="color:#1a9e65;">Line, Style, Mã SP, Màu</strong>, Công đoạn, Số lượng &mdash; giúp xác định chính xác mã hàng</div>
                     <a href="/ImportExport/DownloadOutputTemplate" class="xl-template-btn" download>
                         <i class="fa-solid fa-download"></i>
                         Tải file mẫu (.xlsx)
@@ -319,7 +336,10 @@
                 <div class="xl-step-num">2</div>
                 <div class="xl-step-content">
                     <div class="xl-step-title">Chọn file đã điền</div>
-                    <div class="xl-step-desc">Hỗ trợ .xlsx, .xls. Tối đa 10 MB</div>
+                    <div class="xl-step-desc">
+                        Hỗ trợ .xlsx, .xls. Tối đa 10 MB.<br>
+                        <span style="font-size:11.5px;color:var(--ink-400);">Format mới 9 cột và format cũ 6 cột đều được chấp nhận (tương thích ngược).</span>
+                    </div>
                     <div class="xl-dropzone" id="roDropZone">
                         <input type="file" id="roExcelFile" accept=".xlsx,.xls" style="display:none;">
                         <i class="fa-solid fa-cloud-arrow-up xl-drop-icon"></i>
@@ -336,7 +356,7 @@
         </div>
 
         <div class="ro-modal-footer">
-            <div style="font-size:12px;color:var(--ink-400);"><i class="fa-solid fa-circle-info"></i> Dữ liệu sẽ được cộng dồn, không ghi đè</div>
+            <div style="font-size:12px;color:var(--ink-400);"><i class="fa-solid fa-circle-info"></i> Dữ liệu sẽ được cộng dồn, không ghi đè &mdash; cột <strong>Line+Style+Màu</strong> giúp xác định chính xác mã hàng</div>
             <div class="ro-footer-btns">
                 <button class="btn btn-ghost btn-sm" id="roExcelCancel">Đóng</button>
                 <button class="btn btn-primary btn-sm" id="roImportBtn" disabled
@@ -347,6 +367,7 @@
         </div>
     </div>
 </div>
+
 
 <script>
 (function () {
@@ -652,6 +673,7 @@
     document.getElementById('roExcelImportBtn').addEventListener('click', function () {
         excelBackdrop.classList.add('open');
         resetExcelModal();
+        loadImportDepts();
     });
     document.getElementById('roExcelClose').addEventListener('click', closeExcelModal);
     document.getElementById('roExcelCancel').addEventListener('click', closeExcelModal);
@@ -667,6 +689,32 @@
         document.getElementById('roImportResult').style.display = 'none';
         document.getElementById('roImportResult').innerHTML = '';
         importBtn.disabled = true;
+    }
+
+    // Load danh sách bộ phận vào dropdown
+    function loadImportDepts() {
+        var sel = document.getElementById('roImportDept');
+        if (sel.options.length > 1) return; // đã load rồi
+        fetch('/ProductionDepartment/GetDepartments')
+            .then(function(r){ return r.json(); })
+            .then(function(list){
+                list.forEach(function(d){
+                    var opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.departmentName || d.name || d.id;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function(){}); // fail silently, user can still type deptId
+    }
+
+    // Bộ phận thay đổi → chỉ enable Import khi có cả file lẫn bộ phận
+    document.getElementById('roImportDept').addEventListener('change', function() {
+        updateImportBtnState();
+    });
+    function updateImportBtnState() {
+        var hasDept = !!document.getElementById('roImportDept').value;
+        importBtn.disabled = !(selectedFile && hasDept);
     }
 
     // Browse click
@@ -706,13 +754,16 @@
         nameEl.style.display = 'flex';
         nameEl.innerHTML = '<i class="fa-solid fa-file-excel" style="color:var(--success);"></i>' + esc(f.name) +
             ' <span style="color:var(--ink-300);font-weight:400;">('+fmt(Math.round(f.size/1024))+' KB)</span>';
-        importBtn.disabled = false;
+        updateImportBtnState();
         document.getElementById('roImportResult').style.display = 'none';
     }
 
     // Import
     importBtn.addEventListener('click', function() {
         if (!selectedFile) return;
+        var deptId = document.getElementById('roImportDept').value;
+        if (!deptId) { toast('Vui lòng chọn bộ phận trước khi import', false); return; }
+
         var orig = importBtn.innerHTML;
         importBtn.disabled = true;
         importBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang import...';
@@ -720,6 +771,7 @@
 
         var fd = new FormData();
         fd.append('file', selectedFile);
+        fd.append('deptId', deptId);
 
         fetch('/ImportExport/ImportOutputExcel', { method:'POST', body: fd })
             .then(function(r){ return r.json(); })
@@ -763,3 +815,4 @@
 
 }());
 </script>
+

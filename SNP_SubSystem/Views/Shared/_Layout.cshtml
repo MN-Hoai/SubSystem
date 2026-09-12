@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@ViewData["Title"] - SNP_SubSystem</title>
+    <title>@ViewData["Title"] - SNP SubSystem</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -24,13 +24,6 @@
         </div>
 
         <div class="header-right">
-            <button class="icon-btn" aria-label="Thông báo">
-                <i class="fa-regular fa-bell"></i>
-                <span class="dot"></span>
-            </button>
-            <button class="icon-btn" aria-label="Cài đặt">
-                <i class="fa-solid fa-gear"></i>
-            </button>
             <div class="header-divider"></div>
             <button class="user-chip" aria-label="Tài khoản">
                 <div class="avatar">TN</div>
@@ -43,98 +36,117 @@
         </div>
     </header>
 
-    <!-- BACKDROP: lớp phủ mờ, chỉ hiện khi sidebar mở dạng overlay trên mobile -->
+    <!-- BACKDROP -->
     <div class="backdrop" id="backdrop"></div>
 
-    <!-- SIDEBAR: nav trái, 3 nhóm action link, có thể ẩn/mở (xem #sidebarToggle, #collapseToggle) -->
+    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-scroll">
 
             @{
                 var currentCtrl = ViewContext.RouteData.Values["Controller"]?.ToString();
-                var currentAct = ViewContext.RouteData.Values["Action"]?.ToString();
+                var currentAct  = ViewContext.RouteData.Values["Action"]?.ToString();
             }
 
-            <!-- Nhóm 1: Tổng quan -->
+            <!-- Tổng quan -->
             <div class="nav-section">
                 <div class="nav-section-label">Tổng quan</div>
-                <a asp-controller="Home" asp-action="Index" class="nav-item @(currentCtrl == "Home" && currentAct == "Index" ? "active" : "")" data-tip="Bảng điều khiển">
-                    <i class="fa-solid fa-grip"></i><span class="label">Bảng điều khiển</span>
+                <a asp-controller="Home" asp-action="Index"
+                   class="nav-item @(currentCtrl == "Home" ? "active" : "")"
+                   data-tip="Trang chủ">
+                    <i class="fa-solid fa-house"></i><span class="label">Trang chủ</span>
                 </a>
-                <a href="#" class="nav-item" data-tip="Phân tích">
-                    <i class="fa-solid fa-chart-line"></i><span class="label">Phân tích</span>
+                <a asp-controller="ProductionProgress" asp-action="LineProgress"
+                   class="nav-item @(currentCtrl == "ProductionProgress" && currentAct == "LineProgress" ? "active" : "")"
+                   data-tip="Tiến độ sản xuất">
+                    <i class="fa-solid fa-chart-line"></i><span class="label">Tiến độ sản xuất</span>
+                </a>
+                <a asp-controller="ProductionDepartment" asp-action="ATDepartment"
+                   class="nav-item @(currentCtrl == "ProductionDepartment" && currentAct == "ATDepartment" ? "active" : "")"
+                   data-tip="Tiến độ bộ phận">
+                    <i class="fa-solid fa-display"></i><span class="label">Thông tin bộ phận</span>
                 </a>
             </div>
 
-            <!-- Nhóm 2: Quản lý -->
+            <!-- Sản xuất -->
+            <div class="nav-section">
+                <div class="nav-section-label">Sản xuất</div>
+
+                <a asp-controller="ProductionProgress" asp-action="ATProgress"
+                   class="nav-item @(currentCtrl == "ProductionProgress" && currentAct == "ATProgress" ? "active" : "")"
+                   data-tip="Thông tin mã hàng">
+                    <i class="fa-solid fa-industry"></i>
+                    <span class="label">Thông tin mã hàng</span>
+                </a>
+                <a asp-controller="ProductionProgress" asp-action="ProductionInfoForm"
+                   class="nav-item @(currentCtrl == "ProductionProgress" && currentAct == "ProductionInfoForm" ? "active" : "")"
+                   data-tip="Thêm mã hàng mới">
+                    <i class="fa-solid fa-circle-plus"></i>
+                    <span class="label">Thêm mã hàng</span>
+                </a>
+                <a asp-controller="StyleInfo" asp-action="Index"
+                   class="nav-item @(currentCtrl == "StyleInfo" ? "active" : "")"
+                   data-tip="Chi tiết mã hàng">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span class="label">Chi tiết mã hàng</span>
+                </a>
+                <a asp-controller="ProductionDepartment" asp-action="RecordOutput"
+                   class="nav-item @(currentCtrl == "ProductionDepartment" && currentAct == "RecordOutput" ? "active" : "")"
+                   data-tip="Ghi sản lượng">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span class="label">Ghi sản lượng</span>
+                </a>
+            </div>
+
+            <!-- Quản lý -->
             <div class="nav-section">
                 <div class="nav-section-label">Quản lý</div>
-                <a asp-controller="ProductionProgress"
-                       asp-action="ATProgress"
-                       class="nav-item @(currentCtrl == "ProductionProgress" && currentAct == "ATProgress" ? "active" : "")"
-                       data-tip="Tiến độ sản xuất">
-                    <i class="fa-solid fa-industry"></i>
-                    <span class="label">Tiến độ sản xuất</span>
-                </a>
 
-                <a asp-controller="ProductionDepartment"
-                       asp-action="ATDepartment"
-                       class="nav-item @(currentCtrl == "ProductionDepartment" && currentAct == "ATDepartment" ? "active" : "")"
-                       data-tip="Thông tin bộ phận">
-                    <i class="fa-solid fa-users"></i>
-                    <span class="label">Thông tin bộ phận</span>
+                <a asp-controller="ProductionDepartment" asp-action="DepartmentList"
+                   class="nav-item @(currentCtrl == "ProductionDepartment" && currentAct == "DepartmentList" ? "active" : "")"
+                   data-tip="Quản lý bộ phận">
+                    <i class="fa-solid fa-building-user"></i>
+                    <span class="label">Quản lý bộ phận</span>
                 </a>
-                <a asp-controller="MachineLayoutDesigner"
-                       asp-action="Index"
-                       class="nav-item @(currentCtrl == "MachineLayoutDesigner" && currentAct == "Index" ? "active" : "")"
-                       data-tip="Thiết kế layout máy">
+                <a asp-controller="MachineLayoutDesigner" asp-action="Index"
+                   class="nav-item @(currentCtrl == "MachineLayoutDesigner" ? "active" : "")"
+                   data-tip="Thiết kế layout bộ phận">
                     <i class="fa-solid fa-border-all"></i>
-                    <span class="label">Layout máy</span>
-                </a>
-                <a href="#" class="nav-item" data-tip="Đơn hàng">
-                    <i class="fa-solid fa-box"></i><span class="label">Đơn hàng</span><span class="badge">12</span>
-                </a>
-                <a href="#" class="nav-item" data-tip="Sản phẩm">
-                    <i class="fa-solid fa-tags"></i><span class="label">Sản phẩm</span>
-                </a>
-                <a href="#" class="nav-item" data-tip="Hoá đơn">
-                    <i class="fa-solid fa-file-invoice-dollar"></i><span class="label">Hoá đơn</span>
+                    <span class="label">Thiết kế layout</span>
                 </a>
             </div>
 
-            <!-- Nhóm 3: Hệ thống -->
+            <!-- Quản trị -->
             <div class="nav-section">
-                <div class="nav-section-label">Hệ thống</div>
-                <a href="#" class="nav-item" data-tip="Phân quyền">
-                    <i class="fa-solid fa-user-shield"></i><span class="label">Phân quyền</span>
+                <div class="nav-section-label">Quản trị</div>
+
+                <a href="#" class="nav-item" data-tip="Quản lý tài khoản (sắp ra mắt)">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span class="label">Quản lý tài khoản</span>
                 </a>
-                <a href="#" class="nav-item" data-tip="Nhật ký">
-                    <i class="fa-regular fa-clock"></i><span class="label">Nhật ký hoạt động</span>
+                <a href="#" class="nav-item" data-tip="Phân quyền truy cập (sắp ra mắt)">
+                    <i class="fa-solid fa-key"></i>
+                    <span class="label">Phân quyền</span>
                 </a>
-                <a href="#" class="nav-item" data-tip="Cài đặt hệ thống">
-                    <i class="fa-solid fa-sliders"></i><span class="label">Cài đặt hệ thống</span>
+                <a href="#" class="nav-item" data-tip="Cài đặt hệ thống (sắp ra mắt)">
+                    <i class="fa-solid fa-gear"></i>
+                    <span class="label">Cài đặt</span>
                 </a>
             </div>
 
         </div>
 
-        <!-- Nút thu gọn/mở rộng sidebar (chỉ áp dụng chế độ desktop) -->
         <div class="sidebar-footer">
             <button class="collapse-toggle" id="collapseToggle">
-                <i class="fa-solid fa-angles-left"></i><span>Thu gọn thanh bên</span>
+                <i class="fa-solid fa-angles-left"></i><span>Thu gọn</span>
             </button>
         </div>
     </aside>
 
-    <!-- ============================================================
-       MAIN CONTENT: nơi đổ nội dung theo action link đang chọn.
-       Trang hiện tại: "Tiến độ sản xuất"
-       ============================================================ -->
     <main class="app-main" id="appMain">
     @RenderBody()
     </main>
 
-  
 </body>
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/js/site.js"></script>

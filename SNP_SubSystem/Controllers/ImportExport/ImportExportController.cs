@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Sub_Services.Execute;
+using System;
 using System.Threading.Tasks;
 
 namespace SNP_SubSystem.Controllers.ImportExport
@@ -39,10 +40,13 @@ namespace SNP_SubSystem.Controllers.ImportExport
         // ---------------------------------------------------------------
 
         [HttpPost]
-        public async Task<IActionResult> ImportOutputExcel(IFormFile file)
+        public async Task<IActionResult> ImportOutputExcel(IFormFile file, Guid? deptId = null)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, message = "Vui lòng chọn file Excel." });
+
+            if (deptId == null || deptId == Guid.Empty)
+                return BadRequest(new { success = false, message = "Vui lòng chọn bộ phận trước khi import." });
 
             var ext = System.IO.Path.GetExtension(file.FileName).ToLowerInvariant();
             if (ext != ".xlsx" && ext != ".xls")
@@ -52,7 +56,50 @@ namespace SNP_SubSystem.Controllers.ImportExport
                 return BadRequest(new { success = false, message = "File quá lớn (tối đa 10 MB)." });
 
             using var stream = file.OpenReadStream();
-            var result = await _service.ImportOutputFromExcel(stream);
+            var result = await _service.ImportOutputFromExcel(stream, deptId.Value);
+
+            return Ok(result);
+        }
+
+        // ---------------------------------------------------------------
+        // GET: Tải file mẫu nhập mã hàng (ProductionInfo)
+        // GET /ImportExport/DownloadProductionInfoTemplate
+        // ---------------------------------------------------------------
+
+        [HttpGet]
+        public IActionResult DownloadProductionInfoTemplate()
+        {
+            var bytes    = _service.GenerateProductionInfoImportTemplate();
+            var fileName = $"MauNhapMaHang_{System.DateTime.Today:yyyyMMdd}.xlsx";
+            return File(bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Import mã hàng (ProductionInfo) từ file Excel
+        // POST /ImportExport/ImportProductionInfoExcel
+        // Params: file (IFormFile), departmentId (Guid)
+        // ---------------------------------------------------------------
+
+        [HttpPost]
+        public async Task<IActionResult> ImportProductionInfoExcel(IFormFile file, Guid departmentId)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { success = false, message = "Vui lòng chọn file Excel." });
+
+            var ext = System.IO.Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (ext != ".xlsx" && ext != ".xls")
+                return BadRequest(new { success = false, message = "Chỉ hỗ trợ file .xlsx hoặc .xls." });
+
+            if (file.Length > 10 * 1024 * 1024)
+                return BadRequest(new { success = false, message = "File quá lớn (tối đa 10 MB)." });
+
+            if (departmentId == Guid.Empty)
+                return BadRequest(new { success = false, message = "Vui lòng chọn bộ phận trước khi nhập." });
+
+            using var stream = file.OpenReadStream();
+            var result = await _service.ImportProductionInfoFromExcel(stream, departmentId);
 
             return Ok(result);
         }

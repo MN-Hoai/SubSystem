@@ -746,5 +746,255 @@ namespace Sub_Services.Execute
 
             return (true, "Đã ghi sản lượng thành công.");
         }
+
+        // =====================================================================
+        //  OUTPUT HISTORY: Lịch sử ghi sản lượng
+        // =====================================================================
+
+        public class OutputHistoryDto
+        {
+            public Guid   Id           { get; set; }
+            public string CreateDate   { get; set; }   // yyyy-MM-dd
+            public string InputTime    { get; set; }   // HH:mm
+            public string MachineName  { get; set; }
+            public string DeptName     { get; set; }
+            public string Spmain       { get; set; }
+            public string Style        { get; set; }
+            public string DetailName   { get; set; }
+            public int    OutputNumber { get; set; }
+            public string Source       { get; set; }   // "manual" | "excel"
+        }
+
+        /// <summary>
+        /// Lấy lịch sử ghi sản lượng (DailyOutputDetail) theo khoảng ngày và bộ phận.
+        /// </summary>
+        public async Task<List<OutputHistoryDto>> GetOutputHistory(
+            DateOnly? from, DateOnly? to, Guid? deptId)
+        {
+            var fromDt = from.HasValue ? from.Value.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
+            var toDt   = to.HasValue   ? to.Value.ToDateTime(TimeOnly.MaxValue)   : DateTime.Today.AddDays(1).AddTicks(-1);
+
+            // Dùng projection thay vì Include/ThenInclude để tránh N+1 và lock EF tracking
+            var query = _context.DailyOutputDetails
+                .AsNoTracking()
+                .Where(d => d.Status == 1
+                         && d.DailyOutputId.HasValue
+                         && d.DailyOutput.Status == 1
+                         && d.DailyOutput.CreateDate >= fromDt
+                         && d.DailyOutput.CreateDate <= toDt);
+
+            if (deptId.HasValue && deptId.Value != Guid.Empty)
+                query = query.Where(d =>
+                    d.DailyOutput.ProductionMachine.ProductionDepartmentId == deptId.Value);
+
+            var list = await query
+                .OrderByDescending(d => d.DailyOutput.CreateDate)
+                .ThenByDescending(d => d.InputTime)
+                .Take(3000)          // giới hạn để tránh block khi dữ liệu lớn
+                .Select(d => new OutputHistoryDto
+                {
+                    Id           = d.Id,
+                    CreateDate   = d.DailyOutput.CreateDate.ToString("yyyy-MM-dd"),
+                    InputTime    = d.InputTime.ToString("HH:mm"),
+                    MachineName  = string.IsNullOrEmpty(d.DailyOutput.ProductionMachine.Remark)
+                                   ? d.DailyOutput.ProductionMachine.MachineNumber
+                                   : d.DailyOutput.ProductionMachine.Remark,
+                    DeptName     = d.DailyOutput.ProductionMachine.ProductionDepartment.DepartmentName,
+                    Spmain       = d.DailyOutput.ProductionInfo.Spmain,
+                    Style        = d.DailyOutput.ProductionInfo.Style,
+                    DetailName   = d.StyleDetail.DetailName,
+                    OutputNumber = d.OutputNumber ?? 0,
+                    Source       = string.IsNullOrEmpty(d.Keyword) ? "manual" : d.Keyword
+                })
+                .ToListAsync();
+
+            return list;
+        }
+
+
+        public class UpdateOutputRecord_Request
+        {
+            public Guid   Id           { get; set; }
+            public int    OutputNumber { get; set; }
+            public string Date         { get; set; }
+            public string Time         { get; set; }
+        }
+
+        /// <summary>Cập nhật sản lượng, ngày, giờ của một DailyOutputDetail.</summary>
+        public async Task<(bool Success, string Message)> UpdateOutputRecord(
+            UpdateOutputRecord_Request req)
+        {
+            var detail = await _context.DailyOutputDetails
+                .Include(d => d.DailyOutput)
+                .FirstOrDefaultAsync(d => d.Id == req.Id && d.Status == 1);
+
+            if (detail == null) return (false, "Không tìm thấy bản ghi.");
+            if (req.OutputNumber < 0) return (false, "Sản lượng không hợp lệ.");
+
+            detail.OutputNumber = req.OutputNumber;
+            detail.UpdateDate   = DateTime.Now;
+
+            if (TimeOnly.TryParse(req.Time, out var t))
+                detail.InputTime = t;
+
+            if (DateOnly.TryParse(req.Date, out var d) && detail.DailyOutput != null)
+            {
+                var oldDate = DateOnly.FromDateTime(detail.DailyOutput.CreateDate);
+                if (d != oldDate)
+                {
+                    // Đổi ngày → cập nhật CreateDate của DailyOutput (giữ giờ cũ)
+                    detail.DailyOutput.CreateDate = d.ToDateTime(TimeOnly.FromDateTime(detail.DailyOutput.CreateDate));
+                    detail.DailyOutput.UpdateDate  = DateTime.Now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return (true, "Đã cập nhật.");
+        }
+
+        /// <summary>Xóa mềm một DailyOutputDetail (Status = -2). Bản ghi không còn xuất hiện trong GetOutputHistory (chỉ lấy Status == 1).</summary>
+        public async Task<(bool Success, string Message)> DeleteOutputRecord(Guid id)
+        {
+            var detail = await _context.DailyOutputDetails
+                .FirstOrDefaultAsync(d => d.Id == id && d.Status == 1);
+
+            if (detail == null) return (false, "Không tìm thấy bản ghi.");
+
+            detail.Status     = -2;
+            detail.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã xóa.");
+        }
+
+
+        // =====================================================================
+
+        public class DepartmentListItem
+        {
+            public Guid   Id             { get; set; }
+            public string DepartmentName { get; set; }
+            public string Keyword        { get; set; }
+            public int    Status         { get; set; }
+            public int    ActiveCodes    { get; set; }  // Số mã hàng status >= 0
+            public DateTime CreateDate   { get; set; }
+            public DateTime UpdateDate   { get; set; }
+        }
+
+        public class DepartmentUpsert_Request
+        {
+            public Guid?  Id             { get; set; }
+            public string DepartmentName { get; set; }
+            public string Keyword        { get; set; }
+        }
+
+        /// <summary>Lấy toàn bộ bộ phận (status >= -1 = bao gồm tạm khoá, trừ bị xóa), kèm count mã hàng.</summary>
+        public async Task<List<DepartmentListItem>> GetDepartmentListWithCount()
+        {
+            var depts = await _context.ProductionDepartments
+                .AsNoTracking()
+                .Where(d => d.Status >= -1)          // >= -1: bao gồm tạm khoá (-1), không lấy xóa (-2)
+                .OrderBy(d => d.DepartmentName)
+                .ToListAsync();
+
+            // Count mã hàng theo từng bộ phận (status >= 0 = đang hoạt động)
+            var counts = await _context.ProductionInfos
+                .Where(p => p.Status >= 0)
+                .GroupBy(p => p.ProductionDepartmentId)
+                .Select(g => new { DeptId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.DeptId, x => x.Count);
+
+            return depts.Select(d => new DepartmentListItem
+            {
+                Id             = d.Id,
+                DepartmentName = d.DepartmentName,
+                Keyword        = d.Keyword,
+                Status         = d.Status,
+                ActiveCodes    = counts.TryGetValue(d.Id, out var c) ? c : 0,
+                CreateDate     = d.CreateDate,
+                UpdateDate     = d.UpdateDate,
+            }).ToList();
+        }
+
+        /// <summary>Tạo mới bộ phận.</summary>
+        public async Task<(bool Success, string Message, Guid? Id)> CreateDepartment(
+            DepartmentUpsert_Request req)
+        {
+            if (string.IsNullOrWhiteSpace(req.DepartmentName))
+                return (false, "Tên bộ phận không được để trống.", null);
+
+            var now = DateTime.Now;
+            var dept = new Sub_Entities.Entities.ProductionDepartment
+            {
+                Id             = Guid.NewGuid(),
+                DepartmentName = req.DepartmentName.Trim(),
+                Keyword        = string.IsNullOrWhiteSpace(req.Keyword)
+                    ? req.DepartmentName.Trim().ToUpperInvariant().Replace(" ", "")
+                    : req.Keyword.Trim(),
+                Status         = 1,
+                CreateDate     = now,
+                UpdateDate     = now,
+            };
+            _context.ProductionDepartments.Add(dept);
+            await _context.SaveChangesAsync();
+            return (true, "Tạo bộ phận thành công.", dept.Id);
+        }
+
+        /// <summary>Cập nhật tên / keyword bộ phận. Chỉ cập nhật nếu status >= -1 (kể cả tạm khoá).</summary>
+        public async Task<(bool Success, string Message)> UpdateDepartment(
+            DepartmentUpsert_Request req)
+        {
+            if (!req.Id.HasValue || req.Id == Guid.Empty)
+                return (false, "Id không hợp lệ.");
+            if (string.IsNullOrWhiteSpace(req.DepartmentName))
+                return (false, "Tên bộ phận không được để trống.");
+
+            var dept = await _context.ProductionDepartments
+                .FirstOrDefaultAsync(d => d.Id == req.Id.Value && d.Status >= -1);
+            if (dept == null) return (false, "Không tìm thấy bộ phận.");
+
+            dept.DepartmentName = req.DepartmentName.Trim();
+            dept.Keyword        = string.IsNullOrWhiteSpace(req.Keyword)
+                ? req.DepartmentName.Trim().ToUpperInvariant().Replace(" ", "")
+                : req.Keyword.Trim();
+            dept.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Cập nhật bộ phận thành công.");
+        }
+
+        /// <summary>Tạm khoá bộ phận: Status = -1 (vẫn hiển thị trong danh sách).</summary>
+        public async Task<(bool Success, string Message)> SuspendDepartment(Guid id)
+        {
+            var dept = await _context.ProductionDepartments
+                .FirstOrDefaultAsync(d => d.Id == id && d.Status >= -1);
+            if (dept == null) return (false, "Không tìm thấy bộ phận.");
+            dept.Status     = -1;   // -1 = tạm khoá
+            dept.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã tạm khoá bộ phận.");
+        }
+
+        /// <summary>Mở khoá bộ phận: Status = 1 (hoạt động trở lại).</summary>
+        public async Task<(bool Success, string Message)> UnlockDepartment(Guid id)
+        {
+            var dept = await _context.ProductionDepartments
+                .FirstOrDefaultAsync(d => d.Id == id && d.Status == -1);
+            if (dept == null) return (false, "Không tìm thấy bộ phận đang tạm khoá.");
+            dept.Status     = 1;    // 1 = hoạt động
+            dept.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã mở khoá bộ phận thành công.");
+        }
+
+        /// <summary>Xoá mềm bộ phận: Status = -2 (hoàn toàn ẩn khỏi hệ thống).</summary>
+        public async Task<(bool Success, string Message)> SoftDeleteDepartment(Guid id)
+        {
+            var dept = await _context.ProductionDepartments
+                .FirstOrDefaultAsync(d => d.Id == id && d.Status >= -1);
+            if (dept == null) return (false, "Không tìm thấy bộ phận.");
+            dept.Status     = -2;   // -2 = xóa mềm
+            dept.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã xoá bộ phận thành công.");
+        }
     }
 }

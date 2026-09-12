@@ -412,6 +412,33 @@ namespace Sub_Services.Execute
             return (true, "Đã xóa mã hàng thành công.");
         }
 
+        /// <summary>
+        /// Cập nhật trạng thái hàng loạt cho nhiều ProductionInfo.
+        /// targetStatus: -1 = Xoá mềm, 1 = Đang hoạt động, 2 = Hoàn thành, 0 = Chờ sản xuất
+        /// </summary>
+        public async Task<(bool Success, string Message)> BulkUpdateStatus(List<Guid> ids, int targetStatus)
+        {
+            if (ids == null || !ids.Any())
+                return (false, "Không có mã hàng nào được chọn.");
+
+            var infos = await _context.ProductionInfos
+                .Where(p => ids.Contains(p.Id) && p.Status >= 0)
+                .ToListAsync();
+
+            if (!infos.Any())
+                return (false, "Không tìm thấy mã hàng hợp lệ để cập nhật.");
+
+            var now = DateTime.Now;
+            foreach (var info in infos)
+            {
+                info.Status = targetStatus;
+                info.UpdateDate = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return (true, $"Đã cập nhật trạng thái cho {infos.Count} mã hàng.");
+        }
+
         // =====================================================================
         //  HISTORY: Lịch sử mã hàng (ProductionInfo) — cho trang _ProductionInfoHistory
         // =====================================================================

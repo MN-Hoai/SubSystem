@@ -70,7 +70,7 @@
     .oh-table tbody tr:hover { background:var(--accent-navy-soft); }
     .oh-table tbody td { padding:9px 14px; vertical-align:middle; }
     .oh-num-cell { font-size:14px; font-weight:800; color:var(--accent-navy); cursor:cell; border-radius:5px; padding:2px 6px; display:inline-block; transition:background .1s; }
-    .oh-num-cell.selecting { background:var(--accent-navy-soft); color:var(--accent-navy); }
+    .oh-num-cell.selecting { background:var(--sel-cell-bg, rgba(31,58,103,.14)); color:var(--accent-navy); outline:2px solid rgba(31,58,103,.35); outline-offset:-1px; }
     .oh-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; }
     .oh-badge.manual { background:var(--accent-navy-soft); color:var(--accent-navy); }
     .oh-badge.excel  { background:#e0f7ef; color:var(--success); }
@@ -119,6 +119,11 @@
     .oh-edit-foot { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
     .oh-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 7px; border-radius:6px; transition:background .15s; }
     .oh-modal-close:hover { background:var(--bg-surface); color:var(--danger); }
+
+    /* ROW MULTI-SELECT */
+    .oh-table tbody tr[data-id].oh-row-sel td { background:var(--sel-row-bg, rgba(31,58,103,.10)) !important; }
+    .oh-table tbody tr[data-id].oh-row-ctx td { background:var(--sel-ctx-bg, rgba(31,58,103,.18)) !important; }
+    .oh-table tbody tr[data-id] { cursor:pointer; }
 
     @@keyframes ohIn {
         from { opacity:0; transform:translateY(10px) scale(.97); }
@@ -290,12 +295,15 @@
 
 <!-- Context menu (right-click) -->
 <div class="oh-ctx" id="ohCtxMenu">
+    <div id="ohCtxSelInfo" style="display:none;padding:4px 13px 8px;font-size:11.5px;color:var(--ink-400);font-weight:700;border-bottom:1px solid var(--border-soft);margin-bottom:3px;">
+        Đã chọn: <span id="ohCtxSelCount" style="color:var(--accent-navy);"></span> bản ghi
+    </div>
     <div class="oh-ctx-item" id="ohCtxEdit">
         <i class="fa-solid fa-pen" style="color:var(--accent-navy);"></i> Cập nhật
     </div>
     <div class="oh-ctx-sep"></div>
     <div class="oh-ctx-item danger" id="ohCtxDelete">
-        <i class="fa-solid fa-trash"></i> Xoá
+        <i class="fa-solid fa-trash"></i> <span id="ohCtxDeleteLabel">Xoá</span>
     </div>
 </div>
 
@@ -319,6 +327,8 @@
         <i class="fa-solid fa-xmark"></i>
     </button>
 </div>
+
+
 
 <!-- Edit modal -->
 <div id="ohEditBd" class="oh-edit-bd">
@@ -588,6 +598,17 @@
             tr.addEventListener('contextmenu', function (e) {
                 e.preventDefault();
                 ctxRow = r;
+                // Nếu row chưa được chọn thì chọn 1 mình nó
+                if (!tr.classList.contains('oh-row-sel')) {
+                    rowClearAll();
+                    rowSelect(tr);
+                }
+                var sel = rowGetSelected();
+                var multi = sel.length > 1;
+                document.getElementById('ohCtxSelInfo').style.display  = multi ? 'block' : 'none';
+                document.getElementById('ohCtxSelCount').textContent    = sel.length;
+                document.getElementById('ohCtxDeleteLabel').textContent = multi ? 'Xóa ' + sel.length + ' bản ghi' : 'Xoá';
+                document.getElementById('ohCtxEdit').style.display = multi ? 'none' : 'flex';
                 showCtxMenu(e.clientX, e.clientY);
             });
             ohTbody.appendChild(tr);
@@ -801,29 +822,55 @@
     var selectedIdxs = new Set();
     var autoScrollRaf = null;
     var lastMouseY = 0;
-    var SCROLL_ZONE = 60;   // px from edge triggers scroll
-    var SCROLL_SPD  = 8;    // px per frame
+    var SCROLL_ZONE = 60;
+    var SCROLL_SPD  = 8;
+
+    var cellLastIdx = -1; // dùng cho Shift+Click
 
     function initDragSelect() {
-        var cells = ohTbody.querySelectorAll('.oh-num-cell');
+        var cells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
         cells.forEach(function (cell, idx) {
             cell.addEventListener('mousedown', function (e) {
                 if (e.button !== 0) return;
                 e.preventDefault();
-                clearSelection();
-                isDragging = true; dragStartIdx = idx;
-                selectCell(cells, idx);
+                var freshCells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
+                var freshIdx = freshCells.indexOf(cell);
+                if (e.ctrlKey) {
+                    // Ctrl+Click: toggle ô, giữ lại các ô khác
+                    if (selectedIdxs.has(freshIdx)) {
+                        selectedIdxs.delete(freshIdx);
+                        cell.classList.remove('selecting');
+                    } else {
+                        selectedIdxs.add(freshIdx);
+                        cell.classList.add('selecting');
+                    }
+                    cellLastIdx = freshIdx;
+                    updateSelBar();
+                } else if (e.shiftKey && cellLastIdx > -1) {
+                    // Shift+Click: chọn range từ cellLastIdx đến freshIdx, giữ cũ
+                    var lo = Math.min(cellLastIdx, freshIdx), hi = Math.max(cellLastIdx, freshIdx);
+                    for (var i = lo; i <= hi; i++) selectCell(freshCells, i);
+                    updateSelBar();
+                } else {
+                    // Click thường: bắt đầu kéo
+                    clearSelection();
+                    isDragging = true;
+                    dragStartIdx = freshIdx;
+                    cellLastIdx = freshIdx;
+                    selectCell(freshCells, freshIdx);
+                }
             });
             cell.addEventListener('mouseenter', function () {
                 if (!isDragging) return;
+                var freshCells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
+                var freshIdx = freshCells.indexOf(cell);
                 clearSelection();
-                var lo = Math.min(dragStartIdx, idx), hi = Math.max(dragStartIdx, idx);
-                for (var i = lo; i <= hi; i++) selectCell(cells, i);
+                var lo = Math.min(dragStartIdx, freshIdx), hi = Math.max(dragStartIdx, freshIdx);
+                for (var i = lo; i <= hi; i++) selectCell(freshCells, i);
             });
         });
     }
 
-    /* Auto-scroll: track mouse Y on ohBody container */
     var ohBodyEl = document.querySelector('.oh-body');
     document.addEventListener('mousemove', function (e) {
         lastMouseY = e.clientY;
@@ -838,25 +885,13 @@
         var rel  = lastMouseY - rect.top;
         var h    = rect.height;
         if (rel < SCROLL_ZONE) {
-            /* scroll up */
-            var speed = Math.round(SCROLL_SPD * (1 - rel / SCROLL_ZONE));
-            ohBodyEl.scrollTop -= speed;
+            ohBodyEl.scrollTop -= Math.round(SCROLL_SPD * (1 - rel / SCROLL_ZONE));
             autoScrollRaf = requestAnimationFrame(doAutoScroll);
         } else if (rel > h - SCROLL_ZONE) {
-            /* scroll down */
-            var speed2 = Math.round(SCROLL_SPD * (1 - (h - rel) / SCROLL_ZONE));
-            ohBodyEl.scrollTop += speed2;
+            ohBodyEl.scrollTop += Math.round(SCROLL_SPD * (1 - (h - rel) / SCROLL_ZONE));
             autoScrollRaf = requestAnimationFrame(doAutoScroll);
         }
     }
-
-    document.addEventListener('mouseup', function () {
-        if (isDragging) {
-            isDragging = false;
-            if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = null; }
-            updateSelBar();
-        }
-    });
 
     function selectCell(cells, idx) {
         selectedIdxs.add(idx);
@@ -881,6 +916,103 @@
         document.getElementById('ohSelAvg').textContent   = count > 0 ? fmt(Math.round(total / count)) : '0';
         ohSelBar.classList.add('visible');
     }
+
+    /* ── ROW MULTI-SELECT ── */
+    var rowLastIdx = -1, rowIsDragging = false;
+
+    function rowGetRows()  { return Array.from(ohTbody.querySelectorAll('tr[data-id]')); }
+    function rowSelect(tr) { tr.classList.add('oh-row-sel'); }
+    function rowDesel(tr)  { tr.classList.remove('oh-row-sel','oh-row-ctx'); }
+    function rowClearAll() { rowGetRows().forEach(rowDesel); }
+    function rowGetSelected() { return rowGetRows().filter(function(r){ return r.classList.contains('oh-row-sel'); }); }
+
+    function rowSelectRange(a, b) {
+        var rows = rowGetRows(), lo = Math.min(a,b), hi = Math.max(a,b);
+        for (var i=lo; i<=hi; i++) if (rows[i]) rowSelect(rows[i]);
+    }
+
+    ohTbody.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) { rowClearAll(); return; }
+        // Bỏ qua nếu đang click vào oh-num-cell (drag-select SL)
+        if (e.target.closest('.oh-num-cell')) return;
+        var rows = rowGetRows(), idx = rows.indexOf(tr);
+        if (e.shiftKey && rowLastIdx > -1) {
+            e.preventDefault();
+            rowClearAll();
+            rowSelectRange(rowLastIdx, idx);
+        } else if (e.ctrlKey) {
+            tr.classList.contains('oh-row-sel') ? rowDesel(tr) : rowSelect(tr);
+            rowLastIdx = idx;
+        } else {
+            rowClearAll();
+            rowSelect(tr);
+            rowLastIdx = idx;
+            rowIsDragging = true;
+        }
+        rowUpdateBulk();
+    });
+
+    ohTbody.addEventListener('mouseover', function(e) {
+        if (!rowIsDragging) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        var idx = rowGetRows().indexOf(tr);
+        if (rowLastIdx > -1) { rowClearAll(); rowSelectRange(rowLastIdx, idx); }
+    });
+
+    document.addEventListener('mouseup', function(e) {
+        rowIsDragging = false;
+        if (isDragging) {
+            isDragging = false;
+            if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = null; }
+            updateSelBar();
+        }
+    });
+
+
+    function bulkDeleteRows(ids) {
+        var pending = ids.length, failed = 0;
+        ids.forEach(function(id) {
+            fetch('/ProductionDepartment/DeleteOutputRecord', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) failed++;
+                else allRows = allRows.filter(function(x) { return x.id !== id; });
+            })
+            .catch(function() { failed++; })
+            .finally(function() {
+                pending--;
+                if (pending === 0) {
+                    rowClearAll();
+                    applyFilterSort();
+                    renderSummary();
+                    toast(failed === 0 ? 'Đã xóa ' + ids.length + ' bản ghi' : 'Xóa ' + (ids.length-failed) + '/' + ids.length + ', lỗi: ' + failed, failed === 0);
+                }
+            });
+        });
+    }
+
+    // Override delete để hỗ trợ bulk từ context menu
+    document.getElementById('ohCtxDelete').addEventListener('click', function () {
+        var sel = rowGetSelected();
+        var ids = sel.map(function(tr){ return tr.dataset.id; });
+        closeCtxMenu();
+        if (ids.length > 1) {
+            showConfirm('Xóa hàng loạt', '<strong>Xóa ' + ids.length + ' bản ghi đã chọn?</strong><br><span style="font-size:12px;color:var(--ink-400);">Thao tác này không thể hoàn tác.</span>',
+                function () { bulkDeleteRows(ids); });
+        } else if (ctxRow) {
+            var row = ctxRow;
+            showConfirm('Xóa bản ghi',
+                '<strong>' + esc(row.detailName || '') + '</strong> &mdash; ' + fmt(row.outputNumber) + ' SP<br>' +
+                '<span style="color:var(--ink-400);font-size:12px;">Ngày: ' + fmtDateVN(row.createDate) + ' ' + (row.inputTime || '') + '</span>',
+                function () { deleteRecord(row); });
+        }
+    });
 
     document.getElementById('ohSelClose').addEventListener('click', clearSelection);
 

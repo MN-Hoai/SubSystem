@@ -1,0 +1,255 @@
+using Microsoft.EntityFrameworkCore;
+using Sub_Entities.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Sub_Services.Execute
+{
+    public partial class SubSystemService
+    {
+        // =====================================================================
+        //  ACCOUNT MANAGEMENT
+        // =====================================================================
+
+        public class Account_QueryRequest
+        {
+            public string Keyword    { get; set; }
+            public int?   Status     { get; set; }
+            public int    Page       { get; set; } = 1;
+            public int    PageSize   { get; set; } = 20;
+        }
+
+        public class Account_ListResult
+        {
+            public int  TotalCount { get; set; }
+            public int  Page       { get; set; }
+            public int  PageSize   { get; set; }
+            public List<Account_Item> Items { get; set; } = new();
+        }
+
+        public class Account_Item
+        {
+            public Guid     Id           { get; set; }
+            public string   Username     { get; set; }
+            public string   Msnv         { get; set; }
+            public string   FullName     { get; set; }
+            public string   Email        { get; set; }
+            public string   Keyword      { get; set; }
+            public int      Status       { get; set; }
+            public DateTime ExpiryDate   { get; set; }
+            public DateTime CreateDate   { get; set; }
+            public DateTime UpdateDate   { get; set; }
+        }
+
+        public class Account_UpsertRequest
+        {
+            public Guid?    Id         { get; set; }
+            public string   Username   { get; set; }
+            public string   Msnv       { get; set; }
+            public string   FullName   { get; set; }
+            public string   Email      { get; set; }
+            public string   Password   { get; set; }   // null/empty = giữ nguyên khi update
+            public DateTime ExpiryDate { get; set; }
+            public int      Status     { get; set; } = 1;
+        }
+
+        /// <summary>Lấy danh sách tài khoản có phân trang, tìm kiếm, lọc trạng thái.</summary>
+        public async Task<Account_ListResult> GetAccountList(Account_QueryRequest req)
+        {
+            var q = _context.Users.AsQueryable();
+
+            // Lọc tìm kiếm
+            if (!string.IsNullOrWhiteSpace(req.Keyword))
+            {
+                var kw = req.Keyword.Trim().ToLower();
+                q = q.Where(u =>
+                    u.Username.ToLower().Contains(kw) ||
+                    (u.FullName != null && u.FullName.ToLower().Contains(kw)) ||
+                    (u.Msnv     != null && u.Msnv.ToLower().Contains(kw)) ||
+                    (u.Email    != null && u.Email.ToLower().Contains(kw)));
+            }
+
+            // Lọc trạng thái (không lọc -1 trừ khi yêu cầu xem cả xoá)
+            if (req.Status.HasValue)
+                q = q.Where(u => u.Status == req.Status.Value);
+            else
+                q = q.Where(u => u.Status >= 0); // ẩn bản ghi đã xoá mềm
+
+            var total = await q.CountAsync();
+
+            var page     = Math.Max(1, req.Page);
+            var pageSize = Math.Clamp(req.PageSize, 5, 100);
+
+            var items = await q
+                .OrderByDescending(u => u.CreateDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(u => new Account_Item
+                {
+                    Id         = u.Id,
+                    Username   = u.Username,
+                    Msnv       = u.Msnv,
+                    FullName   = u.FullName,
+                    Email      = u.Email,
+                    Keyword    = u.Keyword,
+                    Status     = u.Status,
+                    ExpiryDate = u.ExpiryDate,
+                    CreateDate = u.CreateDate,
+                    UpdateDate = u.UpdateDate,
+                })
+                .ToListAsync();
+
+            return new Account_ListResult
+            {
+                TotalCount = total,
+                Page       = page,
+                PageSize   = pageSize,
+                Items      = items,
+            };
+        }
+
+        /// <summary>Lấy chi tiết một tài khoản.</summary>
+        public async Task<Account_Item> GetAccountById(Guid id)
+        {
+            return await _context.Users
+                .Where(u => u.Id == id)
+                .Select(u => new Account_Item
+                {
+                    Id         = u.Id,
+                    Username   = u.Username,
+                    Msnv       = u.Msnv,
+                    FullName   = u.FullName,
+                    Email      = u.Email,
+                    Keyword    = u.Keyword,
+                    Status     = u.Status,
+                    ExpiryDate = u.ExpiryDate,
+                    CreateDate = u.CreateDate,
+                    UpdateDate = u.UpdateDate,
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        /// <summary>Tạo mới hoặc cập nhật tài khoản.</summary>
+        public async Task<(bool Ok, string Message, Guid? NewId)> UpsertAccount(Account_UpsertRequest req)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(req.Username))
+                    return (false, "Username không được để trống.", null);
+
+                var now = DateTime.Now;
+
+                if (req.Id.HasValue && req.Id.Value != Guid.Empty)
+                {
+                    // UPDATE
+                    var entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == req.Id.Value);
+                    if (entity == null)
+                        return (false, "Không tìm thấy tài khoản.", null);
+
+                    // Kiểm tra username trùng (ngoại trừ chính nó)
+                    var dup = await _context.Users
+                        .AnyAsync(u => u.Username == req.Username.Trim() && u.Id != req.Id.Value);
+                    if (dup)
+                        return (false, $"Username '{req.Username}' đã tồn tại.", null);
+
+                    entity.Username   = req.Username.Trim();
+                    entity.Msnv       = req.Msnv?.Trim();
+                    entity.FullName   = req.FullName?.Trim();
+                    entity.Email      = req.Email?.Trim();
+                    entity.ExpiryDate = req.ExpiryDate;
+                    entity.Status     = req.Status;
+                    entity.UpdateDate = now;
+
+                    if (!string.IsNullOrWhiteSpace(req.Password))
+                    {
+                        var newSalt = GenerateHashCode();
+                        entity.HashCode     = newSalt;
+                        entity.PasswordHash = HashPasswordWithSalt(req.Password, newSalt);
+                    }
+
+                    await _context.SaveChangesAsync();
+                    return (true, "Cập nhật tài khoản thành công.", entity.Id);
+                }
+                else
+                {
+                    // CREATE
+                    if (string.IsNullOrWhiteSpace(req.Password))
+                        return (false, "Mật khẩu không được để trống khi tạo mới.", null);
+
+                    var dup = await _context.Users.AnyAsync(u => u.Username == req.Username.Trim());
+                    if (dup)
+                        return (false, $"Username '{req.Username}' đã tồn tại.", null);
+
+                    var salt = GenerateHashCode();
+
+                    var entity = new User
+                    {
+                        Id           = Guid.NewGuid(),
+                        Username     = req.Username.Trim(),
+                        Msnv         = req.Msnv?.Trim() ?? string.Empty,
+                        FullName     = req.FullName?.Trim() ?? string.Empty,
+                        Email        = req.Email?.Trim() ?? string.Empty,
+                        HashCode     = salt,
+                        PasswordHash = HashPasswordWithSalt(req.Password, salt),
+                        Keyword      = string.Empty,
+                        ExpiryDate   = req.ExpiryDate,
+                        Status       = req.Status,
+                        CreateDate   = now,
+                        UpdateDate   = now,
+                    };
+
+                    _context.Users.Add(entity);
+                    await _context.SaveChangesAsync();
+                    return (true, "Tạo tài khoản thành công.", entity.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, "Lỗi hệ thống: " + ex.Message, null);
+            }
+        }
+
+        /// <summary>Cập nhật trạng thái một hoặc nhiều tài khoản.</summary>
+        public async Task<(bool Ok, string Message)> SetAccountStatus(List<Guid> ids, int targetStatus)
+        {
+            try
+            {
+                var list = await _context.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
+                if (!list.Any())
+                    return (false, "Không tìm thấy tài khoản nào.");
+
+                foreach (var u in list)
+                {
+                    u.Status     = targetStatus;
+                    u.UpdateDate = DateTime.Now;
+                }
+
+                await _context.SaveChangesAsync();
+                return (true, $"Đã cập nhật {list.Count} tài khoản.");
+            }
+            catch (Exception ex)
+            {
+                return (false, "Lỗi hệ thống: " + ex.Message);
+            }
+        }
+
+        // ── Helpers ─────────────────────────────────────────────────────────
+
+        /// <summary>Sinh chuỗi salt ngẫu nhiên dạng hex 32 ký tự.</summary>
+        private static string GenerateHashCode()
+            => Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLower();
+
+        /// <summary>Hash mật khẩu có salt: SHA256(password + hashCode).</summary>
+        private static string HashPasswordWithSalt(string password, string hashCode)
+        {
+            using var sha256 = SHA256.Create();
+            var combined = password + hashCode;
+            var bytes    = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
+            return Convert.ToHexString(bytes).ToLower();
+        }
+    }
+}

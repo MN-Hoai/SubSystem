@@ -111,6 +111,21 @@ namespace SNP_SubSystem.Controllers.ProductionProgress
         }
 
         // ---------------------------------------------------------------
+        // POST: BulkUpdateStatus
+        // POST /ProductionProgress/BulkUpdateStatus
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest req)
+        {
+            if (req == null || req.Ids == null || req.Ids.Count == 0)
+                return BadRequest(new { success = false, message = "Danh sách ID trống." });
+
+            var (ok, msg) = await _service.BulkUpdateStatus(req.Ids, req.TargetStatus);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        // ---------------------------------------------------------------
         // POST: Tạo mới hoặc cập nhật ProductionInfo
         // POST /ProductionProgress/Upsert
         // ---------------------------------------------------------------
@@ -128,5 +143,9 @@ namespace SNP_SubSystem.Controllers.ProductionProgress
 
         // ── Helper DTO ───────────────────────────────────────────────────────
         public class IdRequest { public Guid Id { get; set; } }
+        public class BulkStatusRequest { 
+            public System.Collections.Generic.List<Guid> Ids { get; set; } 
+            public int TargetStatus { get; set; } 
+        }
     }
 }

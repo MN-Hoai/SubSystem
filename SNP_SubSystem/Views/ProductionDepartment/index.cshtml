@@ -1,27 +1,8 @@
 @{
     ViewData["Title"] = "Thông tin bộ phận";
 
-    /*
-     * =====================================================================
-     * TODO (khi kết nối DB):
-     *   var layouts = await _layoutService.GetAllWithItemsAsync();
-     *   // Mỗi layout gồm: Id, Name, RowCount, ColumnCount, CellWidth?,
-     *   //   CellHeight?, Gap?, Status, ProductionDepartment.Name,
-     *   //   ProductLayoutItems[] { RowIndex, ColumnIndex, SortOrder,
-     *   //     ProductionMachine { MachineName, MachineCode, Status } }
-     *
-     * Hiện tại: dùng mock JSON bên dưới để render giao diện tĩnh.
-     * Cấu trúc mock hoàn toàn khớp với ProductionDepartmentLayout +
-     * ProductLayoutItem + ProductionMachine.
-     * =====================================================================
-     */
 }
 
-<!-- =====================================================
-     MOCK DATA  (sẽ thay bằng Model từ Controller)
-     Cấu trúc khớp 1-1 với ProductionDepartmentLayout
-     + ProductLayoutItem + ProductionMachine
-     ===================================================== -->
 
 <script>
 (function () {
@@ -970,18 +951,13 @@
          <h1 class="page-title">Thông tin bộ phận</h1>
         </div>
        
-        <div class="atd-topbar-right">
+        @* <div class="atd-topbar-right">
             <button class="btn btn-ghost btn-sm" id="atdRefreshBtn">
                 <i class="fa-solid fa-rotate-right"></i> Làm mới
             </button>
-            <a asp-controller="MachineLayoutDesigner" asp-action="Index" class="btn btn-ghost btn-sm">
-                <i class="fa-solid fa-pen-ruler"></i> Thiết kế layout
-            </a>
-            <a asp-controller="ProductionDepartment" asp-action="RecordOutput" class="btn btn-primary btn-sm" >
-                <i class="fa-solid fa-pencil"></i> Ghi sản lượng
-            </a>
            
-        </div>
+           
+        </div> *@
     </div>
 
     <!-- =====================================================
@@ -1012,7 +988,7 @@
             <label class="atd-filter-label">Bộ phận</label>
             <select id="atdDeptFilter">
                 <option value="">Tất cả bộ phận</option>
-                <!-- TODO: render từ DB -->
+              
             </select>
         </div>
 

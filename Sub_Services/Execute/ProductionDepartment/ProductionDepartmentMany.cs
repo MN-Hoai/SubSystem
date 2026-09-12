@@ -289,14 +289,29 @@ namespace Sub_Services.Execute
         public async Task<(bool Success, string Message)> AssignProductionInfoToMachine(
             Guid productionInfoId, Guid machineId)
         {
-            // Kiểm tra đã tồn tại chưa (tránh duplicate)
-            bool exists = await _context.DailyOutputs
+            // Kiểm tra đã tồn tại và đang hoạt động
+            bool activeExists = await _context.DailyOutputs
                 .AnyAsync(d => d.ProductionInfoId    == productionInfoId
                             && d.ProductionMachineId == machineId
                             && d.Status == 1);
 
-            if (exists)
+            if (activeExists)
                 return (false, "Mã sản xuất này đã được gán vào máy.");
+
+            // Kiểm tra có bản ghi cũ đã tách khỏi máy (Status == -1) không
+            var existing = await _context.DailyOutputs
+                .FirstOrDefaultAsync(d => d.ProductionInfoId    == productionInfoId
+                                       && d.ProductionMachineId == machineId
+                                       && d.Status == -1);
+
+            if (existing != null)
+            {
+                // Khôi phục bản ghi cũ
+                existing.Status     = 1;
+                existing.UpdateDate = DateTime.Now;
+                await _context.SaveChangesAsync();
+                return (true, "Đã khôi phục mã sản xuất vào máy thành công.");
+            }
 
             // Kiểm tra ProductionInfo tồn tại
             var info = await _context.ProductionInfos.FindAsync(productionInfoId);
@@ -319,6 +334,36 @@ namespace Sub_Services.Execute
             await _context.SaveChangesAsync();
 
             return (true, "Đã gán mã sản xuất vào máy thành công.");
+        }
+
+        /// <summary>
+        /// Tách nhiều mã sản xuất khỏi máy (chuyển Status của DailyOutput link → -1).
+        /// Giữ lại lịch sử sản lượng đã ghi.
+        /// </summary>
+        public async Task<(bool Success, string Message)> RemoveInfosFromMachine(
+            List<Guid> productionInfoIds, Guid machineId)
+        {
+            if (productionInfoIds == null || !productionInfoIds.Any())
+                return (false, "Không có mã nào được chọn.");
+
+            var links = await _context.DailyOutputs
+                .Where(d => productionInfoIds.Contains(d.ProductionInfoId)
+                         && d.ProductionMachineId == machineId
+                         && d.Status == 1)
+                .ToListAsync();
+
+            if (!links.Any())
+                return (false, "Không tìm thấy liên kết hợp lệ để tách.");
+
+            var now = DateTime.Now;
+            foreach (var link in links)
+            {
+                link.Status     = -1;
+                link.UpdateDate = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return (true, $"Đã tách {links.Count} mã sản xuất khỏi máy.");
         }
 
         // =====================================================================

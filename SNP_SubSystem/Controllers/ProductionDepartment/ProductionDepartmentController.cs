@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sub_Services.Execute;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 
@@ -111,6 +112,41 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
             ViewData["Dept"]        = dept;
             ViewData["DeptId"]      = deptId;
             return View("~/Views/ProductionDepartment/PartialView/_MachineDetail.cshtml");
+        }
+
+        /// <summary>
+        /// Trang chi tiết sản lượng của một mã sản xuất trên một máy (standalone).
+        /// </summary>
+        public async Task<IActionResult> ProductionInfoDetail(
+            string productionInfoId = "",
+            string machineId        = "",
+            string machineName      = "",
+            string dept             = "")
+        {
+            if (!Guid.TryParse(productionInfoId, out var piGuid) ||
+                !Guid.TryParse(machineId, out var mGuid))
+                return RedirectToAction("ATDepartment");
+
+            // Lấy thông tin mã sản xuất + sản lượng ngày hôm nay mặc định
+            var infoList = await _service.GetProductionInfosByMachine(mGuid, null);
+            var info = infoList.FirstOrDefault(i => i.Id == piGuid);
+            if (info == null) return RedirectToAction("ATDepartment");
+
+            ViewData["ProductionInfoId"] = productionInfoId;
+            ViewData["MachineId"]        = machineId;
+            ViewData["MachineName"]      = machineName;
+            ViewData["Dept"]             = dept;
+            ViewData["Spmain"]           = info.Spmain;
+            ViewData["Style"]            = info.Style;
+            ViewData["Line"]             = info.Line;
+            ViewData["Color"]            = info.Color;
+            ViewData["Status"]           = info.Status;
+            ViewData["TotalQty"]         = info.TotalQty;
+            ViewData["Target"]           = info.Target;
+            ViewData["TotalOutput"]      = info.TotalOutputNumber;
+            ViewData["TodayOutput"]      = info.TodayOutput;
+            ViewData["Remark"]           = info.Remark;
+            return View("~/Views/ProductionDepartment/PartialView/_ProductionInfoDetail.cshtml");
         }
 
         // ---------------------------------------------------------------
@@ -363,6 +399,29 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
             var (ok, msg) = await _service.SoftDeleteDepartment(req.Id);
             return ok ? Ok(new { success = true, message = msg })
                       : BadRequest(new { success = false, message = msg });
+        }
+
+
+        // ---------------------------------------------------------------
+        // POST: Tách mã sản xuất khỏi máy (bulk)
+        // POST /ProductionDepartment/RemoveFromMachine
+        // Body: { productionInfoIds: [guid,...], machineId: guid }
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> RemoveFromMachine([FromBody] RemoveFromMachineRequest req)
+        {
+            if (req == null || req.ProductionInfoIds == null || req.ProductionInfoIds.Count == 0 || req.MachineId == Guid.Empty)
+                return BadRequest(new { success = false, message = "D\u1eef li\u1ec7u kh\u00f4ng h\u1ee3p l\u1ec7." });
+
+            var (ok, msg) = await _service.RemoveInfosFromMachine(req.ProductionInfoIds, req.MachineId);
+            return ok ? Ok(new { success = true, message = msg })
+                      : BadRequest(new { success = false, message = msg });
+        }
+
+        public class RemoveFromMachineRequest
+        {
+            public System.Collections.Generic.List<Guid> ProductionInfoIds { get; set; }
+            public Guid MachineId { get; set; }
         }
 
         public class DeptIdRequest { public Guid Id { get; set; } }

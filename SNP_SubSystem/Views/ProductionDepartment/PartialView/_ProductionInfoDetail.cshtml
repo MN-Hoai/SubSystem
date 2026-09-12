@@ -1,0 +1,332 @@
+@{
+    ViewData["Title"] = "Chi tiết sản lượng";
+
+    var productionInfoId = ViewData["ProductionInfoId"]?.ToString() ?? "";
+    var machineId        = ViewData["MachineId"]?.ToString()        ?? "";
+    var machineName      = ViewData["MachineName"]?.ToString()      ?? "Máy";
+    var dept             = ViewData["Dept"]?.ToString()             ?? "";
+    var spmain           = ViewData["Spmain"]?.ToString()           ?? "—";
+    var style            = ViewData["Style"]?.ToString()            ?? "—";
+    var line             = ViewData["Line"]?.ToString()             ?? "";
+    var color            = ViewData["Color"]?.ToString()            ?? "";
+    var status           = ViewData["Status"] as int? ?? 1;
+    var totalQty         = ViewData["TotalQty"] as int? ?? 0;
+    var target           = ViewData["Target"] as int? ?? 0;
+    var totalOutput      = ViewData["TotalOutput"] as int? ?? 0;
+    var todayOutput      = ViewData["TodayOutput"] as int? ?? 0;
+    var remark           = ViewData["Remark"]?.ToString() ?? "";
+
+    var pctQty    = totalQty > 0 ? Math.Min(100, (int)Math.Round((double)totalOutput / totalQty * 100)) : 0;
+    var pctTarget = target > 0   ? Math.Min(100, (int)Math.Round((double)todayOutput / target * 100))   : 0;
+
+    string statusLabel = status == 1 ? "Đang SX" : status == 2 ? "Hoàn thành" : "Tạm dừng";
+    string statusColor = status == 1 ? "var(--success)" : status == 2 ? "var(--accent-navy)" : "#d97706";
+    string statusBg    = status == 1 ? "#E6F4EF" : status == 2 ? "var(--accent-navy-soft)" : "#FFF7ED";
+}
+
+<style>
+    .pid-page { display:flex; flex-direction:column; min-height:calc(100vh - var(--header-h,60px)); background:var(--bg-canvas,#f5f7fc); }
+
+    /* TOP BAR */
+    .pid-topbar { display:flex; align-items:center; gap:14px; padding:14px 28px 12px; background:var(--bg-surface,#fff); border-bottom:1px solid var(--border,#e5e7eb); flex-wrap:wrap; }
+    .pid-back-btn { display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--ink-500,#6b7280); background:var(--bg-canvas,#f5f7fc); border:1.5px solid var(--border,#e5e7eb); border-radius:9px; padding:7px 14px; cursor:pointer; font-family:inherit; transition:background .18s,color .18s; }
+    .pid-back-btn:hover { background:var(--border-soft,#e8eaf0); color:var(--ink-900,#111827); }
+    .pid-topbar-info { flex:1; display:flex; flex-direction:column; gap:4px; min-width:0; }
+    .pid-title { font-size:20px; font-weight:900; color:var(--ink-900,#111827); letter-spacing:-.3px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .pid-subtitle { font-size:13px; color:var(--ink-500,#6b7280); font-weight:500; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .pid-chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; background:var(--bg-canvas,#f5f7fc); border:1.5px solid var(--border,#e5e7eb); border-radius:999px; padding:2px 9px; color:var(--ink-600,#4b5563); }
+    .pid-status-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; border-radius:999px; padding:3px 10px; }
+
+    /* FILTER BAR */
+    .pid-filter-bar { display:flex; align-items:center; gap:12px; padding:10px 28px; background:var(--bg-surface,#fff); border-bottom:1px solid var(--border,#e5e7eb); flex-wrap:wrap; }
+    .pid-filter-label { font-size:11px; font-weight:700; color:var(--ink-500,#6b7280); text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+    .pid-filter-bar input[type="date"] { padding:6px 11px; border:1.5px solid var(--border,#e5e7eb); border-radius:9px; font-family:inherit; font-size:13px; color:var(--ink-900,#111827); background:var(--bg-canvas,#f5f7fc); outline:none; transition:border-color .2s,box-shadow .2s; }
+    .pid-filter-bar input[type="date"]:focus { border-color:var(--accent-navy,#1F3A67); box-shadow:0 0 0 3px var(--accent-navy-soft,#EEF3FB); }
+    .pid-date-sep { font-size:12px; color:var(--ink-300,#9ca3af); font-weight:600; }
+    .pid-filter-count { margin-left:auto; font-size:12px; font-weight:700; color:var(--ink-500,#6b7280); }
+    .pid-btn { display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s; }
+    .pid-btn-primary { background:linear-gradient(135deg,#1F3A67 0%,#2a4d87 100%); color:#fff; }
+    .pid-btn-ghost { background:var(--bg-canvas,#f5f7fc); border:1.5px solid var(--border,#e5e7eb); color:var(--ink-700,#374151); }
+
+    /* BODY */
+    .pid-body { flex:1; padding:20px 28px 40px; display:flex; flex-direction:column; gap:16px; max-width:1100px; margin:0 auto; width:100%; box-sizing:border-box; }
+
+    /* SUMMARY CARDS */
+    .pid-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    @@media(max-width:800px) { .pid-summary-grid { grid-template-columns:1fr 1fr; } }
+    .pid-sum-card { background:var(--bg-surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.06); transition:box-shadow .2s,transform .2s; }
+    .pid-sum-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.1); transform:translateY(-1px); }
+    .pid-sum-label { font-size:10.5px; font-weight:700; color:var(--ink-400,#9ca3af); text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px; }
+    .pid-sum-value { font-size:26px; font-weight:900; color:var(--ink-900,#111827); letter-spacing:-.5px; line-height:1; }
+    .pid-sum-sub { font-size:12px; color:var(--ink-400,#9ca3af); margin-top:4px; }
+    .pid-sum-bar-bg { height:4px; background:var(--border,#e5e7eb); border-radius:999px; margin-top:10px; overflow:hidden; }
+    .pid-sum-bar-fill { height:100%; border-radius:999px; transition:width .5s ease; }
+    .pid-sum-card.c-navy  { border-top:3px solid #1F3A67; }
+    .pid-sum-card.c-green { border-top:3px solid #22c55e; }
+    .pid-sum-card.c-gold  { border-top:3px solid #d97706; }
+    .pid-sum-card.c-teal  { border-top:3px solid #0891b2; }
+
+    /* SECTION TITLE */
+    .pid-section-head { display:flex; align-items:center; justify-content:space-between; }
+    .pid-section-title { font-size:14px; font-weight:800; color:var(--ink-700,#374151); display:flex; align-items:center; gap:8px; }
+
+    /* DAY CARDS */
+    .pid-day-card { background:var(--bg-surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:14px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    .pid-day-card-head { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none; transition:background .15s; }
+    .pid-day-card-head:hover { background:var(--accent-navy-soft,#EEF3FB); }
+    .pid-day-date { font-size:14px; font-weight:700; color:var(--ink-900,#111827); display:flex; align-items:center; gap:10px; }
+    .pid-day-date-icon { color:var(--ink-300,#d1d5db); font-size:12px; }
+    .pid-day-style-tag { font-family:'Courier New',monospace; font-size:11.5px; color:var(--ink-400,#9ca3af); background:var(--bg-canvas,#f5f7fc); border:1px solid var(--border,#e5e7eb); border-radius:5px; padding:2px 7px; }
+    .pid-day-right { display:flex; align-items:center; gap:10px; }
+    .pid-day-total-badge { font-size:14px; font-weight:800; color:#1F3A67; background:var(--accent-navy-soft,#EEF3FB); padding:4px 12px; border-radius:8px; }
+    .pid-day-chevron { color:var(--ink-300,#d1d5db); font-size:11px; transition:transform .2s; }
+    .pid-day-content { border-top:1px solid var(--border-soft,#f0f2f8); }
+    .pid-day-summary { padding:8px 20px; background:var(--bg-canvas,#f5f7fc); border-bottom:1px solid var(--border-soft,#f0f2f8); display:flex; gap:16px; flex-wrap:wrap; }
+    .pid-day-sum-item { font-size:12px; color:var(--ink-500,#6b7280); font-weight:600; }
+    .pid-day-sum-item strong { color:#1F3A67; }
+
+    /* DETAIL TABLE */
+    .pid-detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .pid-detail-table thead th { padding:8px 20px; text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-300,#d1d5db); border-bottom:1px solid var(--border-soft,#f0f2f8); white-space:nowrap; }
+    .pid-detail-table tbody td { padding:11px 20px; border-bottom:1px solid var(--border-soft,#f0f2f8); vertical-align:middle; }
+    .pid-detail-table tbody tr:last-child td { border-bottom:none; }
+    .pid-detail-table tbody tr:hover { background:var(--accent-navy-soft,#EEF3FB); }
+    .pid-output-num { font-size:16px; font-weight:900; color:#1F3A67; }
+    .pid-detail-name { font-weight:600; color:var(--ink-900,#111827); }
+    .pid-time-tag { font-size:11.5px; color:var(--ink-400,#9ca3af); background:var(--bg-canvas,#f5f7fc); border:1px solid var(--border,#e5e7eb); border-radius:6px; padding:2px 8px; font-family:'Courier New',monospace; }
+
+    /* EMPTY/LOADER */
+    .pid-empty { text-align:center; padding:60px 24px; color:var(--ink-300,#d1d5db); }
+    .pid-empty i { font-size:36px; margin-bottom:12px; display:block; }
+    .pid-empty p { font-size:14px; font-weight:600; color:var(--ink-500,#6b7280); }
+    .pid-loader { display:flex; align-items:center; justify-content:center; gap:10px; padding:40px; color:var(--ink-400,#9ca3af); font-size:14px; font-weight:600; }
+</style>
+
+<div class="pid-page">
+
+    <!-- TOP BAR -->
+    <div class="pid-topbar">
+        <button class="pid-back-btn" onclick="history.back()">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại
+        </button>
+        <div class="pid-topbar-info">
+            <div class="pid-title">
+                <span style="font-family:'Courier New',monospace;color:var(--accent-navy,#1F3A67);">@spmain</span>
+                <span style="color:var(--ink-300,#d1d5db);">·</span>
+                <span>@style</span>
+                <span class="pid-status-badge" style="background:@statusBg;color:@statusColor;">@statusLabel</span>
+            </div>
+            <div class="pid-subtitle">
+                @if (!string.IsNullOrEmpty(machineName))
+                {
+                    <span class="pid-chip"><i class="fa-solid fa-gear"></i>@machineName</span>
+                }
+                @if (!string.IsNullOrEmpty(dept))
+                {
+                    <span class="pid-chip"><i class="fa-solid fa-building"></i>@dept</span>
+                }
+                @if (!string.IsNullOrEmpty(line))
+                {
+                    <span class="pid-chip"><i class="fa-solid fa-users"></i>Tổ @line</span>
+                }
+                @if (!string.IsNullOrEmpty(color))
+                {
+                    <span class="pid-chip"><i class="fa-solid fa-palette"></i>@color</span>
+                }
+                @if (!string.IsNullOrEmpty(remark))
+                {
+                    <span style="font-size:12px;color:var(--ink-400,#9ca3af);"><i class="fa-regular fa-note-sticky"></i> @remark</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- DATE FILTER BAR -->
+    <div class="pid-filter-bar">
+        <span class="pid-filter-label"><i class="fa-solid fa-calendar-range"></i> Lọc ngày:</span>
+        <input type="date" id="pidFromDate">
+        <span class="pid-date-sep">→</span>
+        <input type="date" id="pidToDate">
+        <button class="pid-btn pid-btn-primary" id="pidFilterApply">
+            <i class="fa-solid fa-filter"></i> Áp dụng
+        </button>
+        <button class="pid-btn pid-btn-ghost" id="pidFilterToday">
+            <i class="fa-solid fa-calendar-day"></i> Hôm nay
+        </button>
+        <span class="pid-filter-count" id="pidDateCount"></span>
+    </div>
+
+    <!-- BODY -->
+    <div class="pid-body">
+
+        <!-- Summary cards -->
+        <div class="pid-summary-grid">
+            <div class="pid-sum-card c-navy">
+                <div class="pid-sum-label">Tổng sản lượng (kỳ lọc)</div>
+                <div class="pid-sum-value" id="pidSumFiltered">—</div>
+                <div class="pid-sum-sub" id="pidSumFilteredSub">đang tải...</div>
+            </div>
+            <div class="pid-sum-card c-green">
+                <div class="pid-sum-label">Hôm nay</div>
+                <div class="pid-sum-value">@todayOutput.ToString("N0")</div>
+                <div class="pid-sum-sub">/ @target.ToString("N0") mục tiêu ngày</div>
+                <div class="pid-sum-bar-bg"><div class="pid-sum-bar-fill" style="width:@pctTarget%;background:#22c55e;"></div></div>
+            </div>
+            <div class="pid-sum-card c-gold">
+                <div class="pid-sum-label">% Hoàn thành (Qty)</div>
+                <div class="pid-sum-value">@pctQty%</div>
+                <div class="pid-sum-sub">@totalOutput.ToString("N0") / @totalQty.ToString("N0") chiếc</div>
+                <div class="pid-sum-bar-bg"><div class="pid-sum-bar-fill" style="width:@pctQty%;background:#d97706;"></div></div>
+            </div>
+            <div class="pid-sum-card c-teal">
+                <div class="pid-sum-label">Số ngày có sản lượng</div>
+                <div class="pid-sum-value" id="pidSumDays">—</div>
+                <div class="pid-sum-sub">trong kỳ được lọc</div>
+            </div>
+        </div>
+
+        <!-- Section title -->
+        <div class="pid-section-head">
+            <div class="pid-section-title">
+                <i class="fa-solid fa-calendar-days" style="color:#1F3A67;"></i>
+                Lịch sử sản lượng theo ngày
+            </div>
+            <span id="pidDayCount" style="font-size:12px;font-weight:700;color:var(--ink-400,#9ca3af);"></span>
+        </div>
+
+        <!-- Day cards -->
+        <div id="pidDayCards">
+            <div class="pid-loader">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:18px;color:#1F3A67;"></i>
+                Đang tải dữ liệu...
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    var PROD_INFO_ID = '@productionInfoId';
+    var MACHINE_ID   = '@machineId';
+
+    function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('vi-VN'); }
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmtDate(d) {
+        if (!d) return '—';
+        var dt = new Date(d);
+        if (isNaN(dt)) return d;
+        return dt.getDate().toString().padStart(2,'0') + '/' + (dt.getMonth()+1).toString().padStart(2,'0') + '/' + dt.getFullYear();
+    }
+
+    // Init dates: default to today
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    var todayStr = now.toISOString().split('T')[0];
+
+    document.getElementById('pidFromDate').value = todayStr;
+    document.getElementById('pidToDate').value   = todayStr;
+
+    document.getElementById('pidFilterApply').addEventListener('click', loadData);
+    document.getElementById('pidFilterToday').addEventListener('click', function() {
+        document.getElementById('pidFromDate').value = todayStr;
+        document.getElementById('pidToDate').value   = todayStr;
+        loadData();
+    });
+
+    function loadData() {
+        var from = document.getElementById('pidFromDate').value;
+        var to   = document.getElementById('pidToDate').value;
+        var container = document.getElementById('pidDayCards');
+        container.innerHTML = '<div class="pid-loader"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:18px;color:#1F3A67;"></i> Đang tải...</div>';
+        document.getElementById('pidDateCount').textContent = '';
+
+        var url = '/ProductionDepartment/GetDailyOutputs'
+            + '?productionInfoId=' + encodeURIComponent(PROD_INFO_ID)
+            + '&machineId='        + encodeURIComponent(MACHINE_ID);
+        if (from) url += '&from=' + encodeURIComponent(from);
+        if (to)   url += '&to='   + encodeURIComponent(to);
+
+        fetch(url)
+            .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function(list) {
+                var daysWithOutput = list.filter(function(d) { return (d.totalOutputNumber||0) > 0; }).length;
+                var totalFiltered  = list.reduce(function(s,d) { return s + (d.totalOutputNumber||0); }, 0);
+
+                document.getElementById('pidSumFiltered').textContent    = fmt(totalFiltered);
+                document.getElementById('pidSumFilteredSub').textContent = list.length + ' ngày trong kỳ';
+                document.getElementById('pidSumDays').textContent        = fmt(daysWithOutput);
+                document.getElementById('pidDateCount').textContent      = list.length + ' ngày';
+                document.getElementById('pidDayCount').textContent       = list.length + ' ngày dữ liệu';
+
+                renderCards(list);
+            })
+            .catch(function(e) {
+                container.innerHTML = '<div class="pid-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải dữ liệu: ' + esc(e.message) + '</p></div>';
+            });
+    }
+
+    function renderCards(list) {
+        var container = document.getElementById('pidDayCards');
+        if (!list.length) {
+            container.innerHTML = '<div class="pid-empty"><i class="fa-solid fa-calendar-xmark"></i><p>Chưa có sản lượng nào trong khoảng thời gian này</p></div>';
+            return;
+        }
+        container.innerHTML = '';
+        list.forEach(function(d, idx) {
+            var card = document.createElement('div');
+            card.className = 'pid-day-card';
+
+            var byName = {};
+            (d.details||[]).forEach(function(dt) {
+                var n = dt.detailName||'Khác';
+                if (!byName[n]) byName[n] = 0;
+                byName[n] += (dt.outputNumber||0);
+            });
+            var summaryHtml = Object.keys(byName).map(function(k) {
+                return '<span class="pid-day-sum-item"><strong>' + esc(k) + ':</strong> ' + fmt(byName[k]) + '</span>';
+            }).join('');
+
+            var rowsHtml = (d.details||[]).map(function(dt) {
+                return '<tr><td class="pid-detail-name">' + esc(dt.detailName||'Không tên') + '</td>' +
+                    '<td><span class="pid-time-tag">' + esc(dt.inputTime||'—') + '</span></td>' +
+                    '<td><span class="pid-output-num">' + fmt(dt.outputNumber) + '</span></td></tr>';
+            }).join('');
+
+            var isOpen = idx === 0;
+            card.innerHTML =
+                '<div class="pid-day-card-head">' +
+                    '<div class="pid-day-date">' +
+                        '<i class="fa-regular fa-calendar pid-day-date-icon"></i>' +
+                        '<span>' + fmtDate(d.createDate) + '</span>' +
+                        (d.styleCode ? '<span class="pid-day-style-tag">' + esc(d.styleCode) + '</span>' : '') +
+                    '</div>' +
+                    '<div class="pid-day-right">' +
+                        '<span class="pid-day-total-badge"><i class="fa-solid fa-box"></i> ' + fmt(d.totalOutputNumber) + '</span>' +
+                        '<i class="fa-solid fa-chevron-down pid-day-chevron" style="transform:' + (isOpen?'rotate(180deg)':'rotate(0deg)') + ';"></i>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="pid-day-content" style="display:' + (isOpen?'block':'none') + ';">' +
+                    (summaryHtml ? '<div class="pid-day-summary">' + summaryHtml + '</div>' : '') +
+                    (rowsHtml
+                        ? '<table class="pid-detail-table"><thead><tr><th>Công đoạn</th><th>Giờ vào</th><th>Sản lượng</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+                        : '<div style="padding:16px 20px;font-size:13px;color:var(--ink-300,#d1d5db);">Chưa có chi tiết công đoạn</div>'
+                    ) +
+                '</div>';
+
+            var head    = card.querySelector('.pid-day-card-head');
+            var content = card.querySelector('.pid-day-content');
+            var chev    = card.querySelector('.pid-day-chevron');
+            head.addEventListener('click', function() {
+                var open = content.style.display !== 'none';
+                content.style.display = open ? 'none' : 'block';
+                chev.style.transform  = open ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+
+            container.appendChild(card);
+        });
+    }
+
+    loadData();
+}());
+</script>

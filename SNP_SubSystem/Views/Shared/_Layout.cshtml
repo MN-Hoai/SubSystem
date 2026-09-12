@@ -26,9 +26,9 @@
         <div class="header-right">
             <div class="header-divider"></div>
             <button class="user-chip" aria-label="Tài khoản">
-                <div class="avatar">TN</div>
+                <div class="avatar">NH</div>
                 <div class="user-meta">
-                    <span class="user-name">Trần Ngọc</span>
+                    <span class="user-name">Nhật Hoài</span>
                     <span class="user-role">Quản trị viên</span>
                 </div>
                 <i class="fa-solid fa-chevron-down"></i>
@@ -120,7 +120,9 @@
             <div class="nav-section">
                 <div class="nav-section-label">Quản trị</div>
 
-                <a href="#" class="nav-item" data-tip="Quản lý tài khoản (sắp ra mắt)">
+                <a asp-controller="Account" asp-action="Index"
+                   class="nav-item @(currentCtrl == "Account" && currentAct == "Index" ? "active" : "")"
+                   data-tip="Quản lý tài khoản">
                     <i class="fa-solid fa-user-shield"></i>
                     <span class="label">Quản lý tài khoản</span>
                 </a>

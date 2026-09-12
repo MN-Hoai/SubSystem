@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Lich su ma hang";
 }
 <style>
@@ -10,7 +10,7 @@
         --pih-ink-900: #1a1d29; --pih-ink-700: #2e3349;
         --pih-ink-500: #64697f; --pih-ink-400: #8e93a8; --pih-ink-300: #b4b9cc;
     }
-    .pih-page{display:flex;flex-direction:column;height:calc(100vh - var(--header-h,60px));overflow:hidden;font-family:"Inter","Segoe UI",system-ui,sans-serif;background:var(--pih-surface);}
+    .pih-page{display:flex;flex-direction:column;height:calc(100vh - var(--header-h,60px));overflow:hidden;background:var(--pih-surface);}
     .pih-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 12px;background:var(--pih-canvas);border-bottom:1px solid var(--pih-border);flex-shrink:0;gap:14px;flex-wrap:wrap;}
     .pih-topbar-left{display:flex;align-items:center;gap:14px;}
     .pih-icon{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--pih-navy) 0%,var(--pih-navy-700) 100%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;box-shadow:0 4px 14px rgba(31,58,103,.28);}
@@ -41,7 +41,8 @@
     .pih-table thead th.sortable{cursor:pointer;transition:color .15s;} .pih-table thead th.sortable:hover,.pih-table thead th.sort-active{color:var(--pih-navy);}
     .pih-table tbody tr{border-bottom:1px solid var(--pih-border-soft);transition:background .12s;} .pih-table tbody tr:hover{background:var(--pih-navy-soft);}
     .pih-table tbody td{padding:9px 14px;vertical-align:middle;}
-    .pih-num-cell{font-size:14px;font-weight:800;color:var(--pih-navy);cursor:cell;border-radius:5px;padding:2px 6px;display:inline-block;transition:background .1s;} .pih-num-cell.selecting{background:var(--pih-navy-soft);}
+    .pih-num-cell{font-size:14px;font-weight:800;color:var(--pih-navy);cursor:cell;border-radius:5px;padding:2px 6px;display:inline-block;transition:background .1s;}
+    .pih-num-cell.selecting{background:var(--sel-cell-bg, rgba(31,58,103,.14));outline:2px solid rgba(31,58,103,.35);outline-offset:-1px;}
     .pih-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;}
     .pih-badge.active{background:#e0f7ef;color:var(--pih-success);} .pih-badge.wait{background:#fef3d0;color:var(--pih-warn);} .pih-badge.done{background:#e8edf5;color:var(--pih-navy);}
     .pih-empty{text-align:center;padding:60px;color:var(--pih-ink-300);} .pih-empty i{font-size:40px;display:block;margin-bottom:12px;} .pih-empty p{font-size:14px;font-weight:600;color:var(--pih-ink-400);}
@@ -76,6 +77,11 @@
     .pih-cfm-body{padding:18px 22px;} .pih-cfm-msg{font-size:14px;color:var(--pih-ink-700);line-height:1.6;}
     .pih-cfm-foot{padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--pih-border);}
     .pih-toast{position:fixed;bottom:28px;right:28px;z-index:9999;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:700;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.18);animation:pihIn .2s ease;}
+    /* ROW MULTI-SELECT */
+    .pih-table tbody tr[data-id].pih-row-sel td { background:var(--sel-row-bg, rgba(31,58,103,.10)) !important; }
+    .pih-table tbody tr[data-id].pih-row-ctx td { background:var(--sel-ctx-bg, rgba(31,58,103,.18)) !important; }
+    .pih-table tbody tr[data-id] { cursor:pointer; }
+
     @@keyframes pihIn{from{opacity:0;transform:translateY(10px) scale(.97);}to{opacity:1;transform:none;}}
 </style>
 
@@ -133,9 +139,12 @@
 </div>
 
 <div class="pih-ctx" id="pihCtxMenu">
+    <div id="pihCtxSelInfo" style="display:none;padding:4px 13px 8px;font-size:11.5px;color:var(--pih-ink-400);font-weight:700;border-bottom:1px solid var(--pih-border-soft);margin-bottom:3px;">
+        Đã chọn: <span id="pihCtxSelCount" style="color:var(--pih-navy);"></span> mã hàng
+    </div>
     <div class="pih-ctx-item" id="pihCtxEdit"><i class="fa-solid fa-pen" style="color:var(--pih-navy);"></i> Cập nhật</div>
     <div class="pih-ctx-sep"></div>
-    <div class="pih-ctx-item danger" id="pihCtxDelete"><i class="fa-solid fa-trash"></i> Xóa mã hàng</div>
+    <div class="pih-ctx-item danger" id="pihCtxDelete"><i class="fa-solid fa-trash"></i> <span id="pihCtxDeleteLabel">Xóa mã hàng</span></div>
 </div>
 
 <div class="pih-sel-bar" id="pihSelBar">
@@ -274,7 +283,21 @@
                 +'<td style="font-size:12px;color:var(--pih-ink-500);">'+fmtDateVN(r.inlineLine)+'</td>'
                 +'<td style="font-size:12px;color:var(--pih-ink-500);">'+fmtDateVN(r.inlineDepartment)+'</td>'
                 +'<td>'+badge(r.status)+'</td>';
-            tr.addEventListener('contextmenu',function(e){e.preventDefault();ctxRow=r;showCtxMenu(e.clientX,e.clientY);});
+            tr.addEventListener('contextmenu',function(e){
+                e.preventDefault();
+                ctxRow=r;
+                if (!tr.classList.contains('pih-row-sel')) {
+                    rowClearAll();
+                    rowSelect(tr);
+                }
+                var sel = rowGetSelected();
+                var multi = sel.length > 1;
+                document.getElementById('pihCtxSelInfo').style.display  = multi ? 'block' : 'none';
+                document.getElementById('pihCtxSelCount').textContent   = sel.length;
+                document.getElementById('pihCtxDeleteLabel').textContent= multi ? 'Xóa ' + sel.length + ' mã' : 'Xóa mã hàng';
+                document.getElementById('pihCtxEdit').style.display     = multi ? 'none' : 'flex';
+                showCtxMenu(e.clientX,e.clientY);
+            });
             pihTbody.appendChild(tr);
         });
         pihPageInfo.textContent='Hiển thị '+(start+1)+'-'+end+' / '+filtered.length;
@@ -328,8 +351,16 @@
         if(!ctxRow)return;var row=ctxRow;closeCtxMenu();openEditModal(row);
     });
     document.getElementById('pihCtxDelete').addEventListener('click',function(){
-        if(!ctxRow)return;var row=ctxRow;closeCtxMenu();
-        showConfirm('<strong>'+esc(row.style||'')+'</strong> &#8212; SP# '+esc(row.spmain||'')+'<br><span style="color:var(--pih-ink-400);font-size:12px;">Line '+esc(row.line||'')+' &middot; '+esc(row.deptName||'')+'</span>',function(){deleteRecord(row);});
+        var sel = rowGetSelected();
+        var ids = sel.map(function(tr){ return tr.dataset.id; });
+        if (!ctxRow && !ids.length) return;
+        closeCtxMenu();
+        if (ids.length > 1) {
+            showConfirm('<strong>Xóa ' + ids.length + ' mã hàng đã chọn?</strong><br><span style="color:var(--pih-ink-400);font-size:12px;">Thao tác này không thể hoàn tác.</span>',function(){bulkDeleteRows(ids);});
+        } else {
+            var row=ctxRow;
+            showConfirm('<strong>'+esc(row.style||'')+'</strong> &#8212; SP# '+esc(row.spmain||'')+'<br><span style="color:var(--pih-ink-400);font-size:12px;">Line '+esc(row.line||'')+' &middot; '+esc(row.deptName||'')+'</span>',function(){deleteRecord(row);});
+        }
     });
     function deleteRecord(row){
         fetch('/ProductionProgress/SoftDelete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:row.id})})
@@ -379,21 +410,54 @@
                 btn.disabled=false;btn.innerHTML=orig;
                 if(!data.success){toast(data.message||'Lỗi khi cập nhật thông tin mã hàng',false);return;}
                 toast('Đã cập nhật thông tin mã hàng',true);
-                var ds=document.getElementById('pihEditDept');var dn=ds.options[ds.selectedIndex]?ds.options[ds.selectedIndex].text:'';
-                allRows.forEach(function(x){if(x.id!==editRow.id)return;
-                    x.productionDepartmentId=deptId;x.deptName=dn;x.line=line;x.style=style;x.spmain=sp;x.color=color;
-                    x.totalQty=payload.totalQty;x.target=payload.target;x.inlineLine=payload.inlineLine;x.inlineDepartment=payload.inlineDepartment;x.status=payload.status;x.remark=payload.remark;
-                });
-                closeEditModal();applyFilterSort();renderSummary();
+                closeEditModal();
+                loadHistory();
             })
             .catch(function(e){btn.disabled=false;btn.innerHTML=orig;toast('Loi: '+e.message,false);});
     });
     var isDragging=false,dragStartIdx=-1,selectedIdxs=new Set(),autoScrollRaf=null,lastMouseY=0,SCROLL_ZONE=60,SCROLL_SPD=8;
+    var cellLastIdx = -1; // dùng cho Shift+Click
     function initDragSelect(){
-        var cells=pihTbody.querySelectorAll('.pih-num-cell');
+        var cells=Array.from(pihTbody.querySelectorAll('.pih-num-cell'));
         cells.forEach(function(cell,idx){
-            cell.addEventListener('mousedown',function(e){if(e.button!==0)return;e.preventDefault();clearSelection();isDragging=true;dragStartIdx=idx;selectCell(cells,idx);});
-            cell.addEventListener('mouseenter',function(){if(!isDragging)return;clearSelection();var lo=Math.min(dragStartIdx,idx),hi=Math.max(dragStartIdx,idx);for(var i=lo;i<=hi;i++)selectCell(cells,i);});
+            cell.addEventListener('mousedown',function(e){
+                if(e.button!==0)return;
+                e.preventDefault();
+                var freshCells=Array.from(pihTbody.querySelectorAll('.pih-num-cell'));
+                var freshIdx=freshCells.indexOf(cell);
+                if(e.ctrlKey){
+                    // Ctrl+Click: toggle ô, giữ lại các ô khác
+                    if(selectedIdxs.has(freshIdx)){
+                        selectedIdxs.delete(freshIdx);
+                        cell.classList.remove('selecting');
+                    } else {
+                        selectedIdxs.add(freshIdx);
+                        cell.classList.add('selecting');
+                    }
+                    cellLastIdx=freshIdx;
+                    updateSelBar();
+                } else if(e.shiftKey && cellLastIdx>-1){
+                    // Shift+Click: chọn range từ cellLastIdx đến freshIdx, giữ cũ
+                    var lo=Math.min(cellLastIdx,freshIdx),hi=Math.max(cellLastIdx,freshIdx);
+                    for(var i=lo;i<=hi;i++) selectCell(freshCells,i);
+                    updateSelBar();
+                } else {
+                    // Click thường: bắt đầu kéo
+                    clearSelection();
+                    isDragging=true;
+                    dragStartIdx=freshIdx;
+                    cellLastIdx=freshIdx;
+                    selectCell(freshCells,freshIdx);
+                }
+            });
+            cell.addEventListener('mouseenter',function(){
+                if(!isDragging)return;
+                var freshCells=Array.from(pihTbody.querySelectorAll('.pih-num-cell'));
+                var freshIdx=freshCells.indexOf(cell);
+                clearSelection();
+                var lo=Math.min(dragStartIdx,freshIdx),hi=Math.max(dragStartIdx,freshIdx);
+                for(var i=lo;i<=hi;i++) selectCell(freshCells,i);
+            });
         });
     }
     var bodyEl=document.querySelector('.pih-body');
@@ -404,5 +468,64 @@
     function clearSelection(){selectedIdxs.clear();pihTbody.querySelectorAll('.pih-num-cell.selecting').forEach(function(c){c.classList.remove('selecting');});pihSelBar.classList.remove('visible');}
     function updateSelBar(){if(!selectedIdxs.size){pihSelBar.classList.remove('visible');return;}var cells=pihTbody.querySelectorAll('.pih-num-cell'),tQty=0,tTarget=0,count=0;selectedIdxs.forEach(function(i){if(!cells[i])return;var v=parseFloat(cells[i].dataset.val)||0;if(cells[i].dataset.type==='qty')tQty+=v;else tTarget+=v;count++;});document.getElementById('pihSelCount').textContent=count;document.getElementById('pihSelSum').textContent=fmt(tQty);document.getElementById('pihSelTarget').textContent=fmt(tTarget);pihSelBar.classList.add('visible');}
     document.getElementById('pihSelClose').addEventListener('click',clearSelection);
+
+    /* ── ROW MULTI-SELECT ── */
+    var rowLastIdx = -1, rowIsDragging = false;
+
+    function rowGetRows()  { return Array.from(pihTbody.querySelectorAll('tr[data-id]')); }
+    function rowSelect(tr) { tr.classList.add('pih-row-sel'); }
+    function rowDesel(tr)  { tr.classList.remove('pih-row-sel','pih-row-ctx'); }
+    function rowClearAll() { rowGetRows().forEach(rowDesel); }
+    function rowGetSelected() { return rowGetRows().filter(function(r){ return r.classList.contains('pih-row-sel'); }); }
+
+    function rowSelectRange(a, b) {
+        var rows = rowGetRows(), lo = Math.min(a,b), hi = Math.max(a,b);
+        for (var i=lo; i<=hi; i++) if (rows[i]) rowSelect(rows[i]);
+    }
+
+    pihTbody.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) { rowClearAll(); return; }
+        if (e.target.closest('.pih-num-cell')) return;
+        var rows = rowGetRows(), idx = rows.indexOf(tr);
+        if (e.shiftKey && rowLastIdx > -1) {
+            e.preventDefault(); rowClearAll(); rowSelectRange(rowLastIdx, idx);
+        } else if (e.ctrlKey) {
+            tr.classList.contains('pih-row-sel') ? rowDesel(tr) : rowSelect(tr); rowLastIdx = idx;
+        } else {
+            rowClearAll(); rowSelect(tr); rowLastIdx = idx; rowIsDragging = true;
+        }
+    });
+
+    pihTbody.addEventListener('mouseover', function(e) {
+        if (!rowIsDragging) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        var idx = rowGetRows().indexOf(tr);
+        if (rowLastIdx > -1) { rowClearAll(); rowSelectRange(rowLastIdx, idx); }
+    });
+
+    document.addEventListener('mouseup', function() { rowIsDragging = false; });
+    pihTbody.addEventListener('selectstart', function(e) { if (rowIsDragging || e.shiftKey) e.preventDefault(); });
+
+    function bulkDeleteRows(ids) {
+        var pending = ids.length, failed = 0;
+        ids.forEach(function(id) {
+            fetch('/ProductionProgress/SoftDelete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+            .then(function(r){return r.json();})
+            .then(function(data){ if(!data.success) failed++; else allRows=allRows.filter(function(x){return x.id!==id;}); })
+            .catch(function(){ failed++; })
+            .finally(function(){
+                pending--;
+                if (pending===0) {
+                    rowClearAll();
+                    applyFilterSort(); renderSummary();
+                    toast(failed===0?'Đã xóa '+ids.length+' mã hàng':'Xóa '+(ids.length-failed)+'/'+ids.length+', lỗi: '+failed, failed===0);
+                }
+            });
+        });
+    }
+
 }());
 </script>

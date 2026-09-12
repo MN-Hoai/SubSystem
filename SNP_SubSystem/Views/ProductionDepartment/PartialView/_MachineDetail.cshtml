@@ -170,6 +170,18 @@
     .form-input:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
     .md-modal-footer { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:14px 22px 16px; border-top:1px solid var(--border); flex-shrink:0; background:var(--bg-canvas); }
     .md-modal-wide .md-modal-body { padding:0; }
+
+    /* ---- Multi-select & Context Menu ---- */
+    #mdTableBody tr                 { user-select: none; cursor: pointer; }
+    #mdTableBody tr.md-ms-sel  td  { background: rgba(31,58,103,.07) !important; }
+    #mdTableBody tr.md-ctx-active td { background: rgba(31,58,103,.13) !important; }
+
+    /* ---- Nút ngừng may ---- */
+    .md-stop-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:7px; font-size:12px; font-weight:700; color:var(--danger); background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); cursor:pointer; font-family:inherit; transition:background .18s,transform .15s; }
+    .md-stop-btn:hover { background:rgba(239,68,68,.18); transform:translateY(-1px); }
+
+    /* ---- Context Menu hover ---- */
+    #mdCtxMenu button:hover { background: var(--bg-canvas, #f4f6fb); }
 </style>
 
 <div class="md-page">
@@ -280,10 +292,11 @@
                         <th>Hôm nay / Target</th>
                         <th>Trạng thái</th>
                         <th style="text-align:center;">Chi tiết</th>
+                        <th style="text-align:center;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody id="mdTableBody">
-                    <tr><td colspan="8" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải dữ liệu...</p></td></tr>
+                    <tr><td colspan="9" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải dữ liệu...</p></td></tr>
                 </tbody>
             </table>
             </div>
@@ -442,12 +455,42 @@
     </div>
 </div>
 
+<!-- ================================================================
+     CONTEXT MENU
+================================================================ -->
+<div id="mdCtxMenu" style="display:none;position:fixed;z-index:9999;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px 0;min-width:210px;">
+    <div id="mdCtxSelInfo" style="display:none;padding:5px 16px 9px;font-size:12px;color:var(--ink-500);font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px;">
+        Đã chọn: <span id="mdCtxSelCount" style="color:var(--accent-navy);font-size:13px;"></span> mã hàng
+    </div>
+    <button id="mdCtxView" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-eye" style="color:var(--accent-navy);width:18px;"></i> Xem chi tiết
+    </button>
+    <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+    <button id="mdCtxRemove" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--danger);font-family:inherit;">
+        <i class="fa-solid fa-circle-stop" style="width:18px;"></i> Tách khỏi máy
+    </button>
+</div>
+
+<!-- ================================================================
+     BULK ACTION BAR
+================================================================ -->
+<div id="mdBulkBar" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9998;background:var(--accent-navy);color:#fff;border-radius:12px;padding:12px 20px;box-shadow:0 8px 28px rgba(31,58,103,.35);display:none;align-items:center;gap:16px;">
+    <span id="mdBulkLabel" style="font-size:13.5px;font-weight:700;"></span>
+    <button id="mdBulkRemove" style="padding:7px 16px;border-radius:8px;background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.35);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .18s;">
+        <i class="fa-solid fa-circle-stop"></i> Tách khỏi máy
+    </button>
+    <button id="mdBulkClear" style="padding:7px 12px;border-radius:8px;background:transparent;color:rgba(255,255,255,.7);border:none;font-size:13px;cursor:pointer;font-family:inherit;transition:color .18s;">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+
 <script>
 (function () {
     /* =====================================================
        CONFIG từ Razor
        ===================================================== */
-    var MACHINE_ID = '@machineId';
+    var MACHINE_ID   = '@machineId';
+    var MACHINE_NAME = '@Html.Raw(machineName.Replace("'", "\\'"))';
     var DEPT_ID    = '@deptId';
     var DEPT_NAME  = '@Html.Raw(dept.Replace("'", "\\'"))';
 
@@ -499,6 +542,168 @@
     }
 
     /* =====================================================
+       MULTI-SELECT: Drag, Shift+Click, Ctrl+Click
+       ===================================================== */
+    var mdTbody     = document.getElementById('mdTableBody');
+    var bulkBar     = document.getElementById('mdBulkBar');
+    var bulkLabel   = document.getElementById('mdBulkLabel');
+    var bulkRemove  = document.getElementById('mdBulkRemove');
+    var bulkClear   = document.getElementById('mdBulkClear');
+    var ms_dragging = false;
+    var ms_lastIdx  = -1;
+
+    function ms_getRows()  { return Array.from(mdTbody.querySelectorAll('tr[data-id]')); }
+    function ms_setRow(tr, on) { on ? tr.classList.add('md-ms-sel') : tr.classList.remove('md-ms-sel'); }
+    function ms_clearAll() { ms_getRows().forEach(function(r) { r.classList.remove('md-ms-sel','md-ctx-active'); }); updateBulkBar(); }
+    function ms_getSelected() { return ms_getRows().filter(function(r) { return r.classList.contains('md-ms-sel'); }); }
+
+    function ms_selectRange(a, b) {
+        var rows = ms_getRows();
+        var lo = Math.min(a, b), hi = Math.max(a, b);
+        for (var i = lo; i <= hi; i++) if (rows[i]) ms_setRow(rows[i], true);
+    }
+
+    function updateBulkBar() {
+        var sel = ms_getSelected();
+        if (sel.length > 0) {
+            bulkLabel.textContent = 'Đang chọn ' + sel.length + ' mã hàng';
+            bulkBar.style.display = 'flex';
+        } else {
+            bulkBar.style.display = 'none';
+        }
+    }
+
+    mdTbody.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) { ms_clearAll(); return; }
+        var rows = ms_getRows();
+        var idx  = rows.indexOf(tr);
+        if (e.shiftKey && ms_lastIdx > -1) {
+            e.preventDefault();
+            ms_clearAll();
+            ms_selectRange(ms_lastIdx, idx);
+        } else if (e.ctrlKey) {
+            ms_setRow(tr, !tr.classList.contains('md-ms-sel'));
+            ms_lastIdx = idx;
+        } else {
+            ms_clearAll();
+            ms_setRow(tr, true);
+            ms_lastIdx  = idx;
+            ms_dragging = true;
+        }
+        updateBulkBar();
+    });
+
+    mdTbody.addEventListener('mouseover', function(e) {
+        if (!ms_dragging) return;
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        var idx = ms_getRows().indexOf(tr);
+        if (ms_lastIdx > -1) { ms_clearAll(); ms_selectRange(ms_lastIdx, idx); }
+        updateBulkBar();
+    });
+
+    document.addEventListener('mouseup', function() { ms_dragging = false; });
+    mdTbody.addEventListener('selectstart', function(e) { if (ms_dragging || e.shiftKey) e.preventDefault(); });
+
+    bulkClear.addEventListener('click', ms_clearAll);
+
+    /* =====================================================
+       CONTEXT MENU
+       ===================================================== */
+    var mdCtxMenu     = document.getElementById('mdCtxMenu');
+    var mdCtxSelInfo  = document.getElementById('mdCtxSelInfo');
+    var mdCtxSelCount = document.getElementById('mdCtxSelCount');
+    var mdCtxView     = document.getElementById('mdCtxView');
+    var mdCtxRemove   = document.getElementById('mdCtxRemove');
+    var ctx_targetIds  = [];
+    var ctx_targetRows = [];
+    var ctx_singleInfo = null;
+
+    mdTbody.addEventListener('contextmenu', function(e) {
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        e.preventDefault();
+        if (!tr.classList.contains('md-ms-sel')) {
+            ms_clearAll();
+            ms_setRow(tr, true);
+        }
+        ctx_targetRows = ms_getSelected();
+        ctx_targetIds  = ctx_targetRows.map(function(r) { return r.dataset.id; });
+        ctx_singleInfo = ctx_targetIds.length === 1
+            ? allInfos.find(function(p) { return p.id === ctx_targetIds[0]; })
+            : null;
+
+        var multi = ctx_targetIds.length > 1;
+        mdCtxSelInfo.style.display = multi ? 'block' : 'none';
+        if (multi) mdCtxSelCount.textContent = ctx_targetIds.length;
+        mdCtxView.style.display = multi ? 'none' : 'block';
+
+        var x = e.clientX, y = e.clientY;
+        var mW = 220, mH = 140;
+        mdCtxMenu.style.left = (x + mW > window.innerWidth  ? x - mW : x) + 'px';
+        mdCtxMenu.style.top  = (y + mH > window.innerHeight ? y - mH : y) + 'px';
+        mdCtxMenu.style.display = 'block';
+        ctx_targetRows.forEach(function(r) { r.classList.add('md-ctx-active'); });
+        updateBulkBar();
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#mdCtxMenu')) hideCtx();
+    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { hideCtx(); ms_clearAll(); } });
+
+    function hideCtx() {
+        mdCtxMenu.style.display = 'none';
+        ctx_targetRows.forEach(function(r) { r.classList.remove('md-ctx-active'); });
+    }
+
+    mdCtxView.addEventListener('click', function() {
+        hideCtx();
+        if (ctx_singleInfo) navigateToDetail(ctx_singleInfo);
+    });
+
+    function navigateToDetail(info) {
+        var url = '/ProductionDepartment/ProductionInfoDetail'
+            + '?productionInfoId=' + encodeURIComponent(info.id)
+            + '&machineId='        + encodeURIComponent(MACHINE_ID)
+            + '&machineName='      + encodeURIComponent(MACHINE_NAME)
+            + '&dept='             + encodeURIComponent(DEPT_NAME);
+        window.location.href = url;
+    }
+
+    function doRemoveFromMachine(infoIds) {
+        if (!infoIds || !infoIds.length) return;
+        fetch('/ProductionDepartment/RemoveFromMachine', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productionInfoIds: infoIds, machineId: MACHINE_ID })
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+            if (res.ok && res.data.success) {
+                toast(res.data.message || 'Đã tách mã khỏi máy', true);
+                ms_clearAll();
+                loadProductionInfos();
+            } else {
+                toast(res.data.message || 'Lỗi khi tách mã', false);
+            }
+        })
+        .catch(function(e) { toast('Lỗi kết nối: ' + e.message, false); });
+    }
+
+    mdCtxRemove.addEventListener('click', function() {
+        hideCtx();
+        doRemoveFromMachine(ctx_targetIds);
+    });
+
+    bulkRemove.addEventListener('click', function() {
+        var ids = ms_getSelected().map(function(r) { return r.dataset.id; });
+        doRemoveFromMachine(ids);
+    });
+
+    /* =====================================================
        LOAD: Danh sách mã sản xuất theo máy
        ===================================================== */
     function loadProductionInfos() {
@@ -510,7 +715,7 @@
         if (currentSearch) url += '&keyword=' + encodeURIComponent(currentSearch);
 
         document.getElementById('mdTableBody').innerHTML =
-            '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></td></tr>';
+            '<tr><td colspan="9" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></td></tr>';
 
         fetch(url)
             .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -520,7 +725,7 @@
             })
             .catch(function (e) {
                 document.getElementById('mdTableBody').innerHTML =
-                    '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ' + esc(e.message) + '</p></td></tr>';
+                    '<tr><td colspan="9" class="md-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ' + esc(e.message) + '</p></td></tr>';
             });
     }
 
@@ -547,7 +752,7 @@
     function renderTable(list) {
         var tbody = document.getElementById('mdTableBody');
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="md-empty"><i class="fa-solid fa-inbox"></i><p>Không có mã sản xuất nào</p></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="md-empty"><i class="fa-solid fa-inbox"></i><p>Không có mã sản xuất nào</p></td></tr>';
             return;
         }
         tbody.innerHTML = '';
@@ -581,13 +786,18 @@
                     '<div class="td-pct">' + pctTarget + '%</div>' +
                 '</div></td>' +
                 '<td>' + statusBadge(p.status) + '</td>' +
-                '<td style="text-align:center;"><button class="td-view-btn" data-id="' + p.id + '"><i class="fa-solid fa-eye"></i> Xem</button></td>';
+                '<td style="text-align:center;"><button class="td-view-btn" data-id="' + p.id + '"><i class="fa-solid fa-eye"></i> Xem</button></td>' +
+                '<td style="text-align:center;"><button class="md-stop-btn" data-id="' + p.id + '" title="Tách khỏi máy"><i class="fa-solid fa-circle-stop"></i> Ngừng</button></td>';
 
             tr.querySelector('.td-view-btn').addEventListener('click', function (e) {
                 e.stopPropagation();
-                openDetailModal(p);
+                navigateToDetail(p);
             });
-            tr.addEventListener('click', function () { openDetailModal(p); });
+            tr.querySelector('.md-stop-btn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                doRemoveFromMachine([p.id]);
+            });
+            // Click hàng: chỉ chọn (multi-select), không mở modal
             tbody.appendChild(tr);
         });
     }

@@ -34,6 +34,17 @@
     --sidebar-w-collapsed: 80px;
     --header-h: 68px;
     --radius: 12px;
+    /* Vùng chọn (selection) - dùng đồng bộ toàn hệ thống */
+    --sel-row-bg:     rgba(31, 58, 103, 0.10);   /* highlight hàng chọn */
+    --sel-row-border: rgba(31, 58, 103, 0.22);   /* viền hàng chọn */
+    --sel-cell-bg:    rgba(31, 58, 103, 0.14);   /* highlight ô SL drag */
+    --sel-ctx-bg:     rgba(31, 58, 103, 0.18);   /* highlight hàng đang ctx menu */
+}
+
+/* Đồng bộ phông chữ toàn hệ thống — Manrope (không ghi đè Font Awesome) */
+body, input, select, textarea, button, label,
+h1, h2, h3, h4, h5, h6, p, span, div, td, th, a, li {
+    font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 /* ============================================================

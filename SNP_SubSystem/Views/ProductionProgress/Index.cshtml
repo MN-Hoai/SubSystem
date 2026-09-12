@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Tiến độ sản xuất";
+    ViewData["Title"] = "Thông tin mã hàng";
 }
 
 @* Lấy ngày đầu tháng và hôm nay dạng yyyy-MM-dd để gán value mặc định cho date input *@
@@ -61,11 +61,11 @@
             </select>
         </div>
 
-        <!-- Trạng thái (Status ProductionInfo: 1=Đang, 0=Ngừng) -->
+        <!-- Trạng thái (Status ProductionInfo: 1=Đang, 0=Ngừng, 2=Hoàn thành) -->
         <div class="filter-group">
             <label class="filter-label">Trạng thái</label>
             <select id="statusSelect">
-                <option value="">Tất cả (trừ xóa)</option>
+                <option value="">Tất cả</option>
                 <option value="1" selected>Đang hoạt động</option>
                 <option value="0">Chờ sản xuất</option>
                 <option value="2">Hoàn thành</option>
@@ -615,7 +615,7 @@
             }
 
             const statusBadge = p.status === 1
-                ? '<span class="badge-status success">Đang HĐ</span>'
+                ? '<span class="badge-status success">Đang SX</span>'
                 : p.status === 0
                 ? '<span class="badge-status warning">Chờ SX</span>'
                 : '<span class="badge-status">Hoàn thành</span>';
@@ -828,9 +828,22 @@
 <div id="ppToastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
 
 <!-- Context Menu -->
-<div id="ctxMenu" style="display:none;position:fixed;z-index:9999;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px 0;min-width:180px;">
+<div id="ctxMenu" style="display:none;position:fixed;z-index:9999;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px 0;min-width:215px;">
+    <!-- Tiêu đề báo số dòng đang chọn (hiện khi chọn nhiều) -->
+    <div id="ctxSelInfo" style="display:none;padding:5px 16px 9px;font-size:12px;color:var(--ink-500);font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px;">
+        Đã chọn: <span id="ctxSelCount" style="color:var(--primary);font-size:13px;"></span> mã hàng
+    </div>
     <button id="ctxEdit" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
         <i class="fa-solid fa-pen-to-square" style="color:var(--primary);width:18px;"></i> Cập nhật
+    </button>
+    <button id="ctxComplete" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-circle-check" style="color:var(--accent-navy,#1F3A67);width:18px;"></i> Đánh dấu hoàn thành
+    </button>
+    <button id="ctxProducing" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-circle-dot" style="color:var(--success,#1a9e65);width:18px;"></i> Đánh dấu đang SX
+    </button>
+    <button id="ctxWaiting" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-clock" style="color:#8A6423;width:18px;"></i> Đánh dấu chờ SX
     </button>
     <div style="height:1px;background:var(--border);margin:4px 0;"></div>
     <button id="ctxDelete" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--danger);font-family:inherit;">
@@ -880,72 +893,168 @@
         }, ms);
     }
 
-    // ── Context Menu ──────────────────────────────────────────────────
-    const ctxMenu   = document.getElementById('ctxMenu');
-    const ctxEdit   = document.getElementById('ctxEdit');
-    const ctxDelete = document.getElementById('ctxDelete');
-    const delModal  = document.getElementById('modalConfirmDelete');
-    const delInfoBox= document.getElementById('delInfoBox');
-    const btnConfDel= document.getElementById('btnConfirmDel');
-    let activeRow   = null;
+    // =================================================================
+    // MULTI-SELECT: Drag, Shift+Click, Ctrl+Click
+    // =================================================================
+    const progressTbody = document.getElementById('progressTableBody');
+    let ms_isDragging      = false;
+    let ms_lastIdx         = -1;
 
-    document.getElementById('progressTableBody').addEventListener('contextmenu', e => {
+    function ms_getRows()  { return Array.from(progressTbody.querySelectorAll('tr[data-id]')); }
+    function ms_setRow(tr, on) { on ? tr.classList.add('ms-selected') : tr.classList.remove('ms-selected'); }
+    function ms_clearAll() { ms_getRows().forEach(r => r.classList.remove('ms-selected', 'ctx-active')); }
+    function ms_getSelected() { return ms_getRows().filter(r => r.classList.contains('ms-selected')); }
+
+    function ms_selectRange(a, b) {
+        const rows = ms_getRows();
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        for (let i = lo; i <= hi; i++) if (rows[i]) ms_setRow(rows[i], true);
+    }
+
+    progressTbody.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) { ms_clearAll(); ms_lastIdx = -1; return; }
+        const rows = ms_getRows();
+        const idx  = rows.indexOf(tr);
+        if (e.shiftKey && ms_lastIdx > -1) {
+            e.preventDefault();    // Ngăn bôi đen text
+            ms_clearAll();
+            ms_selectRange(ms_lastIdx, idx);
+        } else if (e.ctrlKey) {
+            tr.classList.toggle('ms-selected');
+            ms_lastIdx = idx;
+        } else {
+            ms_clearAll();
+            ms_setRow(tr, true);
+            ms_lastIdx  = idx;
+            ms_isDragging = true;
+        }
+    });
+
+    // Drag-select: bắt sự kiện qua mouseenter trên các thẻ con
+    progressTbody.addEventListener('mouseover', e => {
+        if (!ms_isDragging) return;
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const idx = ms_getRows().indexOf(tr);
+        if (ms_lastIdx > -1) { ms_clearAll(); ms_selectRange(ms_lastIdx, idx); }
+    });
+
+    document.addEventListener('mouseup', () => { ms_isDragging = false; });
+    progressTbody.addEventListener('selectstart', e => { if (ms_isDragging || e.shiftKey) e.preventDefault(); });
+
+    // =================================================================
+    // CONTEXT MENU (hỗ trợ cả single và multi-select)
+    // =================================================================
+    const ctxMenu     = document.getElementById('ctxMenu');
+    const ctxSelInfo  = document.getElementById('ctxSelInfo');
+    const ctxSelCount = document.getElementById('ctxSelCount');
+    const ctxEdit     = document.getElementById('ctxEdit');
+    const ctxComplete = document.getElementById('ctxComplete');
+    const ctxProducing= document.getElementById('ctxProducing');
+    const ctxWaiting  = document.getElementById('ctxWaiting');
+    const ctxDelete   = document.getElementById('ctxDelete');
+    const delModal    = document.getElementById('modalConfirmDelete');
+    const delInfoBox  = document.getElementById('delInfoBox');
+    const btnConfDel  = document.getElementById('btnConfirmDel');
+
+    let ctx_targetIds  = [];
+    let ctx_targetRows = [];
+
+    progressTbody.addEventListener('contextmenu', e => {
         const tr = e.target.closest('tr[data-id]');
         if (!tr) return;
         e.preventDefault();
-        activeRow = tr;
+
+        // Nếu chuột phải vào dòng chưa được bôi đen -> chọn mình nó
+        if (!tr.classList.contains('ms-selected')) {
+            ms_clearAll();
+            ms_setRow(tr, true);
+        }
+
+        ctx_targetRows = ms_getSelected();
+        ctx_targetIds  = ctx_targetRows.map(r => r.dataset.id);
+
+        const multi = ctx_targetIds.length > 1;
+        ctxSelInfo.style.display  = multi ? 'block' : 'none';
+        if (multi) ctxSelCount.textContent = ctx_targetIds.length;
+        ctxEdit.style.display     = multi ? 'none' : 'block'; // Chỉ edit 1 dòng
+
         const { clientX: x, clientY: y } = e;
-        const mW = 190, mH = 90;
+        const mW = 220, mH = 180;
         ctxMenu.style.left = (x + mW > window.innerWidth  ? x - mW : x) + 'px';
         ctxMenu.style.top  = (y + mH > window.innerHeight ? y - mH : y) + 'px';
         ctxMenu.style.display = 'block';
-        document.querySelectorAll('#progressTableBody tr').forEach(r => r.classList.remove('ctx-active'));
-        tr.classList.add('ctx-active');
+        ctx_targetRows.forEach(r => r.classList.add('ctx-active'));
     });
 
-    document.addEventListener('click', () => hideCtx());
+    document.addEventListener('click', e => { if (!e.target.closest('#ctxMenu')) hideCtx(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtx(); });
     function hideCtx() {
         ctxMenu.style.display = 'none';
-        if (activeRow) activeRow.classList.remove('ctx-active');
+        ctx_targetRows.forEach(r => r.classList.remove('ctx-active'));
     }
 
+    // -- Cập nhật (1 dòng) --
     ctxEdit.addEventListener('click', () => {
-        if (!activeRow) return;
-        window.location.href = `/ProductionProgress/ProductionInfoForm?id=${activeRow.dataset.id}`;
+        hideCtx();
+        if (ctx_targetIds.length !== 1) return;
+        window.location.href = `/ProductionProgress/ProductionInfoForm?id=${ctx_targetIds[0]}`;
     });
 
+    // -- Hàm gọi bulk API --
+    async function doBulkStatus(targetStatus, successMsg) {
+        if (!ctx_targetIds.length) return;
+        try {
+            const res = await fetch('/ProductionProgress/BulkUpdateStatus', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ctx_targetIds, targetStatus })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast('success', successMsg);
+                ms_clearAll();
+                document.getElementById('btnRefreshData').click();
+            }
+        } catch (err) { }
+    }
+
+    ctxComplete.addEventListener('click',  () => { hideCtx(); doBulkStatus(2, 'Đã đánh dấu Hoàn thành.'); });
+    ctxProducing.addEventListener('click', () => { hideCtx(); doBulkStatus(1, 'Đã cập nhật Đang SX.'); });
+    ctxWaiting.addEventListener('click',   () => { hideCtx(); doBulkStatus(0, 'Đã đánh dấu Chờ SX.'); });
+
+    // -- Xóa --
     ctxDelete.addEventListener('click', () => {
-        if (!activeRow) return;
         hideCtx();
-        delInfoBox.innerHTML =
-            '<strong>Line:</strong> ' + (activeRow.dataset.line || '--') + ' &nbsp;|&nbsp; ' +
-            '<strong>Style:</strong> ' + (activeRow.dataset.style || '--') + ' &nbsp;|&nbsp; ' +
-            '<strong>SP:</strong> ' + (activeRow.dataset.sp || '--');
+        if (!ctx_targetIds.length) return;
+        delInfoBox.innerHTML = ctx_targetIds.length === 1
+            ? '<strong>Line:</strong> ' + (ctx_targetRows[0].dataset.line  || '--') + ' &nbsp;|&nbsp; '
+            + '<strong>Style:</strong> ' + (ctx_targetRows[0].dataset.style || '--') + ' &nbsp;|&nbsp; '
+            + '<strong>SP:</strong> '    + (ctx_targetRows[0].dataset.sp    || '--')
+            : '<strong>Xóa hàng loạt ' + ctx_targetIds.length + ' mã hàng đã chọn.</strong>';
         delModal.style.display = 'flex';
     });
 
-    document.getElementById('btnCloseDel').addEventListener('click', () => { delModal.style.display = 'none'; });
+    document.getElementById('btnCloseDel').addEventListener('click',  () => { delModal.style.display = 'none'; });
     document.getElementById('btnCancelDel').addEventListener('click', () => { delModal.style.display = 'none'; });
     delModal.addEventListener('click', e => { if (e.target === delModal) delModal.style.display = 'none'; });
 
     btnConfDel.addEventListener('click', async () => {
-        if (!activeRow) return;
-        const id = activeRow.dataset.id;
+        if (!ctx_targetIds.length) return;
         btnConfDel.disabled = true;
         btnConfDel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xóa...';
         try {
-            const res  = await fetch('/ProductionProgress/SoftDelete', {
+            const res  = await fetch('/ProductionProgress/BulkUpdateStatus', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
+                body: JSON.stringify({ ids: ctx_targetIds, targetStatus: -1 })
             });
             const data = await res.json();
             if (res.ok && data.success) {
-                toast('warn', 'Đã xóa mã hàng thành công.');
-                activeRow.style.transition = 'opacity .3s';
-                activeRow.style.opacity = '0';
-                setTimeout(() => { activeRow.remove(); activeRow = null; }, 320);
+                toast('warn', 'Đã xóa ' + ctx_targetIds.length + ' mã hàng thành công.');
                 delModal.style.display = 'none';
+                ms_clearAll();
+                document.getElementById('btnRefreshData').click();
             } else {
                 toast('error', 'Lỗi: ' + (data.message || 'Không xóa được.'));
             }
@@ -961,7 +1070,9 @@
 </script>
 
 <style>
-    #progressTableBody tr.ctx-active td { background: rgba(59,130,246,.08) !important; }
+    #progressTableBody tr                { user-select: none; cursor: pointer; }
+    #progressTableBody tr.ms-selected td { background: var(--sel-row-bg) !important; }
+    #progressTableBody tr.ctx-active  td { background: var(--sel-ctx-bg) !important; }
     #ctxMenu button:hover { background: var(--surface-alt, #f4f6fb); }
     @@keyframes ppToastIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:none; } }
     /* Modal overlay */

@@ -19,11 +19,23 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[ActivityLogs]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[DailyOutput]",
          "ObjectType": 0
       },
       {
          "Name": "[dbo].[DailyOutputDetail]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Pages]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Permissions]",
          "ObjectType": 0
       },
       {
@@ -47,11 +59,31 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[RolePagePermissions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Roles]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[StyleDetail]",
          "ObjectType": 0
       },
       {
          "Name": "[dbo].[StyleInfo]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[UserPagePermissions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[UserRoles]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Users]",
          "ObjectType": 0
       }
    ],

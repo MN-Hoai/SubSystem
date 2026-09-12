@@ -13,9 +13,15 @@ public partial class SNP_SubSystemDBContext : DbContext
     {
     }
 
+    public virtual DbSet<ActivityLog> ActivityLogs { get; set; }
+
     public virtual DbSet<DailyOutput> DailyOutputs { get; set; }
 
     public virtual DbSet<DailyOutputDetail> DailyOutputDetails { get; set; }
+
+    public virtual DbSet<Page> Pages { get; set; }
+
+    public virtual DbSet<Permission> Permissions { get; set; }
 
     public virtual DbSet<ProductLayoutItem> ProductLayoutItems { get; set; }
 
@@ -27,12 +33,67 @@ public partial class SNP_SubSystemDBContext : DbContext
 
     public virtual DbSet<ProductionMachine> ProductionMachines { get; set; }
 
+    public virtual DbSet<Role> Roles { get; set; }
+
+    public virtual DbSet<RolePagePermission> RolePagePermissions { get; set; }
+
     public virtual DbSet<StyleDetail> StyleDetails { get; set; }
 
     public virtual DbSet<StyleInfo> StyleInfos { get; set; }
 
+    public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserPagePermission> UserPagePermissions { get; set; }
+
+    public virtual DbSet<UserRole> UserRoles { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ActivityLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Activity__3214EC2751C9CDCB");
+
+            entity.HasIndex(e => e.CreateDate, "idx_Log_CreateDate");
+
+            entity.HasIndex(e => new { e.ObjectType, e.ObjectId }, "idx_Log_Object");
+
+            entity.HasIndex(e => e.UserId, "idx_Log_User");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.Action)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Ipaddress)
+                .HasMaxLength(45)
+                .HasColumnName("IPAddress");
+            entity.Property(e => e.ObjectId)
+                .HasMaxLength(100)
+                .HasColumnName("ObjectID");
+            entity.Property(e => e.ObjectType).HasMaxLength(100);
+            entity.Property(e => e.PageId).HasColumnName("PageID");
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UserAgent).HasMaxLength(255);
+            entity.Property(e => e.UserId).HasColumnName("UserID");
+
+            entity.HasOne(d => d.Page).WithMany(p => p.ActivityLogs)
+                .HasForeignKey(d => d.PageId)
+                .HasConstraintName("FK_Log_Page");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ActivityLogs)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Log_User");
+        });
+
         modelBuilder.Entity<DailyOutput>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__DailyOut__3214EC27FCBDA101");
@@ -98,6 +159,63 @@ public partial class SNP_SubSystemDBContext : DbContext
                 .HasForeignKey(d => d.StyleDetailId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_DailyOutputDetail_StyleDetail");
+        });
+
+        modelBuilder.Entity<Page>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Pages__3214EC272FD38D92");
+
+            entity.HasIndex(e => e.Code, "UQ__Pages__A25C5AA75C8FD3DD").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.Code)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.ControllerName).HasMaxLength(100);
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Keyword).HasMaxLength(255);
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(150);
+            entity.Property(e => e.ParentId).HasColumnName("ParentID");
+            entity.Property(e => e.Path).HasMaxLength(255);
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Parent).WithMany(p => p.InverseParent)
+                .HasForeignKey(d => d.ParentId)
+                .HasConstraintName("FK_Pages_Parent");
+        });
+
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Permissi__3214EC275CD5751A");
+
+            entity.HasIndex(e => e.Code, "UQ__Permissi__A25C5AA7C8B2E3DA").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.Code)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Keyword).HasMaxLength(255);
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
         });
 
         modelBuilder.Entity<ProductLayoutItem>(entity =>
@@ -239,6 +357,65 @@ public partial class SNP_SubSystemDBContext : DbContext
                 .HasConstraintName("FK_ProductionMachine_ProductionDepartment");
         });
 
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Roles__3214EC2781EB8184");
+
+            entity.HasIndex(e => e.Code, "UQ__Roles__A25C5AA73C06C68F").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.Code)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Description).HasMaxLength(255);
+            entity.Property(e => e.Keyword).HasMaxLength(255);
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RolePagePermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__RolePage__3214EC279D666CDC");
+
+            entity.HasIndex(e => new { e.RoleId, e.PageId, e.PermissionId }, "UQ_RolePagePermissions").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.PageId).HasColumnName("PageID");
+            entity.Property(e => e.PermissionId).HasColumnName("PermissionID");
+            entity.Property(e => e.RoleId).HasColumnName("RoleID");
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Page).WithMany(p => p.RolePagePermissions)
+                .HasForeignKey(d => d.PageId)
+                .HasConstraintName("FK_RPP_Page");
+
+            entity.HasOne(d => d.Permission).WithMany(p => p.RolePagePermissions)
+                .HasForeignKey(d => d.PermissionId)
+                .HasConstraintName("FK_RPP_Permission");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.RolePagePermissions)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("FK_RPP_Role");
+        });
+
         modelBuilder.Entity<StyleDetail>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__StyleDet__3214EC27E2EB92CF");
@@ -283,6 +460,108 @@ public partial class SNP_SubSystemDBContext : DbContext
             entity.Property(e => e.UpdateDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Users__3214EC2749C0636F");
+
+            entity.HasIndex(e => e.Username, "UQ__Users__536C85E4505ABDEB").IsUnique();
+
+            entity.HasIndex(e => e.Msnv, "UQ__Users__6CB3885EDC394B36").IsUnique();
+
+            entity.HasIndex(e => e.Email, "UQ__Users__A9D105347083461A").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())", "DF__Users__ID__5224328E")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())", "DF__Users__CreateDat__540C7B00")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Email)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.ExpiryDate).HasColumnType("datetime");
+            entity.Property(e => e.FullName).HasMaxLength(100);
+            entity.Property(e => e.HashCode)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Keyword).HasMaxLength(255);
+            entity.Property(e => e.Msnv)
+                .HasMaxLength(50)
+                .HasColumnName("MSNV");
+            entity.Property(e => e.PasswordHash)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Status).HasDefaultValue(1, "DF__Users__Status__531856C7");
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())", "DF__Users__UpdateDat__55009F39")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Username)
+                .IsRequired()
+                .HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<UserPagePermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__UserPage__3214EC2770BF97CD");
+
+            entity.HasIndex(e => new { e.UserId, e.PageId, e.PermissionId }, "UQ_UserPagePermissions").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.IsGranted).HasDefaultValue(1);
+            entity.Property(e => e.PageId).HasColumnName("PageID");
+            entity.Property(e => e.PermissionId).HasColumnName("PermissionID");
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UserId).HasColumnName("UserID");
+
+            entity.HasOne(d => d.Page).WithMany(p => p.UserPagePermissions)
+                .HasForeignKey(d => d.PageId)
+                .HasConstraintName("FK_UPP_Page");
+
+            entity.HasOne(d => d.Permission).WithMany(p => p.UserPagePermissions)
+                .HasForeignKey(d => d.PermissionId)
+                .HasConstraintName("FK_UPP_Permission");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserPagePermissions)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_UPP_User");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__UserRole__3214EC2750EC7DB6");
+
+            entity.HasIndex(e => new { e.UserId, e.RoleId }, "UQ_UserRoles").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.RoleId).HasColumnName("RoleID");
+            entity.Property(e => e.Status).HasDefaultValue(1);
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UserId).HasColumnName("UserID");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("FK_UserRoles_Role");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_UserRoles_User");
         });
 
         OnModelCreatingPartial(modelBuilder);

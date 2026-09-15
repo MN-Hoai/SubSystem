@@ -221,7 +221,7 @@ namespace Sub_Services.Execute
         public async Task<List<string>> GetLineList(Guid? productionDepartmentId = null)
         {
             var query = _context.ProductionInfos
-                .Where(p => p.Status >= 0 && p.Line != null);
+                .Where(p => p.Status >= -1 && p.Line != null);
 
             if (productionDepartmentId.HasValue)
                 query = query.Where(p => p.ProductionDepartmentId == productionDepartmentId.Value);
@@ -286,11 +286,11 @@ namespace Sub_Services.Execute
             // ----------------------------------------------------------------
             var query = _context.ProductionInfos.AsQueryable();
 
-            // Luon loai tru Status == -1 (da xoa mem), chi lay Status >= 0
+            // Luon loai tru Status == -2 (da xoa mem), chi lay Status >= -1
             if (request.Status.HasValue)
                 query = query.Where(p => p.Status == request.Status.Value);
             else
-                query = query.Where(p => p.Status >= 0);
+                query = query.Where(p => p.Status >= -1);
 
             // --- Loc theo bo phan san xuat ---
             if (request.ProductionDepartmentId.HasValue)
@@ -384,29 +384,29 @@ namespace Sub_Services.Execute
         //  GET: Lấy chi tiết một ProductionInfo theo Id
         // =====================================================================
 
-        /// <summary>Tra ve chi tiet ProductionInfo (Status != -1).</summary>
+        /// <summary>Tra ve chi tiet ProductionInfo (Status != -2).</summary>
         public async Task<ProductionInfo?> GetProductionInfoById(Guid id)
         {
             return await _context.ProductionInfos
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id && p.Status >= 0);
+                .FirstOrDefaultAsync(p => p.Id == id && p.Status >= -1);
         }
 
         // =====================================================================
-        //  DELETE (Soft): Đổi Status = -1
+        //  DELETE (Soft): Đổi Status = -2
         // =====================================================================
 
         /// <summary>
-        /// Soft-delete ProductionInfo: đổi Status = -1.
+        /// Soft-delete ProductionInfo: đổi Status = -2.
         /// Không xóa thực sự khỏi DB.
         /// </summary>
         public async Task<(bool Success, string Message)> SoftDeleteProductionInfo(Guid id)
         {
             var info = await _context.ProductionInfos.FindAsync(id);
-            if (info == null || info.Status < 0)
+            if (info == null || info.Status < -1)
                 return (false, "Không tìm thấy mã hàng hoặc đã bị xóa.");
 
-            info.Status     = -1;
+            info.Status     = -2;
             info.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return (true, "Đã xóa mã hàng thành công.");
@@ -414,7 +414,7 @@ namespace Sub_Services.Execute
 
         /// <summary>
         /// Cập nhật trạng thái hàng loạt cho nhiều ProductionInfo.
-        /// targetStatus: -1 = Xoá mềm, 1 = Đang hoạt động, 2 = Hoàn thành, 0 = Chờ sản xuất
+        /// targetStatus: -2 = Xoá mềm, -1 = Tạm khoá, 1 = Đang hoạt động, 2 = Hoàn thành, 0 = Chờ sản xuất
         /// </summary>
         public async Task<(bool Success, string Message)> BulkUpdateStatus(List<Guid> ids, int targetStatus)
         {
@@ -422,7 +422,7 @@ namespace Sub_Services.Execute
                 return (false, "Không có mã hàng nào được chọn.");
 
             var infos = await _context.ProductionInfos
-                .Where(p => ids.Contains(p.Id) && p.Status >= 0)
+                .Where(p => ids.Contains(p.Id) && p.Status != targetStatus)
                 .ToListAsync();
 
             if (!infos.Any())
@@ -463,7 +463,7 @@ namespace Sub_Services.Execute
         }
 
         /// <summary>
-        /// Lấy lịch sử mã hàng (ProductionInfo status >= 0) theo khoảng ngày tạo,
+        /// Lấy lịch sử mã hàng (ProductionInfo status >= -1) theo khoảng ngày tạo,
         /// bộ phận và trạng thái.
         /// </summary>
         public async Task<List<ProductionInfoHistoryDto>> GetProductionInfoHistory(
@@ -474,7 +474,7 @@ namespace Sub_Services.Execute
 
             var query = _context.ProductionInfos
                 .AsNoTracking()
-                .Where(p => p.Status >= 0
+                .Where(p => p.Status >= -1
                          && p.CreateDate >= fromDt
                          && p.CreateDate <= toDt)
                 .Include(p => p.ProductionDepartment)
@@ -552,7 +552,7 @@ namespace Sub_Services.Execute
             {
                 // --- UPDATE ---
                 var info = await _context.ProductionInfos
-                    .FirstOrDefaultAsync(p => p.Id == req.Id.Value && p.Status >= 0);
+                    .FirstOrDefaultAsync(p => p.Id == req.Id.Value && p.Status >= -1);
                 if (info == null)
                     return (false, "Không tìm thấy mã hàng để cập nhật.", null);
 
@@ -583,7 +583,7 @@ namespace Sub_Services.Execute
                     p.Style  == req.Style.Trim()  &&
                     p.Spmain == req.Spmain.Trim() &&
                     p.Color  == req.Color.Trim()  &&
-                    p.Status >= 0);
+                    p.Status >= -1);
                 if (dup)
                     return (false, "Mã hàng với Line+Style+SP+Color này đã tồn tại trong bộ phận.", null);
 

@@ -158,8 +158,7 @@
     </div>
 </div>
 
-<!-- Toast Container -->
-<div id="siToastCt" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
+
 
 <style>
     /* ── Modal ──────────────────────────────────────────────────────── */
@@ -229,20 +228,10 @@
 (function () {
     'use strict';
 
-    /* ===== TOAST ============================================================= */
-    const toastCt = document.getElementById('siToastCt');
-    function toast(type, msg, ms) {
-        ms = ms || 3500;
-        const icons  = { success:'fa-circle-check', error:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
-        const colors = { success:'var(--success)', error:'var(--danger)', warn:'#d97706', info:'var(--primary)' };
-        const c = colors[type] || colors.info;
-        const el = document.createElement('div');
-        el.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:13px 16px;box-shadow:0 8px 30px rgba(0,0,0,.12);display:flex;align-items:flex-start;gap:12px;pointer-events:auto;border-left:4px solid ' + c + ';animation:siMbIn .28s ease;';
-        el.innerHTML = '<i class="fa-solid '+(icons[type]||'fa-circle-info')+'" style="color:'+c+';font-size:18px;margin-top:1px;flex-shrink:0;"></i>'
-            + '<div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink-900);">' + String(msg).replace(/</g,'&lt;') + '</div>'
-            + '<button style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--ink-400);padding:0;pointer-events:auto;" onclick="this.parentNode.remove()">&times;</button>';
-        toastCt.appendChild(el);
-        setTimeout(() => { el.style.transition='opacity .25s,transform .25s'; el.style.opacity='0'; el.style.transform='translateX(30px)'; setTimeout(()=>el.remove(),300); }, ms);
+    /* ===== TOAST (dùng toastr thống nhất) ======================================= */
+    function toast(type, msg) {
+        const fn = { success: toastr.success, error: toastr.error, warn: toastr.warning, info: toastr.info };
+        (fn[type] || toastr.info).call(toastr, msg);
     }
 
     /* ===== MODAL ============================================================= */

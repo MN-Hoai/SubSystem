@@ -445,11 +445,14 @@ namespace Sub_Services.Execute
         /// Danh sách máy theo bộ phận (hoặc tất cả) để chọn khi ghi sản lượng.
         /// </summary>
         public async Task<List<RecordOutput_MachineDto>> GetMachinesForRecording(
-            Guid? deptId = null, string keyword = null)
+            Guid? deptId = null, string keyword = null, int? machineStatus = null)
         {
             var query = _context.ProductionMachines
                 .AsNoTracking()
-                .Where(m => m.Status == 1);
+                .Where(m => m.Status >= -1); // loại trừ đã xóa (-2)
+
+            if (machineStatus.HasValue)
+                query = query.Where(m => m.Status == machineStatus.Value);
 
             if (deptId.HasValue && deptId.Value != Guid.Empty)
                 query = query.Where(m => m.ProductionDepartmentId == deptId.Value);
@@ -469,9 +472,11 @@ namespace Sub_Services.Execute
                 {
                     Id          = m.Id,
                     MachineName = m.MachineNumber,
+                    MachineCode = m.MachineNumber,
                     Remark      = m.Remark,
                     Status      = m.Status ?? 1,
-                    DeptName    = m.ProductionDepartment.DepartmentName
+                    DeptName    = m.ProductionDepartment.DepartmentName,
+                    DeptId      = m.ProductionDepartmentId
                 })
                 .ToListAsync();
         }
@@ -493,7 +498,7 @@ namespace Sub_Services.Execute
 
             var query = _context.ProductionInfos
                 .AsNoTracking()
-                .Where(p => infoIds.Contains(p.Id));
+                .Where(p => infoIds.Contains(p.Id) && p.Status >= -1); // loại trừ đã xóa (-2)
 
             if (statusFilter.HasValue)
                 query = query.Where(p => p.Status == statusFilter.Value);
@@ -951,7 +956,7 @@ namespace Sub_Services.Execute
                 .GroupBy(p => p.ProductionDepartmentId)
                 .Select(g => new { 
                     DeptId = g.Key, 
-                    Total = g.Count(),
+                    Total = g.Count(p => p.Status >= 0),
                     Active = g.Count(p => p.Status == 1) 
                 })
                 .ToDictionaryAsync(x => x.DeptId, x => x);

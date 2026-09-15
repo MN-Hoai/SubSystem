@@ -201,7 +201,7 @@
     function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
     function fmtDateVN(s){if(!s)return'&#8212;';var p=String(s).split('T')[0].split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
     function dateStr(v){return v?String(v).split('T')[0]:'';}
-    function toast(msg,ok){var t=document.createElement('div');t.className='pih-toast';t.style.background=ok?'var(--pih-success)':'var(--pih-danger)';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},3200);}
+    function toast(msg,ok){if(ok){toastr.success(msg);}else{toastr.error(msg);}}
     var allRows=[],filtered=[],pageSize=50,curPage=1,sortCol='createDate',sortDir='desc',ctxRow=null,editRow=null;
     var pihFrom=document.getElementById('pihFrom'),pihTo=document.getElementById('pihTo'),pihSearch=document.getElementById('pihSearch');
     var pihDept=document.getElementById('pihDeptFilter'),pihStatus=document.getElementById('pihStatusFilter');

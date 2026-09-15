@@ -40,7 +40,7 @@ namespace Sub_Services.Execute
         public async Task<List<MachineLayout_MachinePickerItem>> GetMachinesByDepartment(Guid departmentId)
         {
             return await _context.ProductionMachines
-                .Where(m => m.ProductionDepartmentId == departmentId && m.Status != 0)
+                .Where(m => m.ProductionDepartmentId == departmentId && m.Status >= -1)
                 .OrderBy(m => m.MachineNumber)
                 .AsNoTracking()
                 .Select(m => new MachineLayout_MachinePickerItem

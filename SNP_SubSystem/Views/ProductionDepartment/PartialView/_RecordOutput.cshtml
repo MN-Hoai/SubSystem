@@ -44,10 +44,20 @@
     .ro-machine-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:9px; cursor:pointer; border:1.5px solid transparent; transition:background .14s,border-color .14s; }
     .ro-machine-item:hover { background:var(--bg-surface); border-color:var(--border); }
     .ro-machine-item.selected { background:var(--accent-navy-soft); border-color:var(--accent-navy); }
-    .ro-machine-icon { width:34px; height:34px; border-radius:8px; flex-shrink:0; background:var(--accent-navy-soft); color:var(--accent-navy); display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .ro-machine-icon { width:34px; height:34px; border-radius:8px; flex-shrink:0; background:var(--accent-navy-soft); color:var(--accent-navy); display:flex; align-items:center; justify-content:center; font-size:14px; position:relative; }
+    .ro-machine-status-dot { position:absolute; bottom:-1px; right:-1px; width:10px; height:10px; border-radius:50%; border:2px solid var(--bg-canvas); }
+    .ro-machine-status-dot.ms-active { background:#22c55e; }
+    .ro-machine-status-dot.ms-inactive { background:#ef4444; }
+    .ro-machine-status-dot.ms-maintenance { background:#eab308; }
+    .ro-status-legend { display:flex; gap:12px; flex-wrap:wrap; padding:6px 16px 8px; border-bottom:1px solid var(--border); font-size:11.5px; color:var(--ink-500); }
+    .ro-status-legend-item { display:flex; align-items:center; gap:4px; }
+    .ro-status-legend-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
     .ro-machine-item.selected .ro-machine-icon { background:var(--accent-navy); color:#fff; }
     .ro-machine-name { font-size:13px; font-weight:700; color:var(--ink-900); }
     .ro-machine-meta { font-size:11.5px; color:var(--ink-400); margin-top:1px; }
+    .ro-machine-view-btn { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px; background:transparent; border:1.5px solid transparent; color:var(--ink-300); font-size:13px; cursor:pointer; transition:background .15s,color .15s,border-color .15s; opacity:0; }
+    .ro-machine-item:hover .ro-machine-view-btn { opacity:1; background:var(--accent-navy-soft); color:var(--accent-navy); border-color:var(--accent-navy); }
+    .ro-machine-item.selected .ro-machine-view-btn { opacity:1; color:var(--accent-navy); border-color:var(--accent-navy); background:rgba(31,58,103,.12); }
     .ro-empty-state { display:flex; flex-direction:column; align-items:center; gap:8px; padding:40px 16px; color:var(--ink-300); font-size:13px; text-align:center; }
     .ro-empty-state i { font-size:28px; }
     /* RIGHT */
@@ -70,11 +80,15 @@
     .ro-code-progress-bar { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent-navy) 0%,#3a5fa8 100%); transition:width .4s; }
     .ro-code-progress-label { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-400); margin-top:4px; }
     .ro-status-badge { font-size:10px; font-weight:800; padding:2px 8px; border-radius:5px; flex-shrink:0; }
-    .ro-status-badge.s1 { background:#e0f7ef; color:var(--success); }
-    .ro-status-badge.s2 { background:#fdecea; color:var(--danger); }
-    .ro-status-badge.s3 { background:var(--accent-gold-soft); color:var(--accent-gold); }
-    .ro-record-btn { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px; padding:7px 0; border-radius:8px; background:var(--accent-navy-soft); color:var(--accent-navy); border:1px solid var(--accent-navy); font-size:12.5px; font-weight:700; transition:background .15s,color .15s; }
-    .ro-code-card:hover .ro-record-btn { background:var(--accent-navy); color:#fff; }
+    .ro-status-badge.s1  { background:#e0f7ef; color:var(--success); }               /* Đang SX */
+    .ro-status-badge.s2  { background:var(--accent-navy-soft); color:var(--accent-navy); } /* Hoàn thành */
+    .ro-status-badge.s0  { background:#FEF9EC; color:#8A6423; }                       /* Chờ SX */
+    .ro-status-badge.sm1 { background:#f0f0f5; color:var(--ink-400); }               /* Tạm khóa */
+    .ro-record-btn { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px; padding:9px; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--accent-navy); background:var(--accent-navy-soft); cursor:pointer; transition:background .18s,color .18s; }
+    .ro-record-btn:hover { background:var(--accent-navy); color:#fff; }
+    .ro-no-record-btn { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px; padding:9px; border-radius:8px; font-size:12px; font-weight:600; color:var(--ink-300); background:var(--bg-canvas); border:1.5px dashed var(--border); cursor:default; }
+    .ro-code-card.disabled { opacity:.75; }
+    .ro-code-card.disabled:hover .ro-record-btn { background:var(--accent-navy-soft); color:var(--accent-navy); }
     .ro-no-machine { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--ink-300); text-align:center; padding:40px; }
     .ro-no-machine i { font-size:48px; }
     .ro-no-machine h3 { font-size:16px; font-weight:700; color:var(--ink-400); margin:0; }
@@ -186,11 +200,22 @@
                     <select class="ro-select" id="roDeptFilter">
                         <option value="">Tất cả bộ phận</option>
                     </select>
+                    <select class="ro-select" id="roMachineStatusFilter">
+                        <option value="1" selected>Hoạt động</option>
+                        <option value="0">Ngừng</option>
+                        <option value="-1">Bảo trì</option>
+                        <option value="">Tất cả trạng thái</option>
+                    </select>
                     <div class="ro-search-wrap">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" class="ro-search-inp" id="roMachineSearch" placeholder="Tìm tên máy, mã máy...">
                     </div>
                 </div>
+            </div>
+            <div class="ro-status-legend">
+                <div class="ro-status-legend-item"><div class="ro-status-legend-dot" style="background:#22c55e;"></div>Hoạt động</div>
+                <div class="ro-status-legend-item"><div class="ro-status-legend-dot" style="background:#ef4444;"></div>Ngừng</div>
+                <div class="ro-status-legend-item"><div class="ro-status-legend-dot" style="background:#eab308;"></div>Bảo trì</div>
             </div>
             <div class="ro-machine-list" id="roMachineList">
                 <div class="ro-empty-state">
@@ -219,8 +244,9 @@
                     <select class="ro-select" id="roStatusFilter" style="width:160px;">
                         <option value="">Tất cả trạng thái</option>
                         <option value="1">Đang sản xuất</option>
+                        <option value="0">Chờ sản xuất</option>
                         <option value="2">Hoàn thành</option>
-                        <option value="3">Tạm dừng</option>
+                        <option value="-1">Tạm khóa</option>
                     </select>
                 </div>
             </div>
@@ -386,17 +412,15 @@
         return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
     }
     function toast(msg, ok) {
-        var t = document.createElement('div');
-        t.className = 'ro-toast';
-        t.style.background = ok ? 'var(--success)' : 'var(--danger)';
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(function(){ t.remove(); }, 3000);
+        if (ok) { toastr.success(msg); }
+        else    { toastr.error(msg); }
     }
     function statusBadge(s) {
-        if (s===1) return '<span class="ro-status-badge s1">Đang SX</span>';
-        if (s===2) return '<span class="ro-status-badge s2">Hoàn thành</span>';
-        return '<span class="ro-status-badge s3">Tạm dừng</span>';
+        if (s === 1)  return '<span class="ro-status-badge s1">Đang SX</span>';
+        if (s === 0)  return '<span class="ro-status-badge s0">Chờ SX</span>';
+        if (s === 2)  return '<span class="ro-status-badge s2">Hoàn thành</span>';
+        if (s === -1) return '<span class="ro-status-badge sm1">Tạm khóa</span>';
+        return '<span class="ro-status-badge sm1">' + s + '</span>';
     }
 
     // STATE
@@ -427,10 +451,12 @@
     function loadMachines() {
         var deptId  = document.getElementById('roDeptFilter').value;
         var keyword = document.getElementById('roMachineSearch').value.trim();
+        var machineStatus = document.getElementById('roMachineStatusFilter').value;
         var url = '/ProductionDepartment/GetMachinesForRecording';
         var p = [];
         if (deptId)  p.push('deptId='  + encodeURIComponent(deptId));
         if (keyword) p.push('keyword=' + encodeURIComponent(keyword));
+        if (machineStatus !== '') p.push('machineStatus=' + encodeURIComponent(machineStatus));
         if (p.length) url += '?' + p.join('&');
         document.getElementById('roMachineList').innerHTML =
             '<div class="ro-empty-state"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
@@ -454,13 +480,33 @@
             var sel = selectedMachine && selectedMachine.id === m.id;
             var item = document.createElement('div');
             item.className = 'ro-machine-item' + (sel ? ' selected' : '');
+
+            // Build URL tới trang MachineDetail
+            var detailUrl = '/ProductionDepartment/MachineDetail'
+                + '?machineId='   + encodeURIComponent(m.id || '')
+                + '&machineName=' + encodeURIComponent(m.machineName || '')
+                + '&machineCode=' + encodeURIComponent(m.machineCode || '')
+                + '&dept='        + encodeURIComponent(m.deptName || '')
+                + '&deptId='      + encodeURIComponent(m.deptId || '');
+
+            // Status dot class
+            var dotClass = m.status === 1 ? 'ms-active' : m.status === 0 ? 'ms-inactive' : 'ms-maintenance';
+
             item.innerHTML =
-                '<div class="ro-machine-icon"><i class="fa-solid fa-gear"></i></div>' +
-                '<div>' +
+                '<div class="ro-machine-icon"><i class="fa-solid fa-gear"></i><div class="ro-machine-status-dot ' + dotClass + '"></div></div>' +
+                '<div style="flex:1;min-width:0;">' +
                     '<div class="ro-machine-name">' + esc(m.machineName) + '</div>' +
                     '<div class="ro-machine-meta">' + (m.remark ? esc(m.remark) + ' &nbsp;·&nbsp; ' : '') + esc(m.deptName||'') + '</div>' +
-                '</div>';
-            item.addEventListener('click', function(){ selectMachine(m); });
+                '</div>' +
+                '<a class="ro-machine-view-btn" href="' + detailUrl + '" title="Xem chi tiết máy">' +
+                    '<i class="fa-solid fa-arrow-up-right-from-square"></i>' +
+                '</a>';
+
+            // Click trên item chọn máy, click trên nút view thì mở trang
+            item.addEventListener('click', function(e) {
+                if (e.target.closest('.ro-machine-view-btn')) return; // để link tự xử lý
+                selectMachine(m);
+            });
             el.appendChild(item);
         });
     }
@@ -503,10 +549,26 @@
             return;
         }
         allCodes.forEach(function(c){
+            var canRecord = (c.status === 1); // Chỉ đang SX mới ghi được
             var pct = (c.target && c.target > 0) ? Math.min(100, Math.round((c.todayOutput||0) / c.target * 100)) : 0;
             var barColor = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--accent-gold)' : 'var(--accent-navy)';
+
+            // Nút góc phải tuỳ trạng thái
+            var actionHtml;
+            if (canRecord) {
+                actionHtml = '<div class="ro-record-btn"><i class="fa-solid fa-plus"></i> Ghi sản lượng</div>';
+            } else if (c.status === -1) {
+                actionHtml = '<div class="ro-no-record-btn"><i class="fa-solid fa-lock"></i> Tạm khóa — không thể ghi</div>';
+            } else if (c.status === 0) {
+                actionHtml = '<div class="ro-no-record-btn"><i class="fa-solid fa-clock"></i> Chờ sản xuất — chưa thể ghi</div>';
+            } else if (c.status === 2) {
+                actionHtml = '<div class="ro-no-record-btn"><i class="fa-solid fa-circle-check"></i> Hoàn thành — không thể ghi</div>';
+            } else {
+                actionHtml = '<div class="ro-no-record-btn"><i class="fa-solid fa-ban"></i> Không thể ghi</div>';
+            }
+
             var card = document.createElement('div');
-            card.className = 'ro-code-card';
+            card.className = 'ro-code-card' + (canRecord ? '' : ' disabled');
             card.innerHTML =
                 '<div class="ro-code-card-header">' +
                     '<div>' +
@@ -528,8 +590,11 @@
                         (c.target ? '<span>Target: ' + fmt(c.target) + '</span>' : '<span style="font-style:italic;">Chưa có target</span>') +
                     '</div>' +
                 '</div>' +
-                '<div class="ro-record-btn"><i class="fa-solid fa-plus"></i> Ghi sản lượng</div>';
-            card.addEventListener('click', function(){ openModal(c); });
+                actionHtml;
+
+            if (canRecord) {
+                card.addEventListener('click', function(){ openModal(c); });
+            }
             grid.appendChild(card);
         });
     }
@@ -659,6 +724,7 @@
         clearTimeout(cTimer); cTimer = setTimeout(loadCodes, 300);
     });
     document.getElementById('roStatusFilter').addEventListener('change', loadCodes);
+    document.getElementById('roMachineStatusFilter').addEventListener('change', loadMachines);
 
     // INIT
     loadMachines();

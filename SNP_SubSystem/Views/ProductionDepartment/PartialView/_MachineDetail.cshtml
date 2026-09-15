@@ -230,7 +230,7 @@
             <label class="md-filter-label">Trạng thái</label>
             <select id="mdStatusFilter">
                 <option value="">Tất cả</option>
-                <option value="1">Đang sản xuất</option>
+                <option value="1" selected>Đang sản xuất</option>
                 <option value="2">Hoàn thành</option>
                 <option value="3">Tạm dừng</option>
             </select>
@@ -499,7 +499,7 @@
        ===================================================== */
     var allInfos       = [];
     var currentSearch  = '';
-    var currentStatus  = '';
+    var currentStatus  = '1';
     var addActiveTab   = 'pick';
     var addPickerItems = [];
     var pickedInfo     = null;
@@ -522,11 +522,8 @@
     }
 
     function toast(msg, ok) {
-        var t = document.createElement('div');
-        t.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:700;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.18);background:' + (ok ? 'var(--success)' : 'var(--danger)') + ';';
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(function () { t.remove(); }, 3000);
+        if (ok) { toastr.success(msg); }
+        else    { toastr.error(msg); }
     }
 
     function statusBadge(s) {
@@ -1157,8 +1154,9 @@
 
     document.getElementById('mdFilterReset').addEventListener('click', function () {
         document.getElementById('mdSearch').value = '';
-        document.getElementById('mdStatusFilter').value = '';
-        currentSearch = currentStatus = '';
+        document.getElementById('mdStatusFilter').value = '1';
+        currentSearch = '';
+        currentStatus = '1';
         loadProductionInfos();
     });
 

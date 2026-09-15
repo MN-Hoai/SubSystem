@@ -385,12 +385,8 @@
     }
 
     function toast(type, msg) {
-        document.querySelectorAll('.acc-toast').forEach(function(t){ t.remove(); });
-        var el = document.createElement('div');
-        el.className = 'acc-toast ' + type;
-        el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(function(){ el.remove(); }, 3000);
+        const fn = { success: toastr.success, error: toastr.error, warn: toastr.warning, info: toastr.info };
+        (fn[type] || toastr.info).call(toastr, msg);
     }
 
     // ── Confirm modal ─────────────────────────────────────────

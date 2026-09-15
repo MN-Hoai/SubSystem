@@ -707,6 +707,19 @@
         to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ---- Region select ---- */
+    .mld-cell.region-selected { border-color: var(--accent-navy) !important; background: rgba(31,58,103,.08) !important; box-shadow: inset 0 0 0 2px var(--accent-navy); }
+    .mld-select-overlay { position:fixed; border:2px dashed var(--accent-navy); background:rgba(31,58,103,.06); pointer-events:none; z-index:999; border-radius:4px; }
+
+    /* ---- Context menu ---- */
+    .mld-ctx-menu { display:none; position:fixed; z-index:9999; background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow-md); padding:6px 0; min-width:210px; }
+    .mld-ctx-info { padding:5px 16px 9px; font-size:12px; color:var(--ink-500); font-weight:600; border-bottom:1px solid var(--border); margin-bottom:4px; }
+    .mld-ctx-btn { display:block; width:100%; text-align:left; padding:9px 16px; background:none; border:none; cursor:pointer; font-size:13.5px; color:var(--ink-900); font-family:inherit; transition:background .12s; }
+    .mld-ctx-btn:hover { background:var(--bg-canvas); }
+    .mld-ctx-btn i { width:18px; display:inline-block; text-align:center; }
+    .mld-ctx-divider { height:1px; background:var(--border); margin:4px 0; }
+    .mld-ctx-btn.danger { color:var(--danger); }
+
     /* ---- Responsive ---- */
     @@media (max-width: 768px) {
         .mld-body { flex-direction: column; }
@@ -731,7 +744,9 @@
             <h1 class="mld-page-title">Thiết kế layout bộ phận</h1>
         </div>
         <div class="mld-topbar-actions">
-
+            <button class="btn btn-danger" id="mldDeleteLayoutBtn" style="display:none; margin-right:8px;">
+                <i class="fa-solid fa-trash"></i> Xóa layout
+            </button>
             <button class="btn btn-primary" id="mldExportBtn">
                 <i class="fa-solid fa-floppy-disk"></i> Lưu layout
             </button>
@@ -859,6 +874,28 @@
     </div><!-- /mld-body -->
 </div><!-- /mld-page -->
 
+<!-- Context Menu -->
+<div class="mld-ctx-menu" id="mldCtxMenu">
+    <div class="mld-ctx-info" id="mldCtxInfo">Đã chọn: <span id="mldCtxCount">0</span> ô</div>
+    <button class="mld-ctx-btn" id="ctxAddMachines">
+        <i class="fa-solid fa-plus" style="color:var(--success);"></i> Thêm máy tự động
+    </button>
+    <div class="mld-ctx-divider"></div>
+    <button class="mld-ctx-btn" id="ctxSetActive">
+        <i class="fa-solid fa-circle" style="color:var(--success);font-size:9px;"></i> Đặt hoạt động
+    </button>
+    <button class="mld-ctx-btn" id="ctxSetInactive">
+        <i class="fa-solid fa-circle" style="color:var(--danger);font-size:9px;"></i> Đặt ngừng
+    </button>
+    <button class="mld-ctx-btn" id="ctxSetMaintenance">
+        <i class="fa-solid fa-circle" style="color:var(--accent-gold);font-size:9px;"></i> Đặt bảo trì
+    </button>
+    <div class="mld-ctx-divider" id="ctxDeleteDivider"></div>
+    <button class="mld-ctx-btn danger" id="ctxDeleteMachines">
+        <i class="fa-solid fa-trash"></i> Xóa máy
+    </button>
+</div>
+
 
 <!-- =====================================================
      MODAL: Thêm / sửa máy vào ô (2-tab: Chọn có sẵn | Tạo mới)
@@ -882,16 +919,47 @@
 
         <!-- TABS -->
         <div class="mld-modal-tabs" id="mldModalTabs">
-            <button class="mld-tab-btn active" id="tabBtnPick" data-tab="pick">
-                <i class="fa-solid fa-list-check"></i> Chọn máy có sẵn
-            </button>
-            <button class="mld-tab-btn" id="tabBtnNew" data-tab="new">
+            <button class="mld-tab-btn active" id="tabBtnNew" data-tab="new">
                 <i class="fa-solid fa-circle-plus"></i> Tạo máy mới
+            </button>
+            <button class="mld-tab-btn" id="tabBtnPick" data-tab="pick">
+                <i class="fa-solid fa-list-check"></i> Chọn máy có sẵn
             </button>
         </div>
 
+        <!-- TAB BODY: Tạo máy mới -->
+        <div class="mld-tab-pane active" id="tabPaneNew">
+            <!-- Tên máy -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fMachineName">Tên / số hiệu máy <span class="req">*</span></label>
+                <input type="text" id="fMachineName" class="mld-modal-input"
+                       placeholder="VD: Máy may 1K, Máy cắt CT-01..." autocomplete="off">
+            </div>
+            <!-- Bộ phận (readonly) -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fDept">Bộ phận</label>
+                <select id="fDept" class="mld-modal-select" disabled>
+                    <option value="">-- Chọn bộ phận --</option>
+                </select>
+            </div>
+            <!-- Trạng thái -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label">Trạng thái <span class="req">*</span></label>
+                <div class="mld-status-picker" id="mldStatusPickerNew">
+                    <div class="mld-status-opt selected" data-val="active"><span class="so-dot"></span>Hoạt động</div>
+                    <div class="mld-status-opt" data-val="inactive"><span class="so-dot"></span>Ngừng</div>
+                    <div class="mld-status-opt" data-val="maintenance"><span class="so-dot"></span>Bảo trì</div>
+                </div>
+            </div>
+            <!-- Ghi chú -->
+            <div class="mld-modal-field">
+                <label class="mld-modal-label" for="fNote">Ghi chú</label>
+                <textarea id="fNote" class="mld-modal-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
+            </div>
+        </div>
+
         <!-- TAB BODY: Chọn máy có sẵn -->
-        <div class="mld-tab-pane active" id="tabPanePick">
+        <div class="mld-tab-pane" id="tabPanePick">
             <!-- Search -->
             <div class="mld-picker-search-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
@@ -925,37 +993,6 @@
             <div class="mld-modal-field">
                 <label class="mld-modal-label" for="fNoteExist">Ghi chú</label>
                 <textarea id="fNoteExist" class="mld-modal-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
-            </div>
-        </div>
-
-        <!-- TAB BODY: Tạo máy mới -->
-        <div class="mld-tab-pane" id="tabPaneNew">
-            <!-- Tên máy -->
-            <div class="mld-modal-field">
-                <label class="mld-modal-label" for="fMachineName">Tên / số hiệu máy <span class="req">*</span></label>
-                <input type="text" id="fMachineName" class="mld-modal-input"
-                       placeholder="VD: Máy may 1K, Máy cắt CT-01..." autocomplete="off">
-            </div>
-            <!-- Bộ phận (readonly) -->
-            <div class="mld-modal-field">
-                <label class="mld-modal-label" for="fDept">Bộ phận</label>
-                <select id="fDept" class="mld-modal-select" disabled>
-                    <option value="">-- Chọn bộ phận --</option>
-                </select>
-            </div>
-            <!-- Trạng thái -->
-            <div class="mld-modal-field">
-                <label class="mld-modal-label">Trạng thái <span class="req">*</span></label>
-                <div class="mld-status-picker" id="mldStatusPickerNew">
-                    <div class="mld-status-opt selected" data-val="active"><span class="so-dot"></span>Hoạt động</div>
-                    <div class="mld-status-opt" data-val="inactive"><span class="so-dot"></span>Ngừng</div>
-                    <div class="mld-status-opt" data-val="maintenance"><span class="so-dot"></span>Bảo trì</div>
-                </div>
-            </div>
-            <!-- Ghi chú -->
-            <div class="mld-modal-field">
-                <label class="mld-modal-label" for="fNote">Ghi chú</label>
-                <textarea id="fNote" class="mld-modal-textarea" placeholder="Ghi chú thêm (tùy chọn)..."></textarea>
             </div>
         </div>
 
@@ -1180,8 +1217,8 @@
         }
 
         function statusLabel(s)  { return s === 'active' ? 'Hoạt động' : s === 'inactive' ? 'Ngừng hoạt động' : 'Bảo trì'; }
-        function statusCode(s)   { return s === 'active' ? 1 : s === 'inactive' ? 2 : 3; }
-        function statusStr(code) { return code === 1 ? 'active' : code === 2 ? 'inactive' : 'maintenance'; }
+        function statusCode(s)   { return s === 'active' ? 1 : s === 'inactive' ? 0 : -1; }
+        function statusStr(code) { return code === 1 ? 'active' : code === 0 ? 'inactive' : 'maintenance'; }
         function statusIconBg(s) { return s === 'active' ? 'active-bg' : s === 'inactive' ? 'inactive-bg' : 'maintenance-bg'; }
         function statusIcon(s)   { return s === 'active' ? 'fa-check' : s === 'inactive' ? 'fa-xmark' : 'fa-wrench'; }
 
@@ -1189,13 +1226,10 @@
             return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
-        /* Simple toast */
+        /* Toast – dùng toastr thống nhất */
         function toast(msg, ok) {
-            var t = document.createElement('div');
-            t.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:700;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.18);background:' + (ok ? 'var(--success)' : 'var(--danger)') + ';';
-            t.textContent = msg;
-            document.body.appendChild(t);
-            setTimeout(function () { t.remove(); }, 3200);
+            if (ok) { toastr.success(msg); }
+            else    { toastr.error(msg); }
         }
 
         /* =====================================================
@@ -1339,10 +1373,17 @@
             rowsEl.value = rows; colsEl.value = cols; gapEl.value = gap;
             currentRows = rows; currentCols = cols;
 
-            if (Object.keys(machines).length > 0) {
-                if (!confirm('Tạo layout mới sẽ xóa toàn bộ thông tin máy hiện tại. Tiếp tục?')) return;
-            }
-            machines = {};
+            // Xóa các máy nằm ngoài grid mới
+            var keys = Object.keys(machines);
+            keys.forEach(function (k) {
+                var parts = k.split('-');
+                var r = parseInt(parts[0]);
+                var c = parseInt(parts[1]);
+                if (r > rows || c > cols) {
+                    delete machines[k];
+                }
+            });
+
             emptyState.style.display = 'none';
             applyGridStyle(rows, cols, gap);
             renderAllCells(rows, cols);
@@ -1500,15 +1541,18 @@
            ===================================================== */
         function applyLayout(layout, deptId) {
             gridEl.innerHTML = '';
+            var btnDeleteLayout = document.getElementById('mldDeleteLayoutBtn');
             if (!layout) {
                 currentLayoutId = null; machines = {};
                 emptyState.style.display = '';
+                if (btnDeleteLayout) btnDeleteLayout.style.display = 'none';
                 var p = emptyState.querySelector('p');
                 if (p) p.innerHTML = 'Bộ phận <strong>' + esc(currentDeptName) + '</strong> chưa có layout. Thiết lập số hàng, số cột rồi nhấn <strong>Tạo layout</strong>.';
                 updateStats(); return;
             }
             // Có layout → ẩn empty state, hiện grid
             emptyState.style.display = 'none';
+            if (btnDeleteLayout) btnDeleteLayout.style.display = 'inline-block';
             currentLayoutId = layout.id;
             rowsEl.value = layout.rowCount; colsEl.value = layout.columnCount; gapEl.value = layout.gap;
             currentRows = layout.rowCount; currentCols = layout.columnCount;
@@ -1609,21 +1653,31 @@
             pickerSelected.style.display = 'none';
             pickerSelectedName.textContent = '—';
 
+            // Reset tab "Tạo máy mới" label
+            tabBtnNew.innerHTML = '<i class="fa-solid fa-circle-plus"></i> Tạo máy mới';
+
             if (m) {
-                // Ô đã có máy → mở tab "Tạo máy mới" với dữ liệu hiện tại để sửa
-                // Nhưng nếu machineId có trong picker list → pre-select
+                // Ô đã có máy → populate CẢ 2 tab
                 modalTitle.textContent = 'Chỉnh sửa máy';
                 modalSub.textContent   = posLabel;
                 btnDelete.classList.add('visible');
 
-                // Try to find in picker list
+                // --- Tab "Tạo máy mới" → đổi thành "Chỉnh sửa" và fill data ---
+                tabBtnNew.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Chỉnh sửa máy';
+                fName.value  = m.name  || '';
+                fNote.value  = m.note  || '';
+                selectedStatusNew = m.status || 'active';
+                document.getElementById('mldStatusPickerNew').querySelectorAll('.mld-status-opt').forEach(function (o) {
+                    o.classList.toggle('selected', o.dataset.val === selectedStatusNew);
+                });
+
+                // --- Tab "Chọn có sẵn" ---
                 var found = pickerMachines.find(function (pm) { return pm.id === m.machineId; });
                 if (found) {
-                    // Pre-select in picker tab
-                    switchTab('pick');
+                    // Dù tìm thấy trong picker, ta vẫn trỏ mặc định vào tab Chỉnh sửa (new)
+                    switchTab('new');
                     renderPickerList('');
                     selectPickerMachine(found);
-                    // Set note and status for pick tab
                     fNoteExist.value = m.note || '';
                     var sp = statusStr(found.status);
                     selectedStatusPick = m.status || sp;
@@ -1631,22 +1685,16 @@
                         o.classList.toggle('selected', o.dataset.val === selectedStatusPick);
                     });
                 } else {
-                    // Not in picker (e.g. was newly created) → show new tab
+                    // Không tìm thấy trong picker → mở tab Chỉnh sửa
                     switchTab('new');
-                    fName.value  = m.name  || '';
-                    fNote.value  = m.note  || '';
-                    selectedStatusNew = m.status || 'active';
-                    document.getElementById('mldStatusPickerNew').querySelectorAll('.mld-status-opt').forEach(function (o) {
-                        o.classList.toggle('selected', o.dataset.val === selectedStatusNew);
-                    });
                 }
             } else {
-                // Ô trống → tab Pick
+                // Ô trống → mặc định mở tab Tạo máy mới (new)
                 modalTitle.textContent = 'Thêm máy vào ô';
                 modalSub.textContent   = posLabel;
                 btnDelete.classList.remove('visible');
-                switchTab('pick');
-                renderPickerList('');
+                switchTab('new');
+                renderPickerList(''); // vẫn render nhỡ user chuyển tab
                 fName.value  = ''; fNote.value  = ''; fNoteExist.value = '';
                 selectedStatusPick = 'active'; selectedStatusNew = 'active';
                 document.querySelectorAll('.mld-status-opt').forEach(function (o) {
@@ -1656,7 +1704,10 @@
 
             fDept.value = currentDeptId;
             backdrop.classList.add('open');
-            setTimeout(function () { pickerSearch.focus(); }, 300);
+            setTimeout(function () { 
+                if (activeTab === 'pick') pickerSearch.focus(); 
+                else fName.focus();
+            }, 300);
         }
 
         function closeModal() {
@@ -1692,7 +1743,7 @@
                     keyword:   fNoteExist.value.trim()
                 };
             } else {
-                // ---- Tab: Tạo máy mới ----
+                // ---- Tab: Chỉnh sửa / Tạo máy mới ----
                 var name = fName.value.trim();
                 if (!name) {
                     fName.focus();
@@ -1702,7 +1753,7 @@
                 }
                 machines[key] = {
                     itemId:    existing.itemId    || null,
-                    machineId: existing.machineId || null,  // sẽ được tạo mới khi SaveLayout
+                    machineId: existing.machineId || null,
                     name:      name,
                     deptId:    currentDeptId,
                     dept:      currentDeptName,
@@ -1710,6 +1761,24 @@
                     note:      fNote.value.trim(),
                     keyword:   fNote.value.trim()
                 };
+            }
+
+            // ---- Lưu thông tin và status vào DB ngay lập tức nếu máy đã tồn tại ----
+            var savedM = machines[key];
+            if (savedM && savedM.machineId) {
+                var newStatus = statusCode(savedM.status);
+                fetch('/MachineLayoutDesigner/UpdateMachineInfo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        machineId: savedM.machineId, 
+                        machineName: savedM.name,
+                        remark: savedM.note,
+                        status: newStatus 
+                    })
+                }).then(function (r) {
+                    if (r.ok) toast('Đã cập nhật thông tin máy.', true);
+                }).catch(function (e) { console.warn('[MLD] info save:', e); });
             }
 
             renderCell(row, col);
@@ -1721,25 +1790,35 @@
            DELETE MACHINE FROM CELL
            ===================================================== */
         btnDelete.addEventListener('click', function () {
-            if (!confirm('Xóa máy khỏi ô này?')) return;
-            var key = currentCellKey;
-            var parts = key.split('-');
-            var row = parseInt(parts[0]); var col = parseInt(parts[1]);
-            var m = machines[key];
+            Swal.fire({
+                title: 'Xác nhận xóa',
+                text: 'Xóa máy khỏi ô này?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Xóa',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: '#e74c3c'
+            }).then(function (result) {
+                if (!result.isConfirmed) return;
+                var key = currentCellKey;
+                var parts = key.split('-');
+                var row = parseInt(parts[0]); var col = parseInt(parts[1]);
+                var m = machines[key];
 
-            if (m && m.itemId) {
-                fetch('/MachineLayoutDesigner/DeleteItem?itemId=' + m.itemId, { method: 'DELETE' })
-                    .then(function (r) {
-                        if (!r.ok) throw new Error('HTTP ' + r.status);
-                        delete machines[key];
-                        renderCell(row, col); updateStats(); closeModal();
-                        toast('Đã xóa máy khỏi ô.', true);
-                    })
-                    .catch(function (e) { toast('Lỗi xóa: ' + e.message, false); });
-            } else {
-                delete machines[key];
-                renderCell(row, col); updateStats(); closeModal();
-            }
+                if (m && m.itemId) {
+                    fetch('/MachineLayoutDesigner/DeleteItem?itemId=' + m.itemId, { method: 'DELETE' })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            delete machines[key];
+                            renderCell(row, col); updateStats(); closeModal();
+                            toast('Đã xóa máy khỏi ô.', true);
+                        })
+                        .catch(function (e) { toast('Lỗi xóa: ' + e.message, false); });
+                } else {
+                    delete machines[key];
+                    renderCell(row, col); updateStats(); closeModal();
+                }
+            });
         });
 
         /* =====================================================
@@ -1747,10 +1826,20 @@
            ===================================================== */
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
-                if (!confirm('Xóa toàn bộ layout và dữ liệu máy?')) return;
-                machines = {}; currentLayoutId = null;
-                gridEl.innerHTML = ''; emptyState.style.display = '';
-                updateStats();
+                Swal.fire({
+                    title: 'Xác nhận xóa',
+                    text: 'Xóa toàn bộ layout và dữ liệu máy?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Xóa tất cả',
+                    cancelButtonText: 'Hủy',
+                    confirmButtonColor: '#e74c3c'
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+                    machines = {}; currentLayoutId = null;
+                    gridEl.innerHTML = ''; emptyState.style.display = '';
+                    updateStats();
+                });
             });
         }
 
@@ -1837,6 +1926,50 @@
         });
 
         /* =====================================================
+           XÓA LAYOUT
+           ===================================================== */
+        var btnDeleteL = document.getElementById('mldDeleteLayoutBtn');
+        if (btnDeleteL) {
+            btnDeleteL.addEventListener('click', function () {
+                if (!currentLayoutId) return;
+                Swal.fire({
+                    title: 'Xóa layout',
+                    text: 'Bạn có chắc chắn muốn xóa layout này? (Chỉ xóa layout, không xóa máy).',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Xóa',
+                    cancelButtonText: 'Hủy',
+                    confirmButtonColor: '#e74c3c'
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        btnDeleteL.disabled = true;
+                        btnDeleteL.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xóa...';
+                        fetch('/MachineLayoutDesigner/DeleteLayout?layoutId=' + currentLayoutId, { method: 'POST' })
+                            .then(function(r) {
+                                if (!r.ok) throw new Error('HTTP ' + r.status);
+                                return r.json();
+                            })
+                            .then(function(res) {
+                                toast('Đã xóa layout.', true);
+                                btnDeleteL.disabled = false;
+                                btnDeleteL.innerHTML = '<i class="fa-solid fa-trash"></i> Xóa layout';
+                                // Tải lại department hiện tại
+                                if (currentDeptId) {
+                                    var evt = new Event('change');
+                                    deptFilter.dispatchEvent(evt);
+                                }
+                            })
+                            .catch(function(e) {
+                                toast('Lỗi xóa layout: ' + e.message, false);
+                                btnDeleteL.disabled = false;
+                                btnDeleteL.innerHTML = '<i class="fa-solid fa-trash"></i> Xóa layout';
+                            });
+                    }
+                });
+            });
+        }
+
+        /* =====================================================
            SHAKE animation
            ===================================================== */
         var shakeStyle = document.createElement('style');
@@ -1844,9 +1977,314 @@
         document.head.appendChild(shakeStyle);
 
         /* =====================================================
+           DRAG-SELECT: Kéo vùng chọn trên canvas
+           ===================================================== */
+        var selectedCellKeys = [];
+        var isDragging = false;
+        var dragStartX = 0, dragStartY = 0;
+        var selectOverlay = null;
+
+        canvasWrap.addEventListener('mousedown', function (e) {
+            // Chỉ drag bằng chuột trái, không drag trên modal/context menu
+            if (e.button !== 0) return;
+            if (e.target.closest('.mld-ctx-menu') || e.target.closest('.mld-modal-backdrop')) return;
+
+            hideCtxMenu();
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+
+            // Tạo overlay
+            selectOverlay = document.createElement('div');
+            selectOverlay.className = 'mld-select-overlay';
+            selectOverlay.style.left = e.clientX + 'px';
+            selectOverlay.style.top  = e.clientY + 'px';
+            selectOverlay.style.width  = '0';
+            selectOverlay.style.height = '0';
+            document.body.appendChild(selectOverlay);
+
+            // Clear previous selection
+            clearRegionSelection();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging || !selectOverlay) return;
+            var x1 = Math.min(dragStartX, e.clientX);
+            var y1 = Math.min(dragStartY, e.clientY);
+            var x2 = Math.max(dragStartX, e.clientX);
+            var y2 = Math.max(dragStartY, e.clientY);
+            selectOverlay.style.left   = x1 + 'px';
+            selectOverlay.style.top    = y1 + 'px';
+            selectOverlay.style.width  = (x2 - x1) + 'px';
+            selectOverlay.style.height = (y2 - y1) + 'px';
+
+            // Highlight cells in rect
+            highlightCellsInRect(x1, y1, x2, y2);
+        });
+
+        document.addEventListener('mouseup', function (e) {
+            if (!isDragging) return;
+            isDragging = false;
+            if (selectOverlay) {
+                selectOverlay.remove();
+                selectOverlay = null;
+            }
+        });
+
+        function highlightCellsInRect(rx1, ry1, rx2, ry2) {
+            var cells = gridEl.querySelectorAll('.mld-cell');
+            selectedCellKeys = [];
+            cells.forEach(function (cell) {
+                var rect = cell.getBoundingClientRect();
+                var overlap = !(rect.right < rx1 || rect.left > rx2 || rect.bottom < ry1 || rect.top > ry2);
+                cell.classList.toggle('region-selected', overlap);
+                if (overlap) selectedCellKeys.push(cell.dataset.key);
+            });
+        }
+
+        function clearRegionSelection() {
+            selectedCellKeys = [];
+            gridEl.querySelectorAll('.mld-cell.region-selected').forEach(function (c) {
+                c.classList.remove('region-selected');
+            });
+        }
+
+        /* =====================================================
+           CONTEXT MENU: Chuột phải
+           ===================================================== */
+        var ctxMenu       = document.getElementById('mldCtxMenu');
+        var ctxInfo        = document.getElementById('mldCtxCount');
+        var ctxAddBtn      = document.getElementById('ctxAddMachines');
+        var ctxSetActiveBtn    = document.getElementById('ctxSetActive');
+        var ctxSetInactiveBtn  = document.getElementById('ctxSetInactive');
+        var ctxSetMaintenBtn   = document.getElementById('ctxSetMaintenance');
+        var ctxDeleteBtn       = document.getElementById('ctxDeleteMachines');
+        var ctxDeleteDivider   = document.getElementById('ctxDeleteDivider');
+
+        canvasWrap.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            if (!currentDeptId) return;
+
+            // Nếu chuột phải trên 1 cell mà chưa chọn vùng → chọn 1 cell đó
+            var cellEl = e.target.closest('.mld-cell');
+            if (cellEl && selectedCellKeys.length <= 1) {
+                clearRegionSelection();
+                cellEl.classList.add('region-selected');
+                selectedCellKeys = [cellEl.dataset.key];
+            }
+
+            if (!selectedCellKeys.length) return;
+
+            // Đếm ô trống / ô có máy
+            var emptyKeys = selectedCellKeys.filter(function (k) { return !machines[k]; });
+            var filledKeys = selectedCellKeys.filter(function (k) { return !!machines[k]; });
+
+            ctxInfo.textContent = selectedCellKeys.length;
+
+            // Ẩn/hiện option
+            ctxAddBtn.style.display         = emptyKeys.length  ? '' : 'none';
+            ctxSetActiveBtn.style.display    = filledKeys.length ? '' : 'none';
+            ctxSetInactiveBtn.style.display  = filledKeys.length ? '' : 'none';
+            ctxSetMaintenBtn.style.display   = filledKeys.length ? '' : 'none';
+            ctxDeleteDivider.style.display   = filledKeys.length ? '' : 'none';
+            ctxDeleteBtn.style.display       = filledKeys.length ? '' : 'none';
+
+            // Vị trí
+            ctxMenu.style.display = 'block';
+            var mw = ctxMenu.offsetWidth, mh = ctxMenu.offsetHeight;
+            var cx = e.clientX, cy = e.clientY;
+            if (cx + mw > window.innerWidth)  cx = window.innerWidth - mw - 8;
+            if (cy + mh > window.innerHeight) cy = window.innerHeight - mh - 8;
+            ctxMenu.style.left = cx + 'px';
+            ctxMenu.style.top  = cy + 'px';
+        });
+
+        function hideCtxMenu() {
+            ctxMenu.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.mld-ctx-menu')) hideCtxMenu();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { hideCtxMenu(); clearRegionSelection(); }
+        });
+
+        /* =====================================================
+           CTX: Thêm máy tự động
+           ===================================================== */
+        ctxAddBtn.addEventListener('click', function () {
+            hideCtxMenu();
+            if (!currentDeptId) return;
+
+            var emptyKeys = selectedCellKeys.filter(function (k) { return !machines[k]; });
+            if (!emptyKeys.length) return;
+
+            // Tìm số thứ tự tiếp theo
+            var existingNumbers = [];
+            pickerMachines.forEach(function (pm) {
+                var match = (pm.machineNumber || '').match(/^Máy\s+(\d+)$/i);
+                if (match) existingNumbers.push(parseInt(match[1]));
+            });
+            Object.keys(machines).forEach(function (k) {
+                var match = (machines[k].name || '').match(/^Máy\s+(\d+)$/i);
+                if (match) existingNumbers.push(parseInt(match[1]));
+            });
+
+            var nextNum = 1;
+            if (existingNumbers.length) nextNum = Math.max.apply(null, existingNumbers) + 1;
+
+            emptyKeys.forEach(function (key) {
+                var machineName = 'Máy ' + nextNum;
+                // Kiểm tra xem tên có trùng trong pickerMachines không
+                var existing = pickerMachines.find(function (pm) {
+                    return (pm.machineNumber || '').toLowerCase() === machineName.toLowerCase();
+                });
+
+                if (existing) {
+                    // Dùng máy đã có sẵn
+                    machines[key] = {
+                        itemId:    null,
+                        machineId: existing.id,
+                        name:      existing.machineNumber,
+                        deptId:    currentDeptId,
+                        dept:      currentDeptName,
+                        status:    statusStr(existing.status),
+                        note:      '',
+                        keyword:   ''
+                    };
+                } else {
+                    // Tạo mới
+                    machines[key] = {
+                        itemId:    null,
+                        machineId: null,
+                        name:      machineName,
+                        deptId:    currentDeptId,
+                        dept:      currentDeptName,
+                        status:    'active',
+                        note:      '',
+                        keyword:   ''
+                    };
+                }
+
+                var parts = key.split('-');
+                renderCell(parseInt(parts[0]), parseInt(parts[1]));
+                nextNum++;
+            });
+
+            updateStats();
+            clearRegionSelection();
+            toast('Đã thêm ' + emptyKeys.length + ' máy tự động.', true);
+        });
+
+        /* =====================================================
+           CTX: Đổi trạng thái hàng loạt
+           ===================================================== */
+        function ctxBulkSetStatus(statusString) {
+            hideCtxMenu();
+            var filledKeys = selectedCellKeys.filter(function (k) { return !!machines[k]; });
+            if (!filledKeys.length) return;
+
+            var machineIds = [];
+            filledKeys.forEach(function (k) {
+                var m = machines[k];
+                if (m.machineId) machineIds.push(m.machineId);
+                m.status = statusString;
+                var parts = k.split('-');
+                renderCell(parseInt(parts[0]), parseInt(parts[1]));
+            });
+
+            updateStats();
+            clearRegionSelection();
+
+            // Lưu vào DB ngay lập tức
+            if (machineIds.length) {
+                fetch('/MachineLayoutDesigner/BulkUpdateMachineStatus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineIds: machineIds, status: statusCode(statusString) })
+                }).then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                }).then(function () {
+                    toast('Đã cập nhật trạng thái ' + machineIds.length + ' máy.', true);
+                }).catch(function (e) {
+                    toast('Lỗi cập nhật trạng thái: ' + e.message, false);
+                });
+            }
+        }
+
+        ctxSetActiveBtn.addEventListener('click', function () { ctxBulkSetStatus('active'); });
+        ctxSetInactiveBtn.addEventListener('click', function () { ctxBulkSetStatus('inactive'); });
+        ctxSetMaintenBtn.addEventListener('click', function () { ctxBulkSetStatus('maintenance'); });
+
+        /* =====================================================
+           CTX: Xóa máy (status = -2)
+           ===================================================== */
+        ctxDeleteBtn.addEventListener('click', function () {
+            hideCtxMenu();
+            var filledKeys = selectedCellKeys.filter(function (k) { return !!machines[k]; });
+            if (!filledKeys.length) return;
+
+            Swal.fire({
+                title: 'Xác nhận xóa',
+                text: 'Xóa ' + filledKeys.length + ' máy đã chọn? Máy sẽ được đánh dấu là đã xóa.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Xóa',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: '#e74c3c'
+            }).then(function (result) {
+                if (!result.isConfirmed) return;
+
+                var machineIds = [];
+                filledKeys.forEach(function (k) {
+                    var m = machines[k];
+                    if (m.machineId) machineIds.push(m.machineId);
+                    delete machines[k];
+                    var parts = k.split('-');
+                    renderCell(parseInt(parts[0]), parseInt(parts[1]));
+                });
+
+                updateStats();
+                clearRegionSelection();
+
+                if (machineIds.length) {
+                    fetch('/MachineLayoutDesigner/BulkUpdateMachineStatus', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ machineIds: machineIds, status: -2 })
+                    }).then(function (r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json();
+                    }).then(function () {
+                        toast('Đã xóa ' + machineIds.length + ' máy.', true);
+                        // Reload picker
+                        if (currentDeptId) fetchPickerMachines(currentDeptId).then(function (list) {
+                            pickerMachines = list;
+                            renderPickerList('');
+                        });
+                    }).catch(function (e) {
+                        toast('Lỗi xóa: ' + e.message, false);
+                    });
+                }
+            });
+        });
+
+        /* =====================================================
+           Prevent default cell click during selection
+           ===================================================== */
+        // Override makeCell to use new click logic
+        var _origMakeCell = makeCell;
+        // Cell click is already set in makeCell — need to prevent open modal on drag
+        // We intercept via mousedown/mouseup distance check
+
+        /* (instant status save logic đã tích hợp vào btnSave handler chính) */
+
+        /* =====================================================
            INIT
            ===================================================== */
-        // Gọi 1 lần duy nhất — IIFE đã chạy sau khi DOM sẵn sàng
+        // Gọ 1 lần duy nhất — IIFE đã chạy sau khi DOM sẵn sàng
         loadDepartments();
 
     }());

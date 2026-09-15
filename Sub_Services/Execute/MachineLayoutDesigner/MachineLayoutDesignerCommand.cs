@@ -3,6 +3,7 @@ using Sub_Entities.Entities;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Sub_Services.Execute
 {
@@ -18,7 +19,7 @@ namespace Sub_Services.Execute
         ///   2. Với mỗi item trong request:
         ///      - Upsert ProductionMachine (insert nếu MachineId null, update nếu có).
         ///      - Upsert ProductLayoutItem.
-        ///   3. Xóa (soft delete Status=0) các ProductLayoutItem không còn trong danh sách gửi lên.
+        ///   3. Xóa (soft delete Status=-2) các ProductLayoutItem không còn trong danh sách gửi lên.
         /// </summary>
         public async Task<MachineLayout_SaveResult> SaveLayout(MachineLayout_SaveRequest req)
         {
@@ -167,7 +168,7 @@ namespace Sub_Services.Execute
 
                 foreach (var removed in removedItems)
                 {
-                    removed.Status     = 0;
+                    removed.Status     = -2;
                     removed.UpdateDate = now;
                 }
 
@@ -196,7 +197,7 @@ namespace Sub_Services.Execute
         // =====================================================================
 
         /// <summary>
-        /// Soft-delete một ProductLayoutItem theo Id (đặt Status = 0).
+        /// Soft-delete một ProductLayoutItem theo Id (đặt Status = -2).
         /// Không xóa ProductionMachine để giữ lịch sử.
         /// </summary>
         public async Task<bool> DeleteLayoutItem(Guid itemId)
@@ -206,10 +207,110 @@ namespace Sub_Services.Execute
 
             if (item == null) return false;
 
-            item.Status     = 0;
+            item.Status     = -2;
             item.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        // =====================================================================
+        //  COMMAND: Xóa layout
+        // =====================================================================
+
+        /// <summary>
+        /// Xóa layout (soft delete Status = -2).
+        /// </summary>
+        public async Task<bool> DeleteLayout(Guid layoutId)
+        {
+            var layout = await _context.ProductionDepartmentLayouts
+                .FirstOrDefaultAsync(l => l.Id == layoutId);
+
+            if (layout == null) return false;
+
+            layout.Status     = -2;
+            layout.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // =====================================================================
+        //  COMMAND: Cập nhật trạng thái máy trực tiếp (không cần lưu layout)
+        // =====================================================================
+
+        /// <summary>
+        /// Cập nhật Status của một ProductionMachine.
+        /// Status: 1=Hoạt động, 0=Ngừng, -1=Bảo trì, -2=Xóa mềm
+        /// </summary>
+        public async Task<(bool Success, string Message)> UpdateMachineStatus(Guid machineId, int status)
+        {
+            var machine = await _context.ProductionMachines
+                .FirstOrDefaultAsync(m => m.Id == machineId);
+            if (machine == null)
+                return (false, "Không tìm thấy máy.");
+
+            machine.Status     = status;
+            machine.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã cập nhật trạng thái máy.");
+        }
+
+        /// <summary>
+        /// Cập nhật thông tin máy: tên, ghi chú, trạng thái.
+        /// </summary>
+        public async Task<(bool Success, string Message)> UpdateMachineInfo(Guid machineId, string machineName, string remark, int status)
+        {
+            var machine = await _context.ProductionMachines
+                .FirstOrDefaultAsync(m => m.Id == machineId);
+            if (machine == null)
+                return (false, "Không tìm thấy máy.");
+
+            if (!string.IsNullOrWhiteSpace(machineName))
+                machine.MachineNumber = machineName.Trim();
+
+            machine.Remark     = remark?.Trim();
+            machine.Status     = status;
+            machine.UpdateDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return (true, "Đã cập nhật thông tin máy.");
+        }
+
+        /// <summary>
+        /// Cập nhật Status hàng loạt cho nhiều máy.
+        /// </summary>
+        public async Task<(bool Success, string Message)> BulkUpdateMachineStatus(List<Guid> machineIds, int status)
+        {
+            if (machineIds == null || !machineIds.Any())
+                return (false, "Không có máy nào được chọn.");
+
+            var machines = await _context.ProductionMachines
+                .Where(m => machineIds.Contains(m.Id))
+                .ToListAsync();
+
+            if (!machines.Any())
+                return (false, "Không tìm thấy máy hợp lệ.");
+
+            var now = DateTime.Now;
+            foreach (var m in machines)
+            {
+                m.Status     = status;
+                m.UpdateDate = now;
+            }
+
+            // Nếu xóa máy (status=-2), soft-delete luôn các ProductLayoutItem tương ứng
+            if (status == -2)
+            {
+                var layoutItems = await _context.ProductLayoutItems
+                    .Where(i => machineIds.Contains(i.ProductionMachineId) && i.Status == 1)
+                    .ToListAsync();
+                foreach (var li in layoutItems)
+                {
+                    li.Status     = -2;
+                    li.UpdateDate = now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return (true, $"Đã cập nhật {machines.Count} máy.");
         }
     }
 }

@@ -409,12 +409,8 @@
         return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
     }
     function toast(msg, ok) {
-        var t = document.createElement('div');
-        t.className = 'oh-toast';
-        t.style.background = ok ? 'var(--success)' : 'var(--danger)';
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(function () { t.remove(); }, 3000);
+        if (ok) { toastr.success(msg); }
+        else    { toastr.error(msg); }
     }
 
     /* ── STATE ── */

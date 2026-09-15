@@ -96,7 +96,7 @@ namespace SNP_SubSystem.Controllers.ProductionProgress
         }
 
         // ---------------------------------------------------------------
-        // DELETE (Soft): Đổi Status = -1
+        // DELETE (Soft): Đổi Status = -2
         // POST /ProductionProgress/SoftDelete
         // ---------------------------------------------------------------
         [HttpPost]

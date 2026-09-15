@@ -123,6 +123,27 @@ namespace SNP_SubSystem.Controllers.MachineLayoutDesigner
         }
 
         // ---------------------------------------------------------------
+        // POST: Xóa layout
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// POST /MachineLayoutDesigner/DeleteLayout?layoutId={guid}
+        /// Đặt trạng thái layout về -2.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DeleteLayout(Guid layoutId)
+        {
+            if (layoutId == Guid.Empty)
+                return BadRequest(new { message = "layoutId không hợp lệ." });
+
+            var ok = await _service.DeleteLayout(layoutId);
+            if (!ok)
+                return NotFound(new { message = "Không tìm thấy layout hoặc không thể xóa." });
+
+            return Ok(new { success = true, message = "Đã xóa layout." });
+        }
+
+        // ---------------------------------------------------------------
         // DELETE: Xóa một item khỏi layout
         // ---------------------------------------------------------------
 
@@ -141,5 +162,92 @@ namespace SNP_SubSystem.Controllers.MachineLayoutDesigner
 
             return Ok(new { message = "Đã xóa item." });
         }
+
+        // ---------------------------------------------------------------
+        // POST: Cập nhật trạng thái một máy
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// POST /MachineLayoutDesigner/UpdateMachineStatus
+        /// Body: { machineId: guid, status: int }
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> UpdateMachineStatus([FromBody] UpdateMachineStatusRequest req)
+        {
+            if (req == null || req.MachineId == Guid.Empty)
+                return BadRequest(new { message = "Dữ liệu không hợp lệ." });
+
+            var result = await _service.UpdateMachineStatus(req.MachineId, req.Status);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { success = true, message = result.Message });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Cập nhật trạng thái hàng loạt
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// POST /MachineLayoutDesigner/BulkUpdateMachineStatus
+        /// Body: { machineIds: [guid], status: int }
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> BulkUpdateMachineStatus([FromBody] BulkUpdateMachineStatusRequest req)
+        {
+            if (req == null || req.MachineIds == null || !req.MachineIds.Any())
+                return BadRequest(new { message = "Không có máy nào được chọn." });
+
+            var result = await _service.BulkUpdateMachineStatus(req.MachineIds, req.Status);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { success = true, message = result.Message });
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Cập nhật thông tin máy
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// POST /MachineLayoutDesigner/UpdateMachineInfo
+        /// Body: { machineId: guid, machineName: string, remark: string, status: int }
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> UpdateMachineInfo([FromBody] UpdateMachineInfoRequest req)
+        {
+            if (req == null || req.MachineId == Guid.Empty)
+                return BadRequest(new { message = "Dữ liệu không hợp lệ." });
+
+            var result = await _service.UpdateMachineInfo(req.MachineId, req.MachineName, req.Remark, req.Status);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { success = true, message = result.Message });
+        }
+
+        // ---------------------------------------------------------------
+        // Request DTOs
+        // ---------------------------------------------------------------
+        public class UpdateMachineStatusRequest
+        {
+            public Guid MachineId { get; set; }
+            public int Status { get; set; }
+        }
+
+        public class UpdateMachineInfoRequest
+        {
+            public Guid MachineId { get; set; }
+            public string MachineName { get; set; }
+            public string Remark { get; set; }
+            public int Status { get; set; }
+        }
+
+        public class BulkUpdateMachineStatusRequest
+        {
+            public List<Guid> MachineIds { get; set; }
+            public int Status { get; set; }
+        }
     }
 }
+

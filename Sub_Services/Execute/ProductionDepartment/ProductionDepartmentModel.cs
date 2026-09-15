@@ -87,9 +87,11 @@ namespace Sub_Services.Execute
         {
             public Guid   Id          { get; set; }
             public string MachineName { get; set; }
+            public string MachineCode { get; set; }   // MachineNumber alias for detail link
             public string Remark      { get; set; }   // mã máy
             public int    Status      { get; set; }
             public string DeptName    { get; set; }
+            public Guid   DeptId      { get; set; }
         }
 
         /// <summary>Mã sản xuất hiển thị ở cột phải khi chọn máy.</summary>

@@ -264,9 +264,9 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
         // ---------------------------------------------------------------
 
         [HttpGet]
-        public async Task<IActionResult> GetMachinesForRecording(Guid? deptId = null, string keyword = null)
+        public async Task<IActionResult> GetMachinesForRecording(Guid? deptId = null, string keyword = null, int? machineStatus = null)
         {
-            var list = await _service.GetMachinesForRecording(deptId, keyword);
+            var list = await _service.GetMachinesForRecording(deptId, keyword, machineStatus);
             return Ok(list);
         }
 

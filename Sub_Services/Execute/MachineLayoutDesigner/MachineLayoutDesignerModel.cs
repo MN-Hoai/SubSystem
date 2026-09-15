@@ -155,7 +155,7 @@ namespace Sub_Services.Execute
             public Guid Id { get; set; }
             public string MachineNumber { get; set; }   // Tên / số hiệu máy
             public string Remark { get; set; }          // Ghi chú
-            public int Status { get; set; }             // 1=HĐ, 2=Ngừng, 3=Bảo trì
+            public int Status { get; set; }             // 1=HĐ, 0=Ngừng, -1=Bảo trì, -2=Xóa
         }
 
     }

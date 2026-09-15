@@ -61,7 +61,7 @@
             </select>
         </div>
 
-        <!-- Trạng thái (Status ProductionInfo: 1=Đang, 0=Ngừng, 2=Hoàn thành) -->
+        <!-- Trạng thái (Status ProductionInfo: -2=Xóa, -1=Tạm khóa, 0=Chờ, 1=Đang, 2=Hoàn thành) -->
         <div class="filter-group">
             <label class="filter-label">Trạng thái</label>
             <select id="statusSelect">
@@ -69,6 +69,9 @@
                 <option value="1" selected>Đang hoạt động</option>
                 <option value="0">Chờ sản xuất</option>
                 <option value="2">Hoàn thành</option>
+                <option value="-1">Tạm khóa</option>
+                <option value="-2">Đã xóa</option>
+                
             </select>
         </div>
 
@@ -511,7 +514,7 @@
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                alert('Lỗi truy vấn: ' + (err.message || res.statusText));
+                toastr.error('Lỗi truy vấn: ' + (err.message || res.statusText), 'Lỗi');
                 resetLoadingState();
                 return;
             }
@@ -618,10 +621,14 @@
                 ? '<span class="badge-status success">Đang SX</span>'
                 : p.status === 0
                 ? '<span class="badge-status warning">Chờ SX</span>'
-                : '<span class="badge-status">Hoàn thành</span>';
+                : p.status === 2
+                ? '<span class="badge-status">Hoàn thành</span>'
+                : p.status === -1
+                ? '<span class="badge-status" style="background:var(--ink-200);color:var(--ink-600);">Tạm khóa</span>'
+                : '<span class="badge-status">' + p.status + '</span>';
 
             tbody.insertAdjacentHTML('beforeend', `
-                <tr data-id="${p.id}" data-line="${escHtml(p.line??'')}"
+                <tr data-id="${p.id}" data-status="${p.status}" data-line="${escHtml(p.line??'')}"
                     data-style="${escHtml(p.style??'')}" data-sp="${escHtml(p.spmain??'')}">
                     <td class="cell-strong">${escHtml(p.line ?? '—')}</td>
                     <td>${escHtml(p.style ?? '—')}</td>
@@ -824,8 +831,7 @@
 })();
 </script>
 
-<!-- Toast Container -->
-<div id="ppToastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;min-width:300px;max-width:380px;pointer-events:none;"></div>
+
 
 <!-- Context Menu -->
 <div id="ctxMenu" style="display:none;position:fixed;z-index:9999;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px 0;min-width:215px;">
@@ -845,7 +851,16 @@
     <button id="ctxWaiting" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
         <i class="fa-solid fa-clock" style="color:#8A6423;width:18px;"></i> Đánh dấu chờ SX
     </button>
-    <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+    <button id="ctxLocked" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-lock" style="color:var(--ink-500);width:18px;"></i> Tạm khóa
+    </button>
+    <button id="ctxUnlock" style="display:none;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--ink-900);font-family:inherit;">
+        <i class="fa-solid fa-lock-open" style="color:var(--success);width:18px;"></i> Mở khóa
+    </button>
+    <button id="ctxRestore" style="display:none;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--primary);font-family:inherit;">
+        <i class="fa-solid fa-rotate-left" style="width:18px;"></i> Khôi phục
+    </button>
+    <div id="ctxDivider" style="height:1px;background:var(--border);margin:4px 0;"></div>
     <button id="ctxDelete" style="display:block;width:100%;text-align:left;padding:9px 16px;background:none;border:none;cursor:pointer;font-size:13.5px;color:var(--danger);font-family:inherit;">
         <i class="fa-solid fa-trash" style="width:18px;"></i> Xóa mã hàng
     </button>
@@ -872,25 +887,10 @@
 <script>
 (function () {
     'use strict';
-
-    // ── Toast system ──────────────────────────────────────────────────
-    const _tc = document.getElementById('ppToastContainer');
-    function toast(type, msg, ms) {
-        ms = ms || 3500;
-        const icons  = { success:'fa-circle-check', error:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
-        const colors = { success:'var(--success)', error:'var(--danger)', warn:'#d97706', info:'var(--primary)' };
-        const c = colors[type] || colors.info;
-        const el = document.createElement('div');
-        el.style.cssText = 'background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:13px 15px;box-shadow:var(--shadow-md);display:flex;align-items:flex-start;gap:12px;border-left:4px solid '+c+';animation:ppToastIn .28s ease;pointer-events:auto;';
-        el.innerHTML = '<i class="fa-solid '+(icons[type]||icons.info)+'" style="color:'+c+';font-size:18px;margin-top:1px;"></i>'
-            + '<div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink-900);">'+ String(msg).replace(/</g,'&lt;') +'</div>'
-            + '<button style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink-400);padding:0;pointer-events:auto;" onclick="this.parentNode.remove()">&times;</button>';
-        _tc.appendChild(el);
-        setTimeout(() => {
-            el.style.transition = 'opacity .25s,transform .25s';
-            el.style.opacity = '0'; el.style.transform = 'translateX(30px)';
-            setTimeout(() => el.remove(), 280);
-        }, ms);
+    // ── Toast system (dùng toastr thống nhất) ──────────────────────────
+    function toast(type, msg) {
+        const fn = { success: toastr.success, error: toastr.error, warn: toastr.warning, info: toastr.info };
+        (fn[type] || toastr.info).call(toastr, msg);
     }
 
     // =================================================================
@@ -954,6 +954,10 @@
     const ctxComplete = document.getElementById('ctxComplete');
     const ctxProducing= document.getElementById('ctxProducing');
     const ctxWaiting  = document.getElementById('ctxWaiting');
+    const ctxLocked   = document.getElementById('ctxLocked');
+    const ctxUnlock   = document.getElementById('ctxUnlock');
+    const ctxRestore  = document.getElementById('ctxRestore');
+    const ctxDivider  = document.getElementById('ctxDivider');
     const ctxDelete   = document.getElementById('ctxDelete');
     const delModal    = document.getElementById('modalConfirmDelete');
     const delInfoBox  = document.getElementById('delInfoBox');
@@ -976,13 +980,34 @@
         ctx_targetRows = ms_getSelected();
         ctx_targetIds  = ctx_targetRows.map(r => r.dataset.id);
 
+        // Lấy danh sách status của các dòng được chọn
+        const selectedStatuses = ctx_targetRows.map(r => parseInt(r.dataset.status));
+        const allDeleted = selectedStatuses.every(s => s === -2);
+        const allLocked  = selectedStatuses.every(s => s === -1);
+        const hasDeleted = selectedStatuses.some(s => s === -2);
+        const hasLocked  = selectedStatuses.some(s => s === -1);
+        const allNormal  = selectedStatuses.every(s => s >= 0);
+
         const multi = ctx_targetIds.length > 1;
         ctxSelInfo.style.display  = multi ? 'block' : 'none';
         if (multi) ctxSelCount.textContent = ctx_targetIds.length;
-        ctxEdit.style.display     = multi ? 'none' : 'block'; // Chỉ edit 1 dòng
+
+        // Ẩn/hiện option tùy trạng thái
+        // Nếu tất cả đã xóa: chỉ hiển Khôi phục
+        // Nếu tất cả tạm khóa: hiển Mở khóa + Xóa
+        // Bình thường: hiển đầy đủ (trừ Mở khóa/Khôi phục)
+        ctxEdit.style.display      = (!multi && !allDeleted && !allLocked) ? 'block' : 'none';
+        ctxComplete.style.display   = allNormal ? 'block' : 'none';
+        ctxProducing.style.display  = allNormal ? 'block' : 'none';
+        ctxWaiting.style.display    = allNormal ? 'block' : 'none';
+        ctxLocked.style.display     = allNormal ? 'block' : 'none';
+        ctxUnlock.style.display     = allLocked ? 'block' : 'none';
+        ctxRestore.style.display    = allDeleted ? 'block' : 'none';
+        ctxDivider.style.display    = allDeleted ? 'none' : 'block';
+        ctxDelete.style.display     = (allDeleted) ? 'none' : 'block';
 
         const { clientX: x, clientY: y } = e;
-        const mW = 220, mH = 180;
+        const mW = 220, mH = 280;
         ctxMenu.style.left = (x + mW > window.innerWidth  ? x - mW : x) + 'px';
         ctxMenu.style.top  = (y + mH > window.innerHeight ? y - mH : y) + 'px';
         ctxMenu.style.display = 'block';
@@ -1023,6 +1048,9 @@
     ctxComplete.addEventListener('click',  () => { hideCtx(); doBulkStatus(2, 'Đã đánh dấu Hoàn thành.'); });
     ctxProducing.addEventListener('click', () => { hideCtx(); doBulkStatus(1, 'Đã cập nhật Đang SX.'); });
     ctxWaiting.addEventListener('click',   () => { hideCtx(); doBulkStatus(0, 'Đã đánh dấu Chờ SX.'); });
+    ctxLocked.addEventListener('click',    () => { hideCtx(); doBulkStatus(-1, 'Đã tạm khóa mã hàng.'); });
+    ctxUnlock.addEventListener('click',    () => { hideCtx(); doBulkStatus(0, 'Đã mở khóa mã hàng.'); });
+    ctxRestore.addEventListener('click',   () => { hideCtx(); doBulkStatus(0, 'Đã khôi phục mã hàng.'); });
 
     // -- Xóa --
     ctxDelete.addEventListener('click', () => {
@@ -1047,7 +1075,7 @@
         try {
             const res  = await fetch('/ProductionProgress/BulkUpdateStatus', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: ctx_targetIds, targetStatus: -1 })
+                body: JSON.stringify({ ids: ctx_targetIds, targetStatus: -2 })
             });
             const data = await res.json();
             if (res.ok && data.success) {

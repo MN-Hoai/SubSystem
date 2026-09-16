@@ -1,0 +1,1193 @@
+@{
+    ViewData["Title"] = "Phân quyền Role";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<style>
+/* ══════════════════════════════════════════════════════════
+   PAGE
+══════════════════════════════════════════════════════════ */
+.rl-page { display:flex; flex-direction:column; gap:20px; padding:24px; height:calc(100vh - 70px); box-sizing:border-box; }
+.rl-topbar { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; flex-shrink:0; }
+.rl-icon { width:44px; height:44px; border-radius:12px;
+    background:linear-gradient(135deg,#1f3a67 0%,#3a5fa8 100%);
+    color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px;
+    flex-shrink:0; box-shadow:0 4px 14px rgba(58,95,168,.3); }
+.rl-page-title { font-size:22px; font-weight:800; color:var(--ink-900); }
+.rl-page-sub   { font-size:12.5px; color:var(--ink-400); margin-top:2px; }
+
+/* ══════════════════════════════════════════════════════════
+   2-COLUMN LAYOUT
+══════════════════════════════════════════════════════════ */
+.rl-body { display:grid; grid-template-columns:300px 1fr; gap:16px; flex:1; min-height:0; }
+@@media(max-width:860px) { .rl-body { grid-template-columns:1fr; } }
+
+/* ══════════════════════════════════════════════════════════
+   PANELS
+══════════════════════════════════════════════════════════ */
+.rl-panel { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+.rl-panel-head { display:flex; align-items:center; justify-content:space-between;
+    padding:13px 16px; border-bottom:1px solid var(--border-soft); flex-shrink:0; gap:8px; }
+.rl-panel-title { font-size:13.5px; font-weight:700; color:var(--ink-900);
+    display:flex; align-items:center; gap:8px; }
+.rl-sub-label { font-size:11.5px; color:var(--ink-400); font-weight:600; }
+
+/* ══════════════════════════════════════════════════════════
+   SEARCH BAR
+══════════════════════════════════════════════════════════ */
+.rl-search { padding:10px 14px; border-bottom:1px solid var(--border-soft); flex-shrink:0; }
+.rl-search-wrap { display:flex; align-items:center; gap:8px; background:var(--bg-canvas);
+    border:1.5px solid var(--border); border-radius:9px; padding:7px 12px; transition:border-color .18s; }
+.rl-search-wrap:focus-within { border-color:#3a5fa8; box-shadow:0 0 0 3px rgba(58,95,168,.08); }
+.rl-search-wrap i { color:var(--ink-300); font-size:12px; flex-shrink:0; }
+.rl-search-wrap input { flex:1; border:none; background:transparent; outline:none;
+    font-size:13px; color:var(--ink-900); font-family:inherit; }
+
+/* ══════════════════════════════════════════════════════════
+   ROLE LIST
+══════════════════════════════════════════════════════════ */
+.rl-scroll { flex:1; overflow-y:auto; }
+.rl-item { display:flex; align-items:center; gap:11px; padding:11px 14px;
+    border-bottom:1px solid var(--border-soft); cursor:pointer; transition:background .13s; }
+.rl-item:last-child { border-bottom:none; }
+.rl-item:hover { background:rgba(58,95,168,.06); }
+.rl-item.active { background:rgba(58,95,168,.11); border-left:3px solid #3a5fa8; padding-left:11px; }
+.rl-item-icon { width:34px; height:34px; border-radius:9px; flex-shrink:0;
+    background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:13px; }
+.rl-item-body { flex:1; min-width:0; }
+.rl-item-name { font-size:13px; font-weight:700; color:var(--ink-900);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rl-item-code { font-size:11px; color:var(--ink-400); font-family:'Courier New',monospace; }
+.rl-item-meta { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex-shrink:0; }
+
+/* ══════════════════════════════════════════════════════════
+   BADGES
+══════════════════════════════════════════════════════════ */
+.rl-badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px;
+    font-size:10px; font-weight:800; white-space:nowrap; }
+.rl-badge.ok  { background:#e0f7ef; color:#15803d; }
+.rl-badge.off { background:#fdecea; color:#dc2626; }
+.rl-badge.cnt { background:rgba(31,58,103,.1); color:var(--accent-navy); }
+
+/* ══════════════════════════════════════════════════════════
+   RIGHT PANEL — ACCOUNTS
+══════════════════════════════════════════════════════════ */
+.rl-right-hero { padding:16px 18px; display:flex; align-items:center; gap:12px;
+    border-bottom:1px solid var(--border-soft); flex-shrink:0; flex-wrap:wrap; }
+.rl-hero-icon { width:46px; height:46px; border-radius:12px; flex-shrink:0;
+    background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:20px; }
+.rl-hero-name { font-size:17px; font-weight:800; color:var(--ink-900); }
+.rl-hero-desc { font-size:12px; color:var(--ink-400); margin-top:2px; }
+.rl-hero-actions { margin-left:auto; display:flex; gap:8px; }
+
+/* ══════════════════════════════════════════════════════════
+   ACCOUNT TABLE
+══════════════════════════════════════════════════════════ */
+.acc-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.acc-tbl thead tr { background:#f8f9fc; position:sticky; top:0; z-index:2; }
+.acc-tbl thead th { padding:9px 14px; text-align:left; font-size:10.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.5px; color:var(--ink-400);
+    border-bottom:2px solid var(--border); white-space:nowrap; }
+.acc-tbl tbody tr { border-bottom:1px solid var(--border-soft); transition:background .12s; }
+.acc-tbl tbody tr:last-child { border-bottom:none; }
+.acc-tbl tbody tr:hover { background:var(--accent-navy-soft); }
+.acc-tbl tbody td { padding:9px 14px; vertical-align:middle; }
+.acc-mono { font-family:'Courier New',monospace; font-size:12px; color:var(--accent-navy);
+    background:rgba(31,58,103,.07); padding:2px 7px; border-radius:5px; }
+
+/* ══════════════════════════════════════════════════════════
+   PLACEHOLDER
+══════════════════════════════════════════════════════════ */
+.rl-placeholder { flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; color:var(--ink-300); padding:40px; }
+.rl-placeholder i { font-size:44px; margin-bottom:14px; opacity:.5; }
+.rl-placeholder p { font-size:14px; font-weight:600; color:var(--ink-500); margin:0; }
+.rl-placeholder small { font-size:12px; color:var(--ink-400); margin-top:4px; }
+
+/* ══════════════════════════════════════════════════════════
+   EMPTY / LOADING
+══════════════════════════════════════════════════════════ */
+.rl-state { text-align:center; padding:40px 20px; }
+.rl-state i { font-size:28px; display:block; margin-bottom:10px; color:var(--ink-300); }
+.rl-state p { font-size:13px; font-weight:600; color:var(--ink-500); margin:0; }
+
+/* ══════════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════════ */
+.btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px;
+    font-size:13.5px; font-weight:700; cursor:pointer; border:none;
+    transition:background .18s,opacity .18s,transform .15s; font-family:inherit; }
+.btn-primary { background:linear-gradient(135deg,#1f3a67 0%,#3a5fa8 100%); color:#fff;
+    box-shadow:0 4px 12px rgba(58,95,168,.22); }
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+.btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+.btn-ghost:hover { background:var(--border-soft); }
+.btn-danger { background:#ef4444; color:#fff; }
+.btn-danger:hover { opacity:.88; }
+.btn-violet { background:rgba(58,95,168,.1); color:#3a5fa8; border:1.5px solid rgba(58,95,168,.2); }
+.btn-violet:hover { background:rgba(58,95,168,.18); }
+.btn-sm  { padding:6px 12px; font-size:12.5px; border-radius:7px; }
+.btn-xs  { padding:4px 9px;  font-size:11.5px; border-radius:6px; }
+
+/* ══════════════════════════════════════════════════════════
+   MODAL BASE
+══════════════════════════════════════════════════════════ */
+.md-bd { display:none; position:fixed; inset:0; z-index:9100; background:rgba(10,14,26,.48);
+    backdrop-filter:blur(4px); align-items:flex-start; justify-content:center; padding-top:56px; }
+.md-bd.open { display:flex !important; animation:fadeIn .18s ease; }
+@@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+.md-box { background:var(--bg-canvas); border-radius:16px;
+    box-shadow:0 24px 64px rgba(0,0,0,.24); width:100%; overflow:hidden; }
+.md-head { display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px; border-bottom:1px solid var(--border); }
+.md-title { font-size:16px; font-weight:800; color:var(--ink-900);
+    display:flex; align-items:center; gap:10px; }
+.md-close { width:32px; height:32px; border-radius:8px; border:none; cursor:pointer;
+    background:var(--bg-canvas); font-size:18px; color:var(--ink-400);
+    display:flex; align-items:center; justify-content:center; transition:background .14s; }
+.md-close:hover { background:var(--border-soft); color:var(--ink-900); }
+.md-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 20px;
+    border-top:1px solid var(--border); background:var(--bg-canvas); }
+
+/* ══════════════════════════════════════════════════════════
+   MODAL: THÊM TÀI KHOẢN vào Role
+══════════════════════════════════════════════════════════ */
+.add-acc-modal { max-width:540px; }
+.add-acc-search { padding:14px 18px; border-bottom:1px solid var(--border-soft); }
+.add-acc-search-wrap { display:flex; align-items:center; gap:9px; background:var(--bg-surface);
+    border:1.5px solid var(--border); border-radius:10px; padding:10px 14px;
+    transition:border-color .18s; }
+.add-acc-search-wrap:focus-within { border-color:#3a5fa8; box-shadow:0 0 0 3px rgba(58,95,168,.1); }
+.add-acc-search-wrap i { color:var(--ink-300); font-size:13px; }
+.add-acc-search-wrap input { flex:1; border:none; background:transparent; outline:none;
+    font-size:14px; color:var(--ink-900); font-family:inherit; }
+.add-acc-list { max-height:380px; overflow-y:auto; }
+.add-acc-item { display:flex; align-items:center; gap:12px; padding:11px 18px;
+    border-bottom:1px solid var(--border-soft); cursor:pointer; transition:background .13s;
+    user-select:none; }
+.add-acc-item:last-child { border-bottom:none; }
+.add-acc-item:hover { background:rgba(58,95,168,.07); }
+.add-acc-item.selected { background:rgba(58,95,168,.12); }
+.add-acc-avatar { width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
+.add-acc-info { flex:1; min-width:0; }
+.add-acc-name { font-size:13.5px; font-weight:700; color:var(--ink-900); }
+.add-acc-sub  { font-size:11.5px; color:var(--ink-400); display:flex; gap:8px; margin-top:2px; }
+.add-acc-check { width:20px; height:20px; border-radius:6px; border:2px solid var(--border);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition:background .14s,border-color .14s; }
+.add-acc-item.selected .add-acc-check { background:#3a5fa8; border-color:#3a5fa8; color:#fff; }
+.add-acc-count { padding:6px 18px; font-size:12px; font-weight:700; color:var(--ink-400);
+    border-top:1px solid var(--border-soft); }
+
+/* ══════════════════════════════════════════════════════════
+   MODAL: PHÂN QUYỀN (permission matrix for role)
+══════════════════════════════════════════════════════════ */
+.perm-modal { max-width:820px; max-height:calc(100vh - 110px); display:flex; flex-direction:column; }
+.perm-modal-body { flex:1; overflow-y:auto; padding:16px 20px; }
+.perm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.perm-tbl thead tr { background:#f8f9fc; position:sticky; top:0; z-index:2; }
+.perm-tbl thead th { padding:9px 14px; text-align:left; font-size:10.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.5px; color:var(--ink-400);
+    border-bottom:2px solid var(--border); white-space:nowrap; }
+.perm-tbl thead th.pc { text-align:center; min-width:72px; }
+.perm-tbl tbody tr { border-bottom:1px solid var(--border-soft); transition:background .12s; }
+.perm-tbl tbody tr:last-child { border-bottom:none; }
+.perm-tbl tbody tr:hover { background:rgba(58,95,168,.04); }
+.perm-tbl tbody td { padding:9px 14px; vertical-align:middle; }
+.perm-tbl tbody td.pc { text-align:center; }
+.perm-tbl tr.pgrp td { background:#f4f0ff; font-weight:700; font-size:11.5px;
+    color:#3a5fa8; padding:6px 14px; }
+.perm-tbl tr.pgrp td i { margin-right:5px; }
+.perm-path { font-family:'Courier New',monospace; font-size:11px; color:var(--accent-navy);
+    background:rgba(31,58,103,.07); padding:1px 6px; border-radius:4px; margin-left:6px; }
+.perm-cb { width:17px; height:17px; cursor:pointer; accent-color:#3a5fa8; }
+.row-all { width:17px; height:17px; cursor:pointer; accent-color:#3a5fa8; }
+.perm-top-bar { display:flex; align-items:center; gap:10px; padding:10px 20px 0;
+    flex-wrap:wrap; flex-shrink:0; }
+.perm-search { flex:1; min-width:160px; padding:7px 12px; border:1.5px solid var(--border);
+    border-radius:8px; font-size:13px; color:var(--ink-900); background:var(--bg-surface);
+    outline:none; transition:border-color .18s; font-family:inherit; }
+.perm-search:focus { border-color:#3a5fa8; }
+.perm-stats { font-size:12px; font-weight:700; color:var(--ink-500); }
+
+/* ══════════════════════════════════════════════════════════
+   CONTEXT MENU
+══════════════════════════════════════════════════════════ */
+.rl-ctx { position:fixed; background:var(--bg-surface); border:1.5px solid var(--border);
+    border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.18); z-index:9000;
+    padding:5px; min-width:185px; display:none; }
+.rl-ctx.visible { display:block; }
+.rl-ctx-item { display:flex; align-items:center; gap:9px; padding:9px 12px; border-radius:7px;
+    font-size:13px; font-weight:600; color:var(--ink-700-solid); cursor:pointer;
+    border:none; background:none; width:100%; text-align:left; font-family:inherit;
+    transition:background .12s; }
+.rl-ctx-item:hover { background:var(--bg-canvas); }
+.rl-ctx-item.danger { color:#dc2626; }
+.rl-ctx-item.danger:hover { background:#fdecea; }
+.rl-ctx-sep { height:1px; background:var(--border-soft); margin:4px 5px; }
+</style>
+
+<div class="rl-page">
+
+    <!-- TOP BAR -->
+    <div class="rl-topbar">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <div class="rl-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            <div>
+                <div class="rl-page-title">Phân quyền Role</div>
+                <div class="rl-page-sub">Quản lý vai trò, tài khoản và quyền truy cập trang</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-ghost" onclick="openPageListModal()">
+                <i class="fa-solid fa-sitemap"></i> Cài đặt Trang
+            </button>
+            <button class="btn btn-primary" onclick="window.location.href='/Role/Setting'">
+                <i class="fa-solid fa-plus"></i> Tạo Role mới
+            </button>
+        </div>
+    </div>
+
+    <!-- 2-COLUMN BODY -->
+    <div class="rl-body">
+
+        <!-- ── LEFT: ROLE LIST ────────────────────────── -->
+        <div class="rl-panel">
+            <div class="rl-panel-head">
+                <div class="rl-panel-title">
+                    <i class="fa-solid fa-list-check" style="color:#3a5fa8;"></i>
+                    Danh sách Role
+                </div>
+                <span class="rl-sub-label" id="roleCount"></span>
+            </div>
+            <div class="rl-search">
+                <div class="rl-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="roleSearch" placeholder="Tìm tên, mã role...">
+                </div>
+            </div>
+            <div class="rl-scroll" id="roleList">
+                <div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>
+            </div>
+        </div>
+
+        <!-- ── RIGHT: ACCOUNTS OF ROLE ───────────────── -->
+        <div class="rl-panel" id="rightPanel">
+
+            <!-- Placeholder khi chưa chọn role -->
+            <div class="rl-placeholder" id="rightPlaceholder">
+                <i class="fa-solid fa-hand-pointer"></i>
+                <p>Chọn một Role bên trái</p>
+                <small>để xem và quản lý tài khoản</small>
+            </div>
+
+            <!-- Nội dung khi đã chọn role -->
+            <div id="rightContent" style="display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;">
+
+                <!-- Hero header -->
+                <div class="rl-right-hero">
+                    <div class="rl-hero-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="rl-hero-name" id="heroName">—</div>
+                        <div class="rl-hero-desc" id="heroDesc"></div>
+                    </div>
+                    <div class="rl-hero-actions">
+                        <button class="btn btn-violet btn-sm" id="btnPermRole">
+                            <i class="fa-solid fa-key"></i> Phân quyền
+                        </button>
+                        <button class="btn btn-ghost btn-sm" id="btnEditRole">
+                            <i class="fa-solid fa-pen"></i> Chỉnh sửa
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Account section header -->
+                <div class="rl-panel-head" style="flex-shrink:0;">
+                    <div class="rl-panel-title">
+                        <i class="fa-solid fa-users" style="color:#1f3a67;"></i>
+                        Tài khoản được gán
+                        <span class="rl-sub-label" id="accCount"></span>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btnAddAcc">
+                        <i class="fa-solid fa-user-plus"></i> Thêm tài khoản
+                    </button>
+                </div>
+
+                <!-- Account table -->
+                <div class="rl-scroll">
+                    <table class="acc-tbl">
+                        <thead>
+                            <tr>
+                                <th>Tài khoản</th>
+                                <th>Họ tên</th>
+                                <th>MSNV</th>
+                                <th>Trạng thái</th>
+                                <th style="width:130px;text-align:center;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accTableBody">
+                            <tr><td colspan="5" class="rl-state" style="padding:0;">
+                                <div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: THÊM TÀI KHOẢN vào Role
+════════════════════════════════════════════════════════ -->
+<div class="md-bd" id="addAccModal">
+    <div class="md-box add-acc-modal">
+        <div class="md-head">
+            <div class="md-title">
+                <i class="fa-solid fa-user-plus" style="color:#3a5fa8;"></i>
+                Thêm tài khoản vào Role
+            </div>
+            <button class="md-close" onclick="closeAddAccModal()">&times;</button>
+        </div>
+
+        <!-- Search ở trên cùng -->
+        <div class="add-acc-search">
+            <div class="add-acc-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="addAccSearch" placeholder="Tìm theo tên, MSNV, email..." autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Số đã chọn -->
+        <div class="add-acc-count" id="addAccSelectedCount" style="display:none;"></div>
+
+        <!-- Danh sách tài khoản active -->
+        <div class="add-acc-list" id="addAccList">
+            <div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>
+        </div>
+
+        <div class="md-foot">
+            <button class="btn btn-ghost" onclick="closeAddAccModal()">Hủy</button>
+            <button class="btn btn-primary" id="btnConfirmAddAcc">
+                <i class="fa-solid fa-check"></i> Thêm đã chọn
+                <span id="btnAddAccBadge" style="background:rgba(255,255,255,.25);border-radius:99px;padding:1px 8px;font-size:11px;"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: PHÂN QUYỀN TRANG cho Role
+════════════════════════════════════════════════════════ -->
+<div class="md-bd" id="permModal">
+    <div class="md-box perm-modal">
+        <div class="md-head">
+            <div class="md-title">
+                <i class="fa-solid fa-key" style="color:#3a5fa8;"></i>
+                Phân quyền — <span id="permModalRoleName">—</span>
+            </div>
+            <button class="md-close" onclick="closePermModal()">&times;</button>
+        </div>
+        <div class="perm-top-bar">
+            <input type="text" class="perm-search" id="permSearch" placeholder="Tìm trang...">
+            <span class="perm-stats" id="permStats"></span>
+            <button class="btn btn-ghost btn-sm" onclick="grantAll()"><i class="fa-solid fa-check-double"></i> Cấp tất cả</button>
+            <button class="btn btn-ghost btn-sm" onclick="revokeAll()"><i class="fa-solid fa-xmark"></i> Thu hồi tất cả</button>
+        </div>
+        <div class="perm-modal-body" id="permMatrixWrap">
+            <div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>
+        </div>
+        <div class="md-foot">
+            <button class="btn btn-ghost" onclick="closePermModal()">Hủy</button>
+            <button class="btn btn-primary" id="btnSavePerm" onclick="savePerm()">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu phân quyền
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: CÀI ĐẶT TRANG (Danh sách)
+════════════════════════════════════════════════════════ -->
+<div class="md-bd" id="pageListModal">
+    <div class="md-box" style="max-width:900px;max-height:calc(100vh - 80px);display:flex;flex-direction:column;">
+        <div class="md-head">
+            <div class="md-title">
+                <i class="fa-solid fa-sitemap" style="color:var(--accent-navy);"></i>
+                Danh sách Trang truy cập
+                <span class="rl-badge cnt" id="pgListCount" style="margin-left:8px;">0</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <div class="add-acc-search-wrap" style="padding:6px 12px;border-radius:8px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="pgListSearch" placeholder="Tìm trang..." style="font-size:12.5px;">
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openPageEditModal(null)">
+                    <i class="fa-solid fa-plus"></i> Thêm trang
+                </button>
+                <button class="md-close" onclick="closePageListModal()">&times;</button>
+            </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:16px;">
+            <table class="acc-tbl">
+                <thead>
+                    <tr>
+                        <th>Tên trang</th>
+                        <th>Controller</th>
+                        <th>Đường dẫn</th>
+                        <th style="text-align:center;">Thứ tự</th>
+                        <th style="text-align:center;">Role</th>
+                        <th>Trạng thái</th>
+                        <th style="width:90px;text-align:center;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="pgListBody">
+                    <tr><td colspan="7" class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: THÊM / SỬA TRANG
+════════════════════════════════════════════════════════ -->
+<div class="md-bd" style="z-index:9200;" id="pageEditModal">
+    <div class="md-box" style="max-width:540px;">
+        <div class="md-head">
+            <div class="md-title">
+                <i class="fa-solid fa-file-pen" style="color:var(--accent-navy);"></i>
+                <span id="pgEditTitle">Thêm trang mới</span>
+            </div>
+            <button class="md-close" onclick="closePageEditModal()">&times;</button>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Mã Code</label>
+                    <input type="text" id="pgeCode" class="perm-search" style="width:100%;box-sizing:border-box;" placeholder="VD: PAGE_DASHBOARD">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Tên trang <span style="color:#dc2626;">*</span></label>
+                    <input type="text" id="pgeName" class="perm-search" style="width:100%;box-sizing:border-box;" placeholder="Tên hiển thị">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Controller</label>
+                    <input type="text" id="pgeController" class="perm-search" style="width:100%;box-sizing:border-box;" placeholder="VD: Account">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Đường dẫn (Path)</label>
+                    <input type="text" id="pgePath" class="perm-search" style="width:100%;box-sizing:border-box;" placeholder="/Account/Index">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Nhóm cha</label>
+                    <select id="pgeParent" class="perm-search" style="width:100%;box-sizing:border-box;">
+                        <option value="">— Không có nhóm cha —</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:6px;">Thứ tự sắp xếp</label>
+                    <input type="number" id="pgeOrder" class="perm-search" style="width:100%;box-sizing:border-box;" value="0" min="0">
+                </div>
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--ink-500);display:block;margin-bottom:8px;">Trạng thái</label>
+                <div style="display:flex;gap:16px;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
+                        <input type="radio" name="pgeStatus" value="1" checked> Hoạt động
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
+                        <input type="radio" name="pgeStatus" value="0"> Khóa
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="md-foot">
+            <button class="btn btn-ghost" onclick="closePageEditModal()">Hủy</button>
+            <button class="btn btn-primary" id="btnSavePage" onclick="savePage()">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu trang
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Context menu for role list -->
+<div class="rl-ctx" id="rlCtxMenu">
+    <button class="rl-ctx-item" id="ctxPerm"><i class="fa-solid fa-key" style="width:16px;color:#3a5fa8;"></i> Phân quyền</button>
+    <button class="rl-ctx-item" id="ctxEdit"><i class="fa-solid fa-pen" style="width:16px;color:var(--accent-navy);"></i> Chỉnh sửa</button>
+    <div class="rl-ctx-sep"></div>
+    <button class="rl-ctx-item" id="ctxToggle"><i class="fa-solid fa-lock" style="width:16px;color:#d97706;"></i> Khóa / Mở khóa</button>
+    <button class="rl-ctx-item danger" id="ctxDelete"><i class="fa-solid fa-trash" style="width:16px;"></i> Xóa</button>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── State ─────────────────────────────────────────── */
+    var allRoles     = [];
+    var selectedRole = null;
+    var ctx_roleId   = null;
+
+    /* All active users cache */
+    var allUsers     = [];
+    var selectedUids = new Set();
+
+    /* Permission matrix */
+    var permAllPages = [];   // all pages with permissions
+    var permAllPerms = [];   // distinct permission types
+    var permMatrix   = {};   // { pageId: { permId: bool } }
+    var permFiltered = [];   // after search
+
+    /* ── Helpers ───────────────────────────────────────── */
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function toast(msg, ok) { ok ? toastr.success(msg) : toastr.error(msg); }
+    function fmtBadge(s) {
+        if (s===1) return '<span class="rl-badge ok">Hoạt động</span>';
+        if (s===0) return '<span class="rl-badge off">Khóa</span>';
+        return '<span class="rl-badge" style="background:var(--border-soft);color:var(--ink-400);">Xóa</span>';
+    }
+    function avatarChar(u) {
+        var name = u.fullName || u.username || '?';
+        return name.charAt(0).toUpperCase();
+    }
+
+    /* ══════════════════════════════════════════════════
+       ROLE LIST
+    ══════════════════════════════════════════════════ */
+    var roleSearch   = document.getElementById('roleSearch');
+    var roleList     = document.getElementById('roleList');
+    var roleCount    = document.getElementById('roleCount');
+    var ctxMenu      = document.getElementById('rlCtxMenu');
+    var searchTimer;
+
+    function loadRoles(kw) {
+        roleList.innerHTML = '<div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>';
+        fetch('/Role/GetList' + (kw ? '?keyword=' + encodeURIComponent(kw) : ''))
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                allRoles = list;
+                roleCount.textContent = list.length + ' role';
+                renderRoles(list);
+            }).catch(function() {
+                roleList.innerHTML = '<div class="rl-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải</p></div>';
+            });
+    }
+
+    function renderRoles(list) {
+        if (!list.length) {
+            roleList.innerHTML = '<div class="rl-state"><i class="fa-solid fa-shield-halved"></i><p>Chưa có role nào</p></div>';
+            return;
+        }
+        var html = '';
+        list.forEach(function(r) {
+            var isActive = selectedRole && selectedRole.id === r.id;
+            html += '<div class="rl-item' + (isActive ? ' active' : '') + '" data-id="' + r.id + '">' +
+                '<div class="rl-item-icon"><i class="fa-solid fa-shield-halved"></i></div>' +
+                '<div class="rl-item-body">' +
+                    '<div class="rl-item-name">' + esc(r.name) + '</div>' +
+                    '<div class="rl-item-code">' + esc(r.code || '—') + '</div>' +
+                '</div>' +
+                '<div class="rl-item-meta">' +
+                    fmtBadge(r.status) +
+                    '<span class="rl-badge cnt">' + r.userCount + ' TK</span>' +
+                '</div>' +
+            '</div>';
+        });
+        roleList.innerHTML = html;
+        roleList.querySelectorAll('.rl-item').forEach(function(el) {
+            el.addEventListener('click', function() { selectRole(el.dataset.id); });
+            el.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                ctx_roleId = el.dataset.id;
+                var x = Math.min(e.clientX, window.innerWidth - 200);
+                var y = Math.min(e.clientY, window.innerHeight - 160);
+                ctxMenu.style.left = x + 'px';
+                ctxMenu.style.top  = y + 'px';
+                ctxMenu.classList.add('visible');
+            });
+        });
+    }
+
+    function selectRole(id) {
+        selectedRole = allRoles.find(function(r) { return r.id === id; }) || null;
+        roleList.querySelectorAll('.rl-item').forEach(function(el) {
+            el.classList.toggle('active', el.dataset.id === id);
+        });
+        if (!selectedRole) return;
+        document.getElementById('rightPlaceholder').style.display = 'none';
+        var rc = document.getElementById('rightContent');
+        rc.style.display = 'flex';
+        document.getElementById('heroName').textContent = selectedRole.name;
+        document.getElementById('heroDesc').textContent = selectedRole.description || selectedRole.code || '';
+        loadAccounts(id);
+    }
+
+    roleSearch.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        var kw = this.value.trim();
+        searchTimer = setTimeout(function() { loadRoles(kw); }, 260);
+    });
+
+    /* ══════════════════════════════════════════════════
+       ACCOUNT LIST (right panel)
+    ══════════════════════════════════════════════════ */
+    var accTableBody = document.getElementById('accTableBody');
+    var accCount     = document.getElementById('accCount');
+
+    function loadAccounts(roleId) {
+        accTableBody.innerHTML = '<tr><td colspan="5"><div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div></td></tr>';
+        fetch('/Role/GetAccounts?roleId=' + encodeURIComponent(roleId))
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                accCount.textContent = list.length + ' tài khoản';
+                renderAccounts(list);
+            });
+    }
+
+    function renderAccounts(list) {
+        if (!list.length) {
+            accTableBody.innerHTML = '<tr><td colspan="5"><div class="rl-state"><i class="fa-solid fa-users"></i><p>Chưa có tài khoản nào</p></div></td></tr>';
+            return;
+        }
+        accTableBody.innerHTML = '';
+        list.forEach(function(u) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><span class="acc-mono">' + esc(u.username) + '</span></td>' +
+                '<td style="font-weight:600;">' + esc(u.fullName || '—') + '</td>' +
+                '<td style="color:var(--ink-500);">' + esc(u.msnv || '—') + '</td>' +
+                '<td>' + fmtBadge(u.status) + '</td>' +
+                '<td style="text-align:center;">' +
+                    '<button class="btn btn-violet btn-xs perm-btn" data-uid="' + u.userId + '" style="margin-right:4px;" title="Phân quyền trang">' +
+                        '<i class="fa-solid fa-key"></i>' +
+                    '</button>' +
+                    '<button class="btn btn-danger btn-xs rm-btn" data-uid="' + u.userId + '" title="Xóa khỏi role">' +
+                        '<i class="fa-solid fa-xmark"></i>' +
+                    '</button>' +
+                '</td>';
+            tr.querySelector('.rm-btn').addEventListener('click', function() {
+                if (!confirm('Xóa tài khoản "' + u.username + '" khỏi role?')) return;
+                fetch('/Role/RemoveUser', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleId: selectedRole.id, userId: u.userId })
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    toast(d.message, d.success);
+                    if (d.success) { loadAccounts(selectedRole.id); loadRoles(roleSearch.value.trim()); }
+                });
+            });
+            // Nút phân quyền trên từng account → mở modal phân quyền của role
+            tr.querySelector('.perm-btn').addEventListener('click', function() {
+                openPermModal();
+            });
+            accTableBody.appendChild(tr);
+        });
+    }
+
+    // Hero buttons
+    document.getElementById('btnEditRole').addEventListener('click', function() {
+        if (selectedRole) window.location.href = '/Role/Setting?id=' + selectedRole.id;
+    });
+    document.getElementById('btnPermRole').addEventListener('click', openPermModal);
+    document.getElementById('btnAddAcc').addEventListener('click', openAddAccModal);
+
+    /* ══════════════════════════════════════════════════
+       MODAL: THÊM TÀI KHOẢN
+    ══════════════════════════════════════════════════ */
+    var addAccModal    = document.getElementById('addAccModal');
+    var addAccSearch   = document.getElementById('addAccSearch');
+    var addAccList     = document.getElementById('addAccList');
+    var addAccCount    = document.getElementById('addAccSelectedCount');
+    var addAccBadge    = document.getElementById('btnAddAccBadge');
+    var accSearchTimer;
+
+    function openAddAccModal() {
+        if (!selectedRole) return;
+        selectedUids = new Set();
+        addAccSearch.value = '';
+        updateAddAccBadge();
+        addAccModal.classList.add('open');
+        loadUsersForAdd('');
+        setTimeout(function() { addAccSearch.focus(); }, 100);
+    }
+
+    function closeAddAccModal() {
+        addAccModal.classList.remove('open');
+        selectedUids = new Set();
+    }
+
+    function loadUsersForAdd(kw) {
+        addAccList.innerHTML = '<div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>';
+        fetch('/Role/SearchUsers?keyword=' + encodeURIComponent(kw || ''))
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                allUsers = list;
+                renderUserPicker(list);
+            });
+    }
+
+    function renderUserPicker(list) {
+        if (!list.length) {
+            addAccList.innerHTML = '<div class="rl-state"><i class="fa-solid fa-magnifying-glass"></i><p>Không tìm thấy tài khoản</p></div>';
+            return;
+        }
+        addAccList.innerHTML = '';
+        list.forEach(function(u) {
+            var div = document.createElement('div');
+            div.className = 'add-acc-item' + (selectedUids.has(u.id) ? ' selected' : '');
+            div.dataset.uid = u.id;
+            div.innerHTML =
+                '<div class="add-acc-avatar">' + avatarChar(u) + '</div>' +
+                '<div class="add-acc-info">' +
+                    '<div class="add-acc-name">' + esc(u.fullName || u.username) + '</div>' +
+                    '<div class="add-acc-sub">' +
+                        '<span><i class="fa-solid fa-at" style="font-size:10px;"></i> ' + esc(u.username) + '</span>' +
+                        (u.msnv ? '<span><i class="fa-solid fa-id-badge" style="font-size:10px;"></i> ' + esc(u.msnv) + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="add-acc-check">' + (selectedUids.has(u.id) ? '<i class="fa-solid fa-check" style="font-size:10px;"></i>' : '') + '</div>';
+            div.addEventListener('click', function() {
+                if (selectedUids.has(u.id)) selectedUids.delete(u.id);
+                else selectedUids.add(u.id);
+                div.classList.toggle('selected', selectedUids.has(u.id));
+                div.querySelector('.add-acc-check').innerHTML = selectedUids.has(u.id) ? '<i class="fa-solid fa-check" style="font-size:10px;"></i>' : '';
+                updateAddAccBadge();
+            });
+            addAccList.appendChild(div);
+        });
+    }
+
+    function updateAddAccBadge() {
+        var n = selectedUids.size;
+        addAccBadge.textContent = n ? n : '';
+        addAccCount.style.display = n ? '' : 'none';
+        addAccCount.textContent = 'Đã chọn ' + n + ' tài khoản';
+    }
+
+    addAccSearch.addEventListener('input', function() {
+        clearTimeout(accSearchTimer);
+        var kw = this.value.trim();
+        accSearchTimer = setTimeout(function() { loadUsersForAdd(kw); }, 250);
+    });
+
+    document.getElementById('btnConfirmAddAcc').addEventListener('click', function() {
+        if (!selectedRole || !selectedUids.size) { toast('Chưa chọn tài khoản nào', false); return; }
+        var ids = Array.from(selectedUids);
+        var btn = this; btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang thêm...';
+        Promise.all(ids.map(function(uid) {
+            return fetch('/Role/AssignUser', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roleId: selectedRole.id, userId: uid })
+            }).then(function(r) { return r.json(); });
+        })).then(function(results) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Thêm đã chọn <span id="btnAddAccBadge" style="background:rgba(255,255,255,.25);border-radius:99px;padding:1px 8px;font-size:11px;"></span>';
+            var ok = results.filter(function(d) { return d.success; }).length;
+            toast('Đã thêm ' + ok + '/' + ids.length + ' tài khoản vào role', ok > 0);
+            closeAddAccModal();
+            loadAccounts(selectedRole.id);
+            loadRoles(roleSearch.value.trim());
+        });
+    });
+
+    addAccModal.addEventListener('click', function(e) { if (e.target === addAccModal) closeAddAccModal(); });
+
+    /* ══════════════════════════════════════════════════
+       MODAL: PHÂN QUYỀN
+    ══════════════════════════════════════════════════ */
+    var permModal = document.getElementById('permModal');
+
+    function openPermModal() {
+        if (!selectedRole) return;
+        document.getElementById('permModalRoleName').textContent = selectedRole.name;
+        document.getElementById('permSearch').value = '';
+        document.getElementById('permMatrixWrap').innerHTML = '<div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>';
+        permModal.classList.add('open');
+        // Load role detail (includes permission state)
+        fetch('/Role/GetDetail?id=' + encodeURIComponent(selectedRole.id))
+            .then(function(r) { return r.json(); })
+            .then(function(detail) {
+                buildPermMatrix(detail.pagePermissions || []);
+            }).catch(function() {
+                document.getElementById('permMatrixWrap').innerHTML = '<div class="rl-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải</p></div>';
+            });
+    }
+
+    function closePermModal() { permModal.classList.remove('open'); }
+
+    function buildPermMatrix(pages) {
+        permAllPages = pages;
+        permAllPerms = pages.length ? (pages[0].permissions || []).map(function(p) { return { id: p.id, code: p.code, name: p.name }; }) : [];
+        permMatrix = {};
+        pages.forEach(function(pg) {
+            permMatrix[pg.pageId] = {};
+            (pg.permissions || []).forEach(function(p) { permMatrix[pg.pageId][p.id] = p.granted || false; });
+        });
+        renderPermMatrix(pages, '');
+    }
+
+    function renderPermMatrix(pages, kw) {
+        var wrap = document.getElementById('permMatrixWrap');
+        if (!pages.length) { wrap.innerHTML = '<div class="rl-state"><i class="fa-solid fa-file-lines"></i><p>Chưa có trang nào</p></div>'; updatePermStats(); return; }
+
+        var filtered = kw ? pages.filter(function(p) { return (p.pageName||'').toLowerCase().includes(kw) || (p.path||'').toLowerCase().includes(kw); }) : pages;
+        permFiltered = filtered;
+
+        var html = '<table class="perm-tbl"><thead><tr><th style="min-width:220px;">Trang / Chức năng</th>';
+        permAllPerms.forEach(function(p) { html += '<th class="pc">' + esc(p.name) + '</th>'; });
+        html += '<th class="pc">Tất cả</th></tr></thead><tbody>';
+
+        // Group by parent
+        var noParent = filtered.filter(function(p) { return !p.parentId; });
+        var withParent = filtered.filter(function(p) { return !!p.parentId; });
+        var grpMap = {};
+        withParent.forEach(function(p) {
+            var key = p.parentId;
+            if (!grpMap[key]) grpMap[key] = { name: p.parentName || 'Nhóm', items: [] };
+            grpMap[key].items.push(p);
+        });
+
+        function rowHtml(pg, indent) {
+            var permsGranted = Object.values(permMatrix[pg.pageId] || {});
+            var allGrant = permsGranted.length && permsGranted.every(Boolean);
+            var r = '<tr><td>' + (indent ? '<span style="width:12px;display:inline-block;opacity:.4;">└</span> ' : '') +
+                '<strong>' + esc(pg.pageName) + '</strong>' +
+                (pg.path ? '<span class="perm-path">' + esc(pg.path) + '</span>' : '') + '</td>';
+            permAllPerms.forEach(function(p) {
+                var chk = permMatrix[pg.pageId] && permMatrix[pg.pageId][p.id];
+                r += '<td class="pc"><input type="checkbox" class="perm-cb" data-page="' + pg.pageId + '" data-perm="' + p.id + '"' + (chk ? ' checked' : '') + '></td>';
+            });
+            r += '<td class="pc"><input type="checkbox" class="row-all" data-page="' + pg.pageId + '"' + (allGrant && permAllPerms.length ? ' checked' : '') + '></td>';
+            r += '</tr>';
+            return r;
+        }
+
+        noParent.forEach(function(pg) {
+            if (grpMap[pg.pageId]) {
+                html += '<tr class="pgrp"><td colspan="' + (permAllPerms.length + 2) + '"><i class="fa-solid fa-folder"></i>' + esc(pg.pageName) + '</td></tr>';
+                html += rowHtml(pg, false);
+                grpMap[pg.pageId].items.forEach(function(c) { html += rowHtml(c, true); });
+            } else {
+                html += rowHtml(pg, false);
+            }
+        });
+        withParent.forEach(function(p) {
+            if (!filtered.find(function(x) { return x.pageId === p.parentId; })) html += rowHtml(p, false);
+        });
+
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+
+        wrap.querySelectorAll('.perm-cb').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                if (!permMatrix[cb.dataset.page]) permMatrix[cb.dataset.page] = {};
+                permMatrix[cb.dataset.page][cb.dataset.perm] = cb.checked;
+                syncRowAll(cb.dataset.page);
+                updatePermStats();
+            });
+        });
+        wrap.querySelectorAll('.row-all').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var pg = cb.dataset.page;
+                Object.keys(permMatrix[pg] || {}).forEach(function(pid) { permMatrix[pg][pid] = cb.checked; });
+                wrap.querySelectorAll('.perm-cb[data-page="' + pg + '"]').forEach(function(x) { x.checked = cb.checked; });
+                updatePermStats();
+            });
+        });
+        updatePermStats();
+    }
+
+    function syncRowAll(pageId) {
+        var vals = Object.values(permMatrix[pageId] || {});
+        var all = vals.length && vals.every(Boolean);
+        var cb = document.querySelector('.row-all[data-page="' + pageId + '"]');
+        if (cb) cb.checked = all;
+    }
+
+    function updatePermStats() {
+        var total = 0, granted = 0;
+        Object.values(permMatrix).forEach(function(pm) { Object.values(pm).forEach(function(v) { total++; if(v) granted++; }); });
+        document.getElementById('permStats').textContent = granted + '/' + total + ' quyền';
+    }
+
+    function grantAll() {
+        Object.keys(permMatrix).forEach(function(pg) { Object.keys(permMatrix[pg]).forEach(function(pm) { permMatrix[pg][pm] = true; }); });
+        renderPermMatrix(permAllPages, document.getElementById('permSearch').value.trim());
+    }
+    function revokeAll() {
+        Object.keys(permMatrix).forEach(function(pg) { Object.keys(permMatrix[pg]).forEach(function(pm) { permMatrix[pg][pm] = false; }); });
+        renderPermMatrix(permAllPages, document.getElementById('permSearch').value.trim());
+    }
+
+    var permSearchTimer;
+    document.getElementById('permSearch').addEventListener('input', function() {
+        clearTimeout(permSearchTimer);
+        var kw = this.value.trim().toLowerCase();
+        permSearchTimer = setTimeout(function() { renderPermMatrix(permAllPages, kw); }, 220);
+    });
+
+    function savePerm() {
+        if (!selectedRole) return;
+        var pagePerms = [];
+        Object.keys(permMatrix).forEach(function(pgId) {
+            var pids = Object.keys(permMatrix[pgId]).filter(function(pid) { return permMatrix[pgId][pid]; });
+            if (pids.length) pagePerms.push({ pageId: pgId, permissionIds: pids });
+        });
+        var btn = document.getElementById('btnSavePerm');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        fetch('/Role/Upsert', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: selectedRole.id, name: selectedRole.name, code: selectedRole.code,
+                description: selectedRole.description, status: selectedRole.status,
+                pagePermissions: pagePerms
+            })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu phân quyền';
+            toast(d.message, d.success);
+            if (d.success) closePermModal();
+        }).catch(function(e) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu phân quyền';
+            toast('Lỗi: ' + e.message, false);
+        });
+    }
+
+    permModal.addEventListener('click', function(e) { if (e.target === permModal) closePermModal(); });
+
+    /* ══════════════════════════════════════════════════
+       CONTEXT MENU
+    ══════════════════════════════════════════════════ */
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#rlCtxMenu')) ctxMenu.classList.remove('visible');
+        if (!e.target.closest('.rl-pick-wrap')) { /* dropdown */ }
+    });
+
+    document.getElementById('ctxPerm').addEventListener('click', function() {
+        ctxMenu.classList.remove('visible');
+        if (ctx_roleId) { selectRole(ctx_roleId); setTimeout(openPermModal, 100); }
+    });
+    document.getElementById('ctxEdit').addEventListener('click', function() {
+        ctxMenu.classList.remove('visible');
+        if (ctx_roleId) window.location.href = '/Role/Setting?id=' + ctx_roleId;
+    });
+    document.getElementById('ctxToggle').addEventListener('click', function() {
+        ctxMenu.classList.remove('visible');
+        if (!ctx_roleId) return;
+        var r = allRoles.find(function(x) { return x.id === ctx_roleId; });
+        var ns = r && r.status === 1 ? 0 : 1;
+        fetch('/Role/SetStatus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [ctx_roleId], targetStatus: ns }) })
+            .then(function(r) { return r.json(); }).then(function(d) { toast(d.message, d.success); if(d.success) loadRoles(roleSearch.value.trim()); });
+    });
+    document.getElementById('ctxDelete').addEventListener('click', function() {
+        ctxMenu.classList.remove('visible');
+        if (!ctx_roleId || !confirm('Xóa role này?')) return;
+        fetch('/Role/SetStatus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [ctx_roleId], targetStatus: -1 }) })
+            .then(function(r) { return r.json(); }).then(function(d) {
+                toast(d.message, d.success);
+                if (d.success) {
+                    if (selectedRole && selectedRole.id === ctx_roleId) {
+                        selectedRole = null;
+                        document.getElementById('rightPlaceholder').style.display = '';
+                        document.getElementById('rightContent').style.display = 'none';
+                    }
+                    loadRoles(roleSearch.value.trim());
+                }
+            });
+    });
+
+    /* ══════════════════════════════════════════════════
+       CÀI ĐẶT TRANG (PAGE MANAGEMENT)
+    ══════════════════════════════════════════════════ */
+    var pageListModal = document.getElementById('pageListModal');
+    var pageEditModal = document.getElementById('pageEditModal');
+    var allPages = [];
+    var editingPageId = null;
+    var pgSearchTimer;
+
+    function openPageListModal() {
+        pageListModal.classList.add('open');
+        document.getElementById('pgListSearch').value = '';
+        loadPages();
+    }
+    function closePageListModal() { pageListModal.classList.remove('open'); }
+
+    function loadPages(kw) {
+        var tbody = document.getElementById('pgListBody');
+        tbody.innerHTML = '<tr><td colspan="7"><div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div></td></tr>';
+        var url = '/Role/GetPages' + (kw ? '?keyword=' + encodeURIComponent(kw) : '');
+        fetch(url).then(function(r) { return r.json(); }).then(function(list) {
+            allPages = list;
+            document.getElementById('pgListCount').textContent = list.length + ' trang';
+            renderPages(list);
+            
+            // Cập nhật list parent cho modal edit
+            var sel = document.getElementById('pgeParent');
+            sel.innerHTML = '<option value="">— Không có nhóm cha —</option>';
+            list.filter(function(p) { return !p.parentId; }).forEach(function(p) {
+                var o = document.createElement('option');
+                o.value = p.id; o.textContent = p.name;
+                sel.appendChild(o);
+            });
+        }).catch(function() {
+            tbody.innerHTML = '<tr><td colspan="7"><div class="rl-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải danh sách</p></div></td></tr>';
+        });
+    }
+
+    function renderPages(list) {
+        var tbody = document.getElementById('pgListBody');
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="7"><div class="rl-state"><i class="fa-solid fa-inbox"></i><p>Chưa có trang nào</p></div></td></tr>';
+            return;
+        }
+        var parents = list.filter(function(p) { return !p.parentId; });
+        var children = list.filter(function(p) { return !!p.parentId; });
+        var childMap = {};
+        children.forEach(function(c) {
+            if (!childMap[c.parentId]) childMap[c.parentId] = [];
+            childMap[c.parentId].push(c);
+        });
+        
+        var html = '';
+        function rowHtml(p, isChild) {
+            return '<tr' + (isChild ? '' : ' style="background:rgba(0,0,0,.015);"') + '>' +
+                '<td>' + (isChild ? '<span style="width:16px;display:inline-block;text-align:right;opacity:.4;margin-right:6px;">└</span>' : '') +
+                    '<strong style="color:var(--ink-900);">' + esc(p.name) + '</strong>' +
+                    (p.code ? ' <span class="acc-mono" style="margin-left:6px;font-size:11px;">' + esc(p.code) + '</span>' : '') +
+                '</td>' +
+                '<td>' + esc(p.controllerName || '—') + '</td>' +
+                '<td>' + (p.path ? '<span class="perm-path">' + esc(p.path) + '</span>' : '—') + '</td>' +
+                '<td style="text-align:center;">' + p.sortOrder + '</td>' +
+                '<td style="text-align:center;">' + (p.roleCount ? '<span class="rl-badge cnt">' + p.roleCount + ' Role</span>' : '—') + '</td>' +
+                '<td>' + fmtBadge(p.status) + '</td>' +
+                '<td style="text-align:center;">' +
+                    '<button class="btn btn-ghost btn-xs" onclick="openPageEditModal(\'' + p.id + '\')" title="Sửa" style="margin-right:4px;"><i class="fa-solid fa-pen"></i></button>' +
+                    '<button class="btn btn-danger btn-xs" onclick="deletePage(\'' + p.id + '\')" title="Xóa"><i class="fa-solid fa-trash"></i></button>' +
+                '</td>' +
+            '</tr>';
+        }
+        
+        parents.forEach(function(p) {
+            html += rowHtml(p, false);
+            if (childMap[p.id]) {
+                childMap[p.id].forEach(function(c) { html += rowHtml(c, true); });
+            }
+        });
+        children.forEach(function(c) {
+            if (!list.find(function(x) { return x.id === c.parentId; })) html += rowHtml(c, false);
+        });
+        
+        tbody.innerHTML = html;
+    }
+
+    document.getElementById('pgListSearch').addEventListener('input', function() {
+        clearTimeout(pgSearchTimer);
+        var kw = this.value.trim();
+        pgSearchTimer = setTimeout(function() { loadPages(kw); }, 250);
+    });
+
+    function openPageEditModal(id) {
+        editingPageId = id;
+        document.getElementById('pgEditTitle').textContent = id ? 'Chỉnh sửa trang' : 'Thêm trang mới';
+        
+        ['pgeCode','pgeName','pgeController','pgePath','pgeParent'].forEach(function(fid) { document.getElementById(fid).value = ''; });
+        document.getElementById('pgeOrder').value = '0';
+        document.querySelector('input[name=pgeStatus][value="1"]').checked = true;
+
+        if (id) {
+            var p = allPages.find(function(x) { return x.id === id; });
+            if (p) {
+                document.getElementById('pgeCode').value = p.code || '';
+                document.getElementById('pgeName').value = p.name || '';
+                document.getElementById('pgeController').value = p.controllerName || '';
+                document.getElementById('pgePath').value = p.path || '';
+                document.getElementById('pgeParent').value = p.parentId || '';
+                document.getElementById('pgeOrder').value = p.sortOrder || 0;
+                var rad = document.querySelector('input[name=pgeStatus][value="' + p.status + '"]');
+                if (rad) rad.checked = true;
+            }
+        }
+        pageEditModal.classList.add('open');
+    }
+    function closePageEditModal() { pageEditModal.classList.remove('open'); }
+
+    function savePage() {
+        var name = document.getElementById('pgeName').value.trim();
+        if (!name) { toastr.error('Vui lòng nhập tên trang'); return; }
+        var btn = document.getElementById('btnSavePage');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        
+        var payload = {
+            id: editingPageId || null,
+            code: document.getElementById('pgeCode').value.trim() || null,
+            name: name,
+            controllerName: document.getElementById('pgeController').value.trim() || null,
+            path: document.getElementById('pgePath').value.trim() || null,
+            parentId: document.getElementById('pgeParent').value || null,
+            sortOrder: parseInt(document.getElementById('pgeOrder').value) || 0,
+            status: parseInt(document.querySelector('input[name=pgeStatus]:checked').value)
+        };
+        
+        fetch('/Role/UpsertPage', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu trang';
+            toast(d.message, d.success);
+            if (d.success) { closePageEditModal(); loadPages(document.getElementById('pgListSearch').value.trim()); }
+        }).catch(function(e) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu trang';
+            toast('Lỗi: ' + e.message, false);
+        });
+    }
+
+    function deletePage(id) {
+        if (!confirm('Xóa trang này? Hành động này có thể làm mất quyền đã phân!')) return;
+        fetch('/Role/SetPageStatus', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [id], targetStatus: -1 })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            toast(d.message, d.success);
+            if (d.success) loadPages(document.getElementById('pgListSearch').value.trim());
+        });
+    }
+
+    pageListModal.addEventListener('click', function(e) { if(e.target===this) closePageListModal(); });
+    pageEditModal.addEventListener('click', function(e) { if(e.target===this) closePageEditModal(); });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { closeAddAccModal(); closePermModal(); closePageListModal(); closePageEditModal(); }
+    });
+
+    /* ── Export for inline onclick ────────────────────── */
+    window.closeAddAccModal = closeAddAccModal;
+    window.closePermModal = closePermModal;
+    window.grantAll = grantAll;
+    window.revokeAll = revokeAll;
+    window.savePerm = savePerm;
+    window.openPageListModal = openPageListModal;
+    window.closePageListModal = closePageListModal;
+    window.openPageEditModal = openPageEditModal;
+    window.closePageEditModal = closePageEditModal;
+    window.savePage = savePage;
+    window.deletePage = deletePage;
+
+    /* ── Init ─────────────────────────────────────────── */
+    loadRoles();
+
+}());
+</script>
+

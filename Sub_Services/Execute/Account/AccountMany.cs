@@ -275,6 +275,47 @@ namespace Sub_Services.Execute
             }
         }
 
+        /// <summary>Kiểm tra thông tin đăng nhập.</summary>
+        public async Task<(bool Ok, string Message, Account_Item User)> VerifyLogin(string username, string password)
+        {
+            try
+            {
+                var u = await _context.Users.FirstOrDefaultAsync(x => x.Username == username.Trim());
+                if (u == null)
+                    return (false, "Tài khoản không tồn tại.", null);
+
+                // Kiểm tra trạng thái
+                if (u.Status != 1)
+                    return (false, "Tài khoản của bạn đang bị khoá.", null);
+
+                // Kiểm tra hạn sử dụng
+                if (u.ExpiryDate < DateTime.Now)
+                    return (false, "Tài khoản của bạn đã hết hạn sử dụng.", null);
+
+                // Kiểm tra mật khẩu
+                var hashedInput = HashPasswordWithSalt(password, u.HashCode);
+                if (hashedInput != u.PasswordHash)
+                    return (false, "Mật khẩu không chính xác.", null);
+
+                var accountItem = new Account_Item
+                {
+                    Id         = u.Id,
+                    Username   = u.Username,
+                    Msnv       = u.Msnv,
+                    FullName   = u.FullName,
+                    Email      = u.Email,
+                    Status     = u.Status,
+                    ExpiryDate = u.ExpiryDate,
+                };
+
+                return (true, "Đăng nhập thành công.", accountItem);
+            }
+            catch (Exception ex)
+            {
+                return (false, "Lỗi hệ thống: " + ex.Message, null);
+            }
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────
 
         /// <summary>Sinh chuỗi salt ngẫu nhiên dạng hex 32 ký tự.</summary>

@@ -26,14 +26,34 @@
 
         <div class="header-right">
             <div class="header-divider"></div>
-            <button class="user-chip" aria-label="Tài khoản">
-                <div class="avatar">NH</div>
-                <div class="user-meta">
-                    <span class="user-name">Nhật Hoài</span>
-                    <span class="user-role">Quản trị viên</span>
+            @if (User.Identity != null && User.Identity.IsAuthenticated)
+            {
+                var fullName = User.Claims.FirstOrDefault(c => c.Type == "FullName")?.Value;
+                if (string.IsNullOrWhiteSpace(fullName)) fullName = User.Identity.Name;
+                var initials = !string.IsNullOrEmpty(fullName) && fullName.Length >= 2 ? fullName.Substring(0, 2).ToUpper() : "U";
+                
+                <div style="position: relative;" onmouseleave="document.getElementById('userMenu').style.display='none'">
+                    <button class="user-chip" aria-label="Tài khoản" onclick="document.getElementById('userMenu').style.display='block'">
+                        <div class="avatar">@initials</div>
+                        <div class="user-meta">
+                            <span class="user-name">@fullName</span>
+                            <span class="user-role">@User.Identity.Name</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <div id="userMenu" style="display:none; position:absolute; top:100%; right:0; background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); padding:8px; min-width:180px; z-index:9999; margin-top:8px;">
+                        <a href="/Login/Logout" style="display:flex; align-items:center; gap:8px; padding:10px 12px; color:#ef4444; text-decoration:none; font-size:13px; font-weight:600; border-radius:6px; transition:background 0.2s;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Đăng xuất
+                        </a>
+                    </div>
                 </div>
-                <i class="fa-solid fa-chevron-down"></i>
-            </button>
+            }
+            else
+            {
+                <a href="/Login" style="padding:8px 16px; background:#1f3a67; color:white; text-decoration:none; border-radius:8px; font-size:13px; font-weight:600;">
+                    <i class="fa-solid fa-user"></i> Đăng nhập
+                </a>
+            }
         </div>
     </header>
 
@@ -127,7 +147,7 @@
                     <i class="fa-solid fa-user-shield"></i>
                     <span class="label">Quản lý tài khoản</span>
                 </a>
-                <a href="#" class="nav-item" data-tip="Phân quyền truy cập (sắp ra mắt)">
+                <a asp-controller="Role" asp-action="Index" class="nav-item" data-tip="Phân quyền truy cập (sắp ra mắt)">
                     <i class="fa-solid fa-key"></i>
                     <span class="label">Phân quyền</span>
                 </a>

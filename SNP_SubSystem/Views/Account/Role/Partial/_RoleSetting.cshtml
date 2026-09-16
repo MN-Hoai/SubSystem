@@ -1,0 +1,417 @@
+@{
+    var roleId = ViewData["RoleId"]?.ToString() ?? "";
+    var isNew  = string.IsNullOrEmpty(roleId);
+    ViewData["Title"] = isNew ? "Tạo Role mới" : "Chỉnh sửa Role";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<style>
+/* ── PAGE ──────────────────────────────────────────────── */
+.rs-page { display:flex; flex-direction:column; gap:20px; padding:24px; max-width:1100px; margin:0 auto; }
+.rs-topbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.rs-back { display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:9px;
+    font-size:13px; font-weight:700; color:var(--ink-600); background:var(--bg-canvas);
+    border:1.5px solid var(--border); cursor:pointer; transition:background .15s; text-decoration:none; }
+.rs-back:hover { background:var(--border-soft); }
+.rs-icon { width:44px; height:44px; border-radius:12px;
+    background:linear-gradient(135deg,#1f3a67 0%,#7c3aed 100%);
+    color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px;
+    flex-shrink:0; box-shadow:0 4px 14px rgba(124,58,237,.3); }
+.rs-page-title { font-size:22px; font-weight:800; color:var(--ink-900); }
+.rs-page-sub { font-size:12.5px; color:var(--ink-400); margin-top:2px; }
+
+/* ── PANEL ────────────────────────────────────────────── */
+.rs-panel { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.rs-panel-head { display:flex; align-items:center; gap:10px; padding:14px 20px;
+    border-bottom:1px solid var(--border-soft); }
+.rs-panel-title { font-size:14px; font-weight:700; color:var(--ink-900); }
+.rs-panel-body { padding:20px; }
+
+/* ── FORM ─────────────────────────────────────────────── */
+.rs-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+@@media(max-width:600px) { .rs-row { grid-template-columns:1fr; } }
+.rs-row-full { margin-bottom:16px; }
+.rs-lbl { font-size:11px; font-weight:700; color:var(--ink-500); text-transform:uppercase;
+    letter-spacing:.4px; margin-bottom:5px; display:block; }
+.rs-lbl .req { color:var(--danger); margin-left:2px; }
+.rs-inp { width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-size:13.5px; color:var(--ink-900); background:var(--bg-surface); outline:none;
+    transition:border-color .18s,box-shadow .18s; font-family:inherit; box-sizing:border-box; }
+.rs-inp:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+.rs-textarea { min-height:72px; resize:vertical; }
+
+/* ── STATUS SELECT ────────────────────────────────────── */
+.rs-status-grp { display:flex; gap:10px; flex-wrap:wrap; }
+.rs-status-opt { display:flex; align-items:center; gap:7px; cursor:pointer;
+    padding:8px 14px; border-radius:9px; border:1.5px solid var(--border);
+    font-size:13px; font-weight:600; transition:border-color .15s,background .15s; }
+.rs-status-opt input[type=radio] { display:none; }
+.rs-status-opt.active-opt  { border-color:#22c55e; background:#e0f7ef; color:#15803d; }
+.rs-status-opt.locked-opt  { border-color:#f97316; background:#fff7ed; color:#c2410c; }
+
+/* ── BUTTONS ──────────────────────────────────────────── */
+.btn { display:inline-flex; align-items:center; gap:7px; padding:9px 18px; border-radius:9px;
+    font-size:13.5px; font-weight:700; cursor:pointer; border:none;
+    transition:background .18s,opacity .18s,transform .15s; font-family:inherit; }
+.btn-primary { background:linear-gradient(135deg,#1f3a67 0%,#7c3aed 100%); color:#fff;
+    box-shadow:0 4px 12px rgba(124,58,237,.22); }
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+.btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+.btn-ghost:hover { background:var(--border-soft); }
+.btn-sm { padding:6px 12px; font-size:12.5px; border-radius:7px; }
+
+/* ── PERMISSION MATRIX ────────────────────────────────── */
+.rs-perm-filter { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+.rs-perm-search { padding:8px 12px; border:1.5px solid var(--border); border-radius:8px;
+    font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none;
+    transition:border-color .18s; flex:1; min-width:180px; font-family:inherit; }
+.rs-perm-search:focus { border-color:#7c3aed; }
+
+.rs-perm-tbl-wrap { border:1px solid var(--border); border-radius:10px; overflow:hidden; max-height:480px; overflow-y:auto; }
+.rs-perm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.rs-perm-tbl thead tr { background:#f8f9fc; position:sticky; top:0; z-index:2; }
+.rs-perm-tbl thead th { padding:9px 14px; text-align:left; font-size:10.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.5px; color:var(--ink-400);
+    border-bottom:2px solid var(--border); white-space:nowrap; }
+.rs-perm-tbl thead th.perm-col { text-align:center; min-width:80px; }
+.rs-perm-tbl tbody tr { border-bottom:1px solid var(--border-soft); transition:background .12s; }
+.rs-perm-tbl tbody tr:last-child { border-bottom:none; }
+.rs-perm-tbl tbody tr:hover { background:var(--accent-navy-soft); }
+.rs-perm-tbl tbody td { padding:9px 14px; vertical-align:middle; }
+.rs-perm-tbl tbody td.perm-col { text-align:center; }
+
+/* Group row (parent page) */
+.rs-perm-tbl tr.group-row td { background:#f1f3f9; font-weight:700; font-size:12px;
+    color:var(--ink-600); padding:7px 14px; }
+.rs-perm-tbl tr.group-row td i { margin-right:6px; color:#7c3aed; }
+
+/* Checkbox style */
+.perm-cb { width:17px; height:17px; cursor:pointer; accent-color:#7c3aed; }
+.page-name-cell { display:flex; align-items:center; gap:7px; }
+.page-name-cell .page-path { font-size:11px; color:var(--ink-400); font-family:'Courier New',monospace; }
+
+/* Select all row */
+.rs-perm-tbl tr.select-all-row td { background:#faf5ff; }
+.select-all-cb { width:17px; height:17px; cursor:pointer; accent-color:#7c3aed; }
+
+/* ── LOADING ──────────────────────────────────────────── */
+.rs-loading { text-align:center; padding:40px; color:var(--ink-400); font-size:13px; font-weight:600; }
+</style>
+
+<div class="rs-page">
+
+    <!-- TOPBAR -->
+    <div class="rs-topbar">
+        <a class="rs-back" href="/Role/Index">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại
+        </a>
+        <div class="rs-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div>
+            <div class="rs-page-title" id="pageTitle">@(isNew ? "Tạo Role mới" : "Chỉnh sửa Role")</div>
+            <div class="rs-page-sub" id="pageSub">@(isNew ? "Đặt tên, mô tả và cài đặt quyền truy cập trang" : "Chỉnh sửa thông tin và phân quyền trang truy cập")</div>
+        </div>
+    </div>
+
+    <!-- FORM THÔNG TIN ROLE -->
+    <div class="rs-panel">
+        <div class="rs-panel-head">
+            <i class="fa-solid fa-circle-info" style="color:#7c3aed;font-size:16px;"></i>
+            <span class="rs-panel-title">Thông tin Role</span>
+        </div>
+        <div class="rs-panel-body">
+            <div class="rs-row">
+                <div>
+                    <label class="rs-lbl" for="fCode">Mã Code</label>
+                    <input type="text" class="rs-inp" id="fCode" placeholder="VD: ADMIN, MANAGER...">
+                </div>
+                <div>
+                    <label class="rs-lbl" for="fName">Tên Role <span class="req">*</span></label>
+                    <input type="text" class="rs-inp" id="fName" placeholder="Tên hiển thị của role">
+                </div>
+            </div>
+            <div class="rs-row-full">
+                <label class="rs-lbl" for="fDesc">Mô tả</label>
+                <textarea class="rs-inp rs-textarea" id="fDesc" placeholder="Mô tả phạm vi quyền hạn..."></textarea>
+            </div>
+            <div class="rs-row-full">
+                <label class="rs-lbl">Trạng thái</label>
+                <div class="rs-status-grp">
+                    <label class="rs-status-opt active-opt" id="optActive">
+                        <input type="radio" name="fStatus" id="statusActive" value="1" checked>
+                        <i class="fa-solid fa-circle-check"></i> Hoạt động
+                    </label>
+                    <label class="rs-status-opt locked-opt" id="optLocked">
+                        <input type="radio" name="fStatus" id="statusLocked" value="0">
+                        <i class="fa-solid fa-lock"></i> Khóa
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHÂN QUYỀN TRANG -->
+    <div class="rs-panel">
+        <div class="rs-panel-head">
+            <i class="fa-solid fa-key" style="color:#7c3aed;font-size:16px;"></i>
+            <span class="rs-panel-title">Phân quyền trang truy cập</span>
+            <span style="font-size:12px;color:var(--ink-400);margin-left:auto;" id="permStats"></span>
+        </div>
+        <div class="rs-panel-body">
+            <div class="rs-perm-filter">
+                <input type="text" class="rs-perm-search" id="permSearch" placeholder="Tìm trang...">
+                <button class="btn btn-ghost btn-sm" id="btnGrantAll"><i class="fa-solid fa-check-double"></i> Cấp tất cả</button>
+                <button class="btn btn-ghost btn-sm" id="btnRevokeAll"><i class="fa-solid fa-xmark"></i> Thu hồi tất cả</button>
+            </div>
+            <div class="rs-perm-tbl-wrap" id="permMatrix">
+                <div class="rs-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách trang...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER ACTION -->
+    <div style="display:flex;justify-content:flex-end;gap:12px;padding-bottom:20px;">
+        <a href="/Role/Index" class="btn btn-ghost">
+            <i class="fa-solid fa-xmark"></i> Hủy
+        </a>
+        <button class="btn btn-primary" id="btnSave">
+            <i class="fa-solid fa-floppy-disk"></i> Lưu Role
+        </button>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    var ROLE_ID = '@roleId';
+    var allPages = [];       // [{pageId, pageName, pageCode, path, parentId, parentName, sortOrder, permissions:[{id,code,name,granted}]}]
+    var allPerms = [];       // distinct permission types from first page
+    var permMatrix = {};     // { pageId: { permId: bool } }
+
+    // ── DOM refs ──────────────────────────────────────────────
+    var permDiv   = document.getElementById('permMatrix');
+    var permSearch = document.getElementById('permSearch');
+    var permStats = document.getElementById('permStats');
+
+    // ── Init ───────────────────────────────────────────────────
+    if (ROLE_ID) {
+        // Chỉnh sửa: load detail (thông tin + quyền hiện tại)
+        fetch('/Role/GetDetail?id=' + encodeURIComponent(ROLE_ID))
+            .then(function(r) { return r.json(); })
+            .then(function(role) {
+                document.getElementById('fCode').value = role.code || '';
+                document.getElementById('fName').value = role.name || '';
+                document.getElementById('fDesc').value = role.description || '';
+                if (role.status === 0) {
+                    document.getElementById('statusLocked').checked = true;
+                }
+                buildMatrix(role.pagePermissions);
+            })
+            .catch(function() { permDiv.innerHTML = '<div class="rs-loading">Lỗi tải thông tin role</div>'; });
+    } else {
+        // Tạo mới: load tất cả pages
+        fetch('/Role/GetAllPages')
+            .then(function(r) { return r.json(); })
+            .then(function(pages) { buildMatrix(pages); })
+            .catch(function() { permDiv.innerHTML = '<div class="rs-loading">Lỗi tải danh sách trang</div>'; });
+    }
+
+    // ── Build Matrix ───────────────────────────────────────────
+    function buildMatrix(pages) {
+        allPages = pages || [];
+        // Lấy tất cả permissions (lấy từ page đầu tiên)
+        allPerms = (allPages[0] && allPages[0].permissions) ? allPages[0].permissions.map(function(p) { return { id: p.id, code: p.code, name: p.name }; }) : [];
+
+        // Build matrix state
+        permMatrix = {};
+        allPages.forEach(function(pg) {
+            permMatrix[pg.pageId] = {};
+            (pg.permissions || []).forEach(function(perm) {
+                permMatrix[pg.pageId][perm.id] = perm.granted || false;
+            });
+        });
+
+        renderMatrix(allPages, '');
+    }
+
+    function renderMatrix(pages, keyword) {
+        if (!pages.length) {
+            permDiv.innerHTML = '<div class="rs-loading" style="color:var(--ink-400);">Không có trang nào được cấu hình</div>';
+            updateStats();
+            return;
+        }
+
+        // Group by parent
+        var grouped = {};
+        var noParent = [];
+        pages.forEach(function(pg) {
+            var kw = keyword.toLowerCase();
+            if (kw && !pg.pageName.toLowerCase().includes(kw) && !(pg.path||'').toLowerCase().includes(kw)) return;
+            if (pg.parentId) {
+                if (!grouped[pg.parentId]) grouped[pg.parentId] = { name: pg.parentName || 'Nhóm khác', pages: [] };
+                grouped[pg.parentId].pages.push(pg);
+            } else {
+                noParent.push(pg);
+            }
+        });
+
+        var html = '<table class="rs-perm-tbl">';
+        // Header
+        html += '<thead><tr><th style="min-width:240px;">Trang / Chức năng</th>';
+        allPerms.forEach(function(p) { html += '<th class="perm-col">' + esc(p.name) + '</th>'; });
+        html += '<th class="perm-col" style="min-width:80px;">Tất cả</th></tr></thead>';
+        html += '<tbody>';
+
+        // Top-level pages (no parent)
+        noParent.forEach(function(pg) { html += renderPageRow(pg); });
+
+        // Grouped pages
+        Object.keys(grouped).forEach(function(parentId) {
+            var grp = grouped[parentId];
+            html += '<tr class="group-row"><td colspan="' + (allPerms.length + 2) + '"><i class="fa-solid fa-folder"></i>' + esc(grp.name) + '</td></tr>';
+            grp.pages.forEach(function(pg) { html += renderPageRow(pg, true); });
+        });
+
+        html += '</tbody></table>';
+        permDiv.innerHTML = html;
+
+        // Attach events
+        permDiv.querySelectorAll('.perm-cb[data-page][data-perm]').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                permMatrix[cb.dataset.page][cb.dataset.perm] = cb.checked;
+                syncRowAll(cb.dataset.page);
+                updateStats();
+            });
+        });
+        permDiv.querySelectorAll('.row-all-cb').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var pageId = cb.dataset.page;
+                var checked = cb.checked;
+                Object.keys(permMatrix[pageId] || {}).forEach(function(permId) { permMatrix[pageId][permId] = checked; });
+                permDiv.querySelectorAll('.perm-cb[data-page="' + pageId + '"]').forEach(function(x) { x.checked = checked; });
+                updateStats();
+            });
+        });
+        updateStats();
+    }
+
+    function renderPageRow(pg, indent) {
+        var html = '<tr>';
+        html += '<td><div class="page-name-cell">' + (indent ? '<span style="width:16px;display:inline-block;"></span>' : '') +
+            '<span style="font-weight:600;">' + esc(pg.pageName) + '</span>' +
+            (pg.path ? '<span class="page-path">' + esc(pg.path) + '</span>' : '') +
+            '</div></td>';
+        var allGranted = true;
+        allPerms.forEach(function(p) {
+            var granted = permMatrix[pg.pageId] && permMatrix[pg.pageId][p.id];
+            if (!granted) allGranted = false;
+            html += '<td class="perm-col"><input type="checkbox" class="perm-cb" data-page="' + pg.pageId + '" data-perm="' + p.id + '"' + (granted ? ' checked' : '') + '></td>';
+        });
+        // "All" checkbox
+        html += '<td class="perm-col"><input type="checkbox" class="row-all-cb" data-page="' + pg.pageId + '"' + (allGranted && allPerms.length > 0 ? ' checked' : '') + '></td>';
+        html += '</tr>';
+        return html;
+    }
+
+    function syncRowAll(pageId) {
+        var perms = permMatrix[pageId] || {};
+        var allGranted = Object.values(perms).length > 0 && Object.values(perms).every(function(v) { return v; });
+        var cb = permDiv.querySelector('.row-all-cb[data-page="' + pageId + '"]');
+        if (cb) cb.checked = allGranted;
+    }
+
+    function updateStats() {
+        var total = 0, granted = 0;
+        Object.values(permMatrix).forEach(function(perms) {
+            Object.values(perms).forEach(function(v) { total++; if(v) granted++; });
+        });
+        permStats.textContent = granted + '/' + total + ' quyền được cấp';
+    }
+
+    // ── Perm Search ────────────────────────────────────────────
+    var permSearchTimer;
+    permSearch.addEventListener('input', function() {
+        clearTimeout(permSearchTimer);
+        var kw = this.value.trim();
+        permSearchTimer = setTimeout(function() { renderMatrix(allPages, kw); }, 200);
+    });
+
+    // ── Grant/Revoke All ───────────────────────────────────────
+    document.getElementById('btnGrantAll').addEventListener('click', function() {
+        Object.keys(permMatrix).forEach(function(pgId) {
+            Object.keys(permMatrix[pgId]).forEach(function(permId) { permMatrix[pgId][permId] = true; });
+        });
+        renderMatrix(allPages, permSearch.value.trim());
+    });
+    document.getElementById('btnRevokeAll').addEventListener('click', function() {
+        Object.keys(permMatrix).forEach(function(pgId) {
+            Object.keys(permMatrix[pgId]).forEach(function(permId) { permMatrix[pgId][permId] = false; });
+        });
+        renderMatrix(allPages, permSearch.value.trim());
+    });
+
+    // ── Status radio visual ────────────────────────────────────
+    document.querySelectorAll('input[name=fStatus]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.getElementById('optActive').style.fontWeight = this.value === '1' ? '800' : '600';
+            document.getElementById('optLocked').style.fontWeight = this.value === '0' ? '800' : '600';
+        });
+    });
+
+    // ── Save ───────────────────────────────────────────────────
+    document.getElementById('btnSave').addEventListener('click', function() {
+        var name = document.getElementById('fName').value.trim();
+        if (!name) { toastr.error('Vui lòng nhập Tên Role'); return; }
+
+        var status = parseInt(document.querySelector('input[name=fStatus]:checked').value);
+
+        // Build pagePermissions
+        var pagePermissions = [];
+        Object.keys(permMatrix).forEach(function(pgId) {
+            var permIds = [];
+            Object.keys(permMatrix[pgId]).forEach(function(permId) {
+                if (permMatrix[pgId][permId]) permIds.push(permId);
+            });
+            if (permIds.length) pagePermissions.push({ pageId: pgId, permissionIds: permIds });
+        });
+
+        var payload = {
+            id:             ROLE_ID || null,
+            code:           document.getElementById('fCode').value.trim() || null,
+            name:           name,
+            description:    document.getElementById('fDesc').value.trim() || null,
+            status:         status,
+            pagePermissions: pagePermissions
+        };
+
+        var btn = document.getElementById('btnSave');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+
+        fetch('/Role/Upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu Role';
+            if (d.success) {
+                toastr.success(d.message || 'Đã lưu thành công');
+                setTimeout(function() { window.location.href = '/Role/Index'; }, 800);
+            } else {
+                toastr.error(d.message || 'Lỗi khi lưu');
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu Role';
+            toastr.error('Lỗi kết nối: ' + e.message);
+        });
+    });
+
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+}());
+</script>

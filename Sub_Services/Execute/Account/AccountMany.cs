@@ -73,11 +73,11 @@ namespace Sub_Services.Execute
                     (u.Email    != null && u.Email.ToLower().Contains(kw)));
             }
 
-            // Lọc trạng thái (không lọc -1 trừ khi yêu cầu xem cả xoá)
+            // Lọc trạng thái
             if (req.Status.HasValue)
                 q = q.Where(u => u.Status == req.Status.Value);
             else
-                q = q.Where(u => u.Status >= 0); // ẩn bản ghi đã xoá mềm
+                q = q.Where(u => u.Status >= -2); // hiển thị tất cả bao gồm đã xoá mềm (-2)
 
             var total = await q.CountAsync();
 
@@ -230,6 +230,44 @@ namespace Sub_Services.Execute
 
                 await _context.SaveChangesAsync();
                 return (true, $"Đã cập nhật {list.Count} tài khoản.");
+            }
+            catch (Exception ex)
+            {
+                return (false, "Lỗi hệ thống: " + ex.Message);
+            }
+        }
+
+        /// <summary>Gia hạn thời gian sử dụng tài khoản.</summary>
+        public async Task<(bool Ok, string Message)> ExtendAccountExpiry(List<Guid> ids, int years = 1)
+        {
+            try
+            {
+                var list = await _context.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
+                if (!list.Any())
+                    return (false, "Không tìm thấy tài khoản nào.");
+
+                var now = DateTime.Now;
+                foreach (var u in list)
+                {
+                    // Nếu ngày hết hạn cũ đã qua thì cộng từ hôm nay, nếu còn hạn thì cộng tiếp từ ngày hết hạn đó
+                    if (u.ExpiryDate < now)
+                    {
+                        u.ExpiryDate = now.AddYears(years);
+                    }
+                    else
+                    {
+                        u.ExpiryDate = u.ExpiryDate.AddYears(years);
+                    }
+                    
+                    // Nếu tài khoản đang hết hạn (-1), tự động mở khoá (1)
+                    if (u.Status == -1)
+                        u.Status = 1;
+
+                    u.UpdateDate = now;
+                }
+
+                await _context.SaveChangesAsync();
+                return (true, $"Đã gia hạn {list.Count} tài khoản thêm {years} năm.");
             }
             catch (Exception ex)
             {

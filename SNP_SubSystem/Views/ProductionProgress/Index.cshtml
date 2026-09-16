@@ -99,7 +99,12 @@
                 <div class="panel-title" id="panelTableTitle">Danh sách chuyền sản xuất</div>
                 <div class="panel-sub" id="panelTableSub">Đang tải dữ liệu...</div>
             </div>
-            <button class="btn btn-ghost" id="btnRefreshData"><i class="fa-solid fa-rotate-right"></i>Làm mới</button>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="btn btn-ghost" id="btnTodayActive" title="Lọc mã hàng đang sản xuất và có target hôm nay">
+                    <i class="fa-solid fa-calendar-check"></i>Đang SX hôm nay
+                </button>
+                <button class="btn btn-ghost" id="btnRefreshData"><i class="fa-solid fa-rotate-right"></i>Làm mới</button>
+            </div>
         </div>
 
         <!-- Loading overlay -->
@@ -119,6 +124,7 @@
             <table id="progressTable">
                 <thead>
                     <tr>
+                        <th>Bộ phận</th>
                         <th>Line</th>
                         <th>Style</th>
                         <th>SP#</th>
@@ -629,7 +635,10 @@
 
             tbody.insertAdjacentHTML('beforeend', `
                 <tr data-id="${p.id}" data-status="${p.status}" data-line="${escHtml(p.line??'')}"
-                    data-style="${escHtml(p.style??'')}" data-sp="${escHtml(p.spmain??'')}">
+                    data-style="${escHtml(p.style??'')}" data-sp="${escHtml(p.spmain??'')}"
+                    data-total-output="${p.totalOutput??0}" data-total-qty="${p.totalQty??0}"
+                    data-today-output="${p.todayOutput??0}" data-target="${p.target??0}">
+                    <td><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:700;background:rgba(31,58,103,.09);color:var(--accent-navy);white-space:nowrap;">${escHtml(p.departmentName ?? '—')}</span></td>
                     <td class="cell-strong">${escHtml(p.line ?? '—')}</td>
                     <td>${escHtml(p.style ?? '—')}</td>
                     <td class="cell-mono">${escHtml(p.spmain ?? '—')}</td>
@@ -828,6 +837,36 @@
         fetchList(1);
     });
 
+    // Nút "Đang SX hôm nay": lọc status=1, fromDate=toDate=hôm nay
+    // → hiện mã nằm trong khoảng ngày lên chuyền - hoàn thành và có target hôm nay > 0
+    document.getElementById('btnTodayActive').addEventListener('click', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        statusSelect.value    = '1';       // Đang SX
+        fromDateInput.value   = todayStr;
+        toDateInput.value     = todayStr;
+        searchInput.value     = '';
+        deptSelect.value      = '';
+        lineSelect.value      = '';
+        currentPage           = 1;
+        // Animate nút để báo hiệu đang lọc
+        const btn = document.getElementById('btnTodayActive');
+        btn.style.background = 'var(--accent-navy-soft, rgba(31,58,103,.1))';
+        btn.style.borderColor = 'var(--accent-navy)';
+        btn.style.color = 'var(--accent-navy)';
+        loadLines(null).then(() => fetchList(1));
+    });
+
+    // Reset style nút "Đang SX hôm nay" khi bấm các nút lọc khác
+    function resetTodayBtn() {
+        const btn = document.getElementById('btnTodayActive');
+        if (btn) { btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+    }
+    btnSearch.addEventListener('click', resetTodayBtn, true);
+    btnReset.addEventListener('click',  resetTodayBtn, true);
+    [lineSelect, statusSelect, fromDateInput, toDateInput, deptSelect].forEach(el => {
+        el.addEventListener('change', resetTodayBtn, true);
+    });
+
 })();
 </script>
 
@@ -914,7 +953,7 @@
     progressTbody.addEventListener('mousedown', e => {
         if (e.button !== 0) return;
         const tr = e.target.closest('tr[data-id]');
-        if (!tr) { ms_clearAll(); ms_lastIdx = -1; return; }
+        if (!tr) { ms_clearAll(); ms_lastIdx = -1; ms_updateSummary(); return; }
         const rows = ms_getRows();
         const idx  = rows.indexOf(tr);
         if (e.shiftKey && ms_lastIdx > -1) {
@@ -930,6 +969,7 @@
             ms_lastIdx  = idx;
             ms_isDragging = true;
         }
+        ms_updateSummary();
     });
 
     // Drag-select: bắt sự kiện qua mouseenter trên các thẻ con
@@ -939,10 +979,54 @@
         if (!tr) return;
         const idx = ms_getRows().indexOf(tr);
         if (ms_lastIdx > -1) { ms_clearAll(); ms_selectRange(ms_lastIdx, idx); }
+        ms_updateSummary();
     });
 
-    document.addEventListener('mouseup', () => { ms_isDragging = false; });
+    document.addEventListener('mouseup', () => { ms_isDragging = false; ms_updateSummary(); });
     progressTbody.addEventListener('selectstart', e => { if (ms_isDragging || e.shiftKey) e.preventDefault(); });
+
+    // ── Summary bar khi chọn nhiều dòng ───────────────────────────────
+    function fmtN(n) { return Number(n||0).toLocaleString('vi-VN'); }
+
+    function ms_updateSummary() {
+        // Lấy element ở đây (sau khi DOM đã ready) thay vì lúc khai báo script
+        const bar  = document.getElementById('msSummaryBar');
+        const txt  = document.getElementById('msSummaryText');
+        if (!bar || !txt) return;
+
+        const selected = ms_getSelected();
+        if (selected.length < 2) {
+            bar.style.display = 'none';
+            return;
+        }
+        let sumTotalOutput = 0, sumTotalQty = 0, sumTodayOutput = 0, sumTarget = 0;
+        selected.forEach(function(r) {
+            sumTotalOutput += parseInt(r.dataset.totalOutput || 0);
+            sumTotalQty    += parseInt(r.dataset.totalQty    || 0);
+            sumTodayOutput += parseInt(r.dataset.todayOutput || 0);
+            sumTarget      += parseInt(r.dataset.target      || 0);
+        });
+        const totalPct = sumTotalQty > 0 ? Math.round(sumTotalOutput / sumTotalQty * 100) : 0;
+        const todayPct = sumTarget   > 0 ? Math.round(sumTodayOutput / sumTarget   * 100) : 0;
+        const cTotal   = totalPct >= 80 ? '#34d399' : totalPct >= 50 ? '#fbbf24' : '#f87171';
+        const cToday   = todayPct >= 80 ? '#34d399' : todayPct >= 50 ? '#fbbf24' : '#f87171';
+
+        txt.innerHTML =
+            `<span style="color:#94a3b8;margin-right:8px;"><i class="fa-solid fa-check-double"></i> ${selected.length} dòng đã chọn</span>` +
+            `<span style="display:inline-block;width:1px;height:14px;background:rgba(255,255,255,.2);margin:0 12px;vertical-align:middle;"></span>` +
+            `<span style="opacity:.65;font-size:11px;margin-right:5px;">Tổng SL</span>` +
+            `<strong>${fmtN(sumTotalOutput)}</strong>` +
+            `<span style="opacity:.4;margin:0 3px;">/</span>` +
+            `<strong>${fmtN(sumTotalQty)}</strong>` +
+            `<span style="color:${cTotal};margin-left:7px;font-weight:800;">${totalPct}%</span>` +
+            `<span style="display:inline-block;width:1px;height:14px;background:rgba(255,255,255,.2);margin:0 14px;vertical-align:middle;"></span>` +
+            `<span style="opacity:.65;font-size:11px;margin-right:5px;">Ngày</span>` +
+            `<strong>${fmtN(sumTodayOutput)}</strong>` +
+            `<span style="opacity:.4;margin:0 3px;">/</span>` +
+            `<strong>${fmtN(sumTarget)}</strong>` +
+            `<span style="color:${cToday};margin-left:7px;font-weight:800;">${todayPct}%</span>`;
+        bar.style.display = 'flex';
+    }
 
     // =================================================================
     // CONTEXT MENU (hỗ trợ cả single và multi-select)
@@ -1097,6 +1181,22 @@
 })();
 </script>
 
+<!-- Floating selection summary bar -->
+<div id="msSummaryBar" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+    z-index:8888;background:rgba(15,23,42,.92);backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.12);border-radius:12px;
+    padding:10px 20px;font-size:13px;color:#e2e8f0;font-weight:600;
+    box-shadow:0 8px 28px rgba(0,0,0,.35);align-items:center;gap:0;
+    white-space:nowrap;font-family:Manrope,sans-serif;
+    animation:msSumIn .18s cubic-bezier(.4,0,.2,1);">
+    <span id="msSummaryText"></span>
+    <button onclick="document.getElementById('msSummaryBar').style.display='none';" title="Đóng"
+        style="margin-left:14px;background:rgba(255,255,255,.12);border:none;border-radius:6px;
+        color:#e2e8f0;cursor:pointer;padding:2px 7px;font-size:13px;line-height:1;">
+        ×
+    </button>
+</div>
+
 <style>
     #progressTableBody tr                { user-select: none; cursor: pointer; }
     #progressTableBody tr.ms-selected td { background: var(--sel-row-bg) !important; }
@@ -1114,4 +1214,5 @@
     .modal-body { padding:20px 22px; }
     .modal-footer { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
     @@keyframes mbIn { from { opacity:0; transform:translateY(-16px) scale(.97); } to { opacity:1; transform:none; } }
+    @@keyframes msSumIn { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 </style>

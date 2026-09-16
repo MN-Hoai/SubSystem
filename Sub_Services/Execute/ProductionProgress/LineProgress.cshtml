@@ -19,7 +19,7 @@
 /* ── HERO BAR ─────────────────────────────────────────────── */
 .lp-topbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 .lp-icon { width:44px; height:44px; border-radius:12px; flex-shrink:0;
-    background:linear-gradient(135deg,#1f3a67,#1f3a67); color:#fff;
+    background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff;
     display:flex; align-items:center; justify-content:center; font-size:18px;
     box-shadow:0 4px 14px rgba(31,58,103,.3); }
 .lp-title { font-size:22px; font-weight:800; color:var(--ink-900); }
@@ -39,10 +39,10 @@
     transition:background .14s,border-color .14s; font-family:inherit; }
 .lp-q-btn:hover { background:rgba(31,58,103,.08); border-color:var(--accent-navy); color:var(--accent-navy); }
 .lp-q-btn.active,
-.lp-q-btn.primary { background:linear-gradient(135deg,#1f3a67,#1f3a67); color:#fff; border-color:transparent; }
+.lp-q-btn.primary { background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff; border-color:transparent; }
 .lp-q-btn.primary:hover { opacity:.9; }
 .lp-search-btn { padding:7px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;
-    border:none; background:linear-gradient(135deg,#1f3a67,#1f3a67); color:#fff; font-family:inherit;
+    border:none; background:linear-gradient(135deg,#1f3a67,#3a5fa8); color:#fff; font-family:inherit;
     display:flex; align-items:center; gap:6px; transition:opacity .14s; }
 .lp-search-btn:hover { opacity:.88; }
 
@@ -71,8 +71,9 @@
 .lp-empty i { font-size:44px; color:var(--border); display:block; margin-bottom:12px; }
 .lp-empty p { font-size:14px; font-weight:600; color:var(--ink-400); }
 
-/* ── DETAIL GRID ────────────────────────────────── */
-.lp-detail { display:flex; flex-direction:column; gap:16px; padding:16px 20px; }
+/* ── DETAIL GRID ────────────────────────────────────────────── */
+.lp-detail { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 20px; }
+@@media (max-width:960px) { .lp-detail { grid-template-columns:1fr; } }
 
 .lp-card { background:var(--bg-surface); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
 .lp-card-head { display:flex; align-items:center; justify-content:space-between;
@@ -97,8 +98,8 @@
 .c-low  { color:#ef4444 !important; }
 
 /* Detail chart canvas area */
-.lp-chart-area { position:relative; height:240px; }
-.lp-chart-area-sm { position:relative; height:160px; }
+.lp-chart-area { position:relative; height:220px; }
+.lp-chart-area-sm { position:relative; height:190px; }
 
 /* Dept select */
 .lp-dept-sel { padding:6px 10px; border:1.5px solid var(--border); border-radius:7px; font-size:12.5px;
@@ -371,7 +372,7 @@
             type: 'bar'
         };
         var dsTotalQtyFixed = {
-            label: 'Tổng Qty',
+            label: 'Tổng Qty (đơn hàng)',
             data: depts.map(function(d){ return d.totalQtyFixed; }),
             backgroundColor: 'rgba(99,102,241,0.18)',
             borderColor: '#6366f1',
@@ -409,7 +410,7 @@
                                 var cp = dept.totalQtyFixed > 0
                                     ? Math.round(dept.totalTotalOutput / dept.totalQtyFixed * 100) : 0;
                                 return dept.departmentName
-                                    + ' — SL ngày: ' + fmt(dept.totalTodayOutput) + '/' + fmt(dept.totalTarget)
+                                    + ' — SL kỳ: ' + fmt(dept.totalTodayOutput) + '/' + fmt(dept.totalTarget)
                                     + ' (' + dept.todayOutputPct + '%)'
                                     + ' | ĐH: ' + fmt(dept.totalTotalOutput) + '/' + fmt(dept.totalQtyFixed)
                                     + ' (' + cp + '%)';
@@ -503,7 +504,7 @@
         html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Sản lượng đạt</div>';
         html += '<div class="lp-kpi-val">' + fmt(dept.totalTodayOutput);
         html += '<span class="lp-kpi-pct ' + pctC(dp) + '">' + dp + '%</span></div></div>';
-        html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Tổng đơn hàng</div>';
+        html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Tổng ĐH (cố định)</div>';
         html += '<div class="lp-kpi-val" style="font-size:16px;">' + fmt(dept.totalQtyFixed);
         html += '<span class="lp-kpi-pct ' + pctC(compPct) + '">' + compPct + '%</span></div></div>';
         html += '</div>';
@@ -523,7 +524,7 @@
         html += '<div class="lp-chart-area-sm"><canvas id="detailDoughnutCanvas"></canvas></div>';
 
         html += '<table class="lp-tbl"><thead><tr>';
-        html += '<th>Tổ</th><th>SL Ngày</th><th>Target</th><th>% Target</th><th>Tổng SL</th><th>Tổng Qty</th><th>% SL/Qty</th>';
+        html += '<th>Tổ</th><th>SL Kỳ</th><th>Target kỳ</th><th>% Kỳ</th><th>Tổng SL</th><th>Tổng Qty</th><th>%HT</th>';
         html += '</tr></thead><tbody>';
         if (!lines.length) {
             html += '<tr><td colspan="7" style="text-align:center;color:var(--ink-400);padding:14px;">Chưa có dữ liệu</td></tr>';
@@ -688,7 +689,7 @@
                                 return [
                                     'Tổng SL tích lũy: ' + fmt(l.totalOutput),
                                     'Tổng Qty đơn hàng: ' + fmt(l.totalQtyFixed),
-                                    'Hoàn thành: ' + l.completionPct + '%'
+                                    '% Hoàn thành: ' + l.completionPct + '%'
                                 ];
                             }
                         }

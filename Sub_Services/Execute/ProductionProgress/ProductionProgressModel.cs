@@ -124,6 +124,7 @@ namespace Sub_Services.Execute
 
             // ---------- Lien ket bo phan ----------
             public Guid ProductionDepartmentId { get; set; }
+            public string DepartmentName { get; set; }
 
             // ---------- Thong tin san xuat ----------
             public string Line { get; set; }

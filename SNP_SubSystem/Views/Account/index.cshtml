@@ -55,7 +55,7 @@
 
     /* Row selection */
     .acc-table tbody tr.acc-sel td { background:var(--sel-row-bg, rgba(31,58,103,.10)) !important; }
-    .acc-table tbody tr.acc-ctx td { background:var(--sel-ctx-bg, rgba(31,58,103,.18)) !important; }
+    .acc-table tbody tr.acc-row-ctx td { background:var(--sel-ctx-bg, rgba(31,58,103,.18)) !important; }
 
     /* ── BADGES ──────────────────────────────────────────── */
     .acc-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
@@ -170,10 +170,11 @@
         <div class="acc-filter-grp">
             <span class="acc-filter-lbl">Trạng thái</span>
             <select class="acc-inp" id="fStatus">
-                <option value="">Tất cả (trừ đã xoá)</option>
+                <option value="">Tất cả</option>
                 <option value="1" selected>Hoạt động</option>
-                <option value="0">Bị khoá</option>
-                <option value="-1">Đã xoá</option>
+                <option value="0">Tạm khoá</option>
+                <option value="-1">Hết hạn</option>
+                <option value="-2">Đã xoá</option>
             </select>
         </div>
         <div class="acc-filter-grp">
@@ -248,10 +249,16 @@
     <button class="acc-ctx-item" id="ctxUnlock">
         <i class="fa-solid fa-lock-open" style="color:var(--success);width:18px;"></i> Mở khoá (Status 1)
     </button>
-    <button class="acc-ctx-item" id="ctxLock">
-        <i class="fa-solid fa-lock" style="color:#d97706;width:18px;"></i> Khoá tài khoản (Status 0)
+    <button class="acc-ctx-item" id="ctxRestore">
+        <i class="fa-solid fa-trash-can-arrow-up" style="color:var(--success);width:18px;"></i> Khôi phục tài khoản
     </button>
-    <div class="acc-ctx-sep"></div>
+    <button class="acc-ctx-item" id="ctxExtend">
+        <i class="fa-solid fa-calendar-plus" style="color:var(--accent-navy);width:18px;"></i> Gia hạn nhanh 1 năm
+    </button>
+    <button class="acc-ctx-item" id="ctxLock">
+        <i class="fa-solid fa-lock" style="color:#d97706;width:18px;"></i> Tạm khoá (Status 0)
+    </button>
+    <div class="acc-ctx-sep" id="ctxSepDanger"></div>
     <button class="acc-ctx-item danger" id="ctxDelete">
         <i class="fa-solid fa-trash" style="width:18px;"></i> Xoá tài khoản
     </button>
@@ -302,7 +309,8 @@
                 <label class="acc-form-lbl">Trạng thái</label>
                 <select class="acc-form-inp" id="fStatusForm">
                     <option value="1">Hoạt động</option>
-                    <option value="0">Khoá</option>
+                    <option value="0">Tạm khoá</option>
+                    <option value="-1">Hết hạn</option>
                 </select>
             </div>
         </div>
@@ -380,7 +388,8 @@
 
     function statusBadge(status) {
         if (status === 1)  return '<span class="acc-badge active"><i class="fa-solid fa-circle" style="font-size:7px;"></i> Hoạt động</span>';
-        if (status === 0)  return '<span class="acc-badge locked"><i class="fa-solid fa-lock" style="font-size:9px;"></i> Bị khoá</span>';
+        if (status === 0)  return '<span class="acc-badge locked"><i class="fa-solid fa-lock" style="font-size:9px;"></i> Tạm khoá</span>';
+        if (status === -1) return '<span class="acc-badge" style="background:var(--border-soft);color:var(--ink-400);"><i class="fa-solid fa-clock" style="font-size:9px;"></i> Hết hạn</span>';
         return '<span class="acc-badge deleted">Đã xoá</span>';
     }
 
@@ -460,6 +469,7 @@
             var tr = document.createElement('tr');
             tr.dataset.id   = u.id;
             tr.dataset.name = u.username || '';
+            tr.dataset.status = u.status;
             tr.innerHTML =
                 '<td><strong class="mono">' + esc(u.username) + '</strong></td>' +
                 '<td>' + esc(u.fullName || '—') + '</td>' +
@@ -494,7 +504,7 @@
     function getRows()      { return Array.from(tbody.querySelectorAll('tr[data-id]')); }
     function selRows()      { return getRows().filter(function(r){ return r.classList.contains('acc-sel'); }); }
     function selIds()       { return selRows().map(function(r){ return r.dataset.id; }); }
-    function clearSel()     { getRows().forEach(function(r){ r.classList.remove('acc-sel','acc-ctx'); }); }
+    function clearSel()     { getRows().forEach(function(r){ r.classList.remove('acc-sel','acc-row-ctx'); }); }
     function selRange(a,b)  {
         var rows = getRows(), lo = Math.min(a,b), hi = Math.max(a,b);
         for (var i=lo;i<=hi;i++) if (rows[i]) rows[i].classList.add('acc-sel');
@@ -527,7 +537,7 @@
     // ── Context menu ──────────────────────────────────────────
     function hideCtx() {
         ctxMenu.classList.remove('visible');
-        tbody.querySelectorAll('.acc-ctx').forEach(function(r){ r.classList.remove('acc-ctx'); });
+        tbody.querySelectorAll('.acc-row-ctx').forEach(function(r){ r.classList.remove('acc-row-ctx'); });
     }
 
     tbody.addEventListener('contextmenu', function(e){
@@ -539,12 +549,26 @@
         if (!sel.includes(tr.dataset.id)) {
             clearSel(); tr.classList.add('acc-sel'); lastRowIdx = getRows().indexOf(tr);
         }
-        tbody.querySelectorAll('.acc-ctx').forEach(function(r){ r.classList.remove('acc-ctx'); });
-        tr.classList.add('acc-ctx');
+        tbody.querySelectorAll('.acc-row-ctx').forEach(function(r){ r.classList.remove('acc-row-ctx'); });
+        tr.classList.add('acc-row-ctx');
         ctxIds = selIds();
+        
+        var statuses = selRows().map(function(r) { return parseInt(r.dataset.status); });
+        var hasDeleted = statuses.includes(-2);
+        var hasActive = statuses.includes(1);
+        var hasLocked = statuses.includes(0);
+        var hasExpired = statuses.includes(-1);
 
-        // Ẩn "Cập nhật" khi chọn nhiều
-        document.getElementById('ctxEdit').style.display = ctxIds.length === 1 ? '' : 'none';
+        // Hiển thị tuỳ chọn theo trạng thái
+        document.getElementById('ctxEdit').style.display = ctxIds.length === 1 && !hasDeleted ? '' : 'none';
+        document.getElementById('ctxRestore').style.display = hasDeleted ? '' : 'none';
+        document.getElementById('ctxExtend').style.display = !hasDeleted ? '' : 'none';
+        
+        document.getElementById('ctxUnlock').style.display = (hasLocked || hasExpired) && !hasDeleted ? '' : 'none';
+        document.getElementById('ctxLock').style.display = hasActive && !hasDeleted ? '' : 'none';
+        
+        document.getElementById('ctxDelete').style.display = !hasDeleted ? '' : 'none';
+        document.getElementById('ctxSepDanger').style.display = !hasDeleted ? '' : 'none';
 
         var vw = window.innerWidth, vh = window.innerHeight;
         var x  = Math.min(e.clientX, vw - 210);
@@ -591,8 +615,31 @@
     }
 
     document.getElementById('ctxUnlock').addEventListener('click', function(){ doSetStatus(1,  'Mở khoá'); });
-    document.getElementById('ctxLock').addEventListener('click',   function(){ doSetStatus(0,  'Khoá'); });
-    document.getElementById('ctxDelete').addEventListener('click', function(){ doSetStatus(-1, 'Xoá mềm'); });
+    document.getElementById('ctxRestore').addEventListener('click', function(){ doSetStatus(1, 'Khôi phục'); });
+    document.getElementById('ctxLock').addEventListener('click',   function(){ doSetStatus(0,  'Tạm khoá'); });
+    document.getElementById('ctxDelete').addEventListener('click', function(){ doSetStatus(-2, 'Xoá mềm'); });
+
+    document.getElementById('ctxExtend').addEventListener('click', function(){
+        hideCtx();
+        if (!ctxIds.length) return;
+        var txt = ctxIds.length === 1
+            ? '<strong>Gia hạn 1 năm</strong> cho tài khoản này?'
+            : '<strong>Gia hạn 1 năm</strong> cho <strong>' + ctxIds.length + '</strong> tài khoản đã chọn?';
+        showConfirm(txt + '<br><span style="font-size:12px;color:var(--ink-400);">Nếu tài khoản đã hết hạn, tài khoản sẽ tự động được Mở khoá.</span>',
+            function(){
+                fetch('/Account/ExtendExpiry', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ctxIds, years: 1 })
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(res){
+                    if (res.success) { clearSel(); fetchList(currentPage); }
+                    else toast('error', res.message || 'Lỗi');
+                })
+                .catch(function(e){ toast('error', e.message); });
+            }
+        );
+    });
 
     // ── Form modal ────────────────────────────────────────────
     function openNewModal() {

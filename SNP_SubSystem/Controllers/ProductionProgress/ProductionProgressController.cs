@@ -141,6 +141,24 @@ namespace SNP_SubSystem.Controllers.ProductionProgress
                       : BadRequest(new { success = false, message = msg });
         }
 
+        // ---------------------------------------------------------------
+        // GET: Lấy dữ liệu thống kê tiến độ theo Line cho khoảng ngày
+        // GET /ProductionProgress/GetLineProgressData?from=yyyy-MM-dd&to=yyyy-MM-dd
+        // ---------------------------------------------------------------
+        [HttpGet]
+        public async Task<IActionResult> GetLineProgressData(string from = null, string to = null)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+
+            DateOnly fromDate = !string.IsNullOrEmpty(from) && DateOnly.TryParse(from, out var f) ? f : today;
+            DateOnly toDate   = !string.IsNullOrEmpty(to)   && DateOnly.TryParse(to,   out var t) ? t : today;
+
+            if (fromDate > toDate) toDate = fromDate;
+
+            var result = await _service.GetLineProgressData(fromDate, toDate);
+            return Ok(result);
+        }
+
         // ── Helper DTO ───────────────────────────────────────────────────────
         public class IdRequest { public Guid Id { get; set; } }
         public class BulkStatusRequest { 

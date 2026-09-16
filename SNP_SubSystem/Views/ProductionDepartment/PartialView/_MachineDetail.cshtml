@@ -231,8 +231,9 @@
             <select id="mdStatusFilter">
                 <option value="">Tất cả</option>
                 <option value="1" selected>Đang sản xuất</option>
+                <option value="0">Chờ SX</option>
                 <option value="2">Hoàn thành</option>
-                <option value="3">Tạm dừng</option>
+                <option value="-1">Tạm khóa</option>
             </select>
         </div>
         <div class="md-filter-group" style="align-self:flex-end;">
@@ -1173,11 +1174,10 @@
     });
 
     /* =====================================================
-       INIT
+       INIT — Gọi trực tiếp vì partial view inject sau DOM ready
+       (DOMContentLoaded đã fired trước khi partial được load)
        ===================================================== */
-    document.addEventListener('DOMContentLoaded', function () {
-        loadProductionInfos();
-    });
+    loadProductionInfos();
 
 }());
 </script>

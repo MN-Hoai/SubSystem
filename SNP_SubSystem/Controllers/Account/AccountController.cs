@@ -83,11 +83,33 @@ namespace SNP_SubSystem.Controllers.Account
                 : BadRequest(new { success = false, message = msg });
         }
 
+        // ---------------------------------------------------------------
+        // POST: Gia hạn tài khoản (thêm 1 năm)
+        // POST /Account/ExtendExpiry
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> ExtendExpiry([FromBody] ExtendExpiryRequest req)
+        {
+            if (req == null || req.Ids == null || req.Ids.Count == 0)
+                return BadRequest(new { success = false, message = "Danh sách ID trống." });
+
+            var (ok, msg) = await _service.ExtendAccountExpiry(req.Ids, req.Years);
+            return ok
+                ? Ok(new { success = true, message = msg })
+                : BadRequest(new { success = false, message = msg });
+        }
+
         // ── Helper DTOs ─────────────────────────────────────────────────
         public class SetStatusRequest
         {
             public List<Guid> Ids          { get; set; }
             public int        TargetStatus { get; set; }
+        }
+
+        public class ExtendExpiryRequest
+        {
+            public List<Guid> Ids   { get; set; }
+            public int        Years { get; set; } = 1;
         }
     }
 }

@@ -332,40 +332,49 @@ namespace Sub_Services.Execute
             var productionInfoList = await orderedQuery
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
+                .Join(_context.ProductionDepartments,
+                    p => p.ProductionDepartmentId,
+                    d => d.Id,
+                    (p, d) => new { Info = p, DeptName = d.DepartmentName })
                 .AsNoTracking()
                 .ToListAsync();
 
             // ----------------------------------------------------------------
             // 6. Map sang DTO, nap 2 truong tong hop san luong
             // ----------------------------------------------------------------
-            var items = productionInfoList.Select(p => new ProductionProgress_OutputInfo
+            var items = productionInfoList.Select(x =>
             {
-                // -- Thong tin ProductionInfo --
-                Id                     = p.Id,
-                ProductionDepartmentId = p.ProductionDepartmentId,
-                Line                   = p.Line,
-                Style                  = p.Style,
-                Spmain                 = p.Spmain,
-                TotalQty               = p.TotalQty,
-                FinishQty              = p.FinishQty,
-                Color                  = p.Color,
-                Target                 = p.Target,
-                InlineLine             = p.InlineLine,
-                InlineDepartment       = p.InlineDepartment,
-                Remark                 = p.Remark,
-                Machine                = p.Machine,
-                Keyword                = p.Keyword,
-                Status                 = p.Status,
-                CreateDate             = p.CreateDate,
-                UpdateDate             = p.UpdateDate,
-                CreateBy               = p.CreateBy,
-                UpdateBy               = p.UpdateBy,
+                var p = x.Info;
+                return new ProductionProgress_OutputInfo
+                {
+                    // -- Thong tin ProductionInfo --
+                    Id                     = p.Id,
+                    ProductionDepartmentId = p.ProductionDepartmentId,
+                    DepartmentName         = x.DeptName,
+                    Line                   = p.Line,
+                    Style                  = p.Style,
+                    Spmain                 = p.Spmain,
+                    TotalQty               = p.TotalQty,
+                    FinishQty              = p.FinishQty,
+                    Color                  = p.Color,
+                    Target                 = p.Target,
+                    InlineLine             = p.InlineLine,
+                    InlineDepartment       = p.InlineDepartment,
+                    Remark                 = p.Remark,
+                    Machine                = p.Machine,
+                    Keyword                = p.Keyword,
+                    Status                 = p.Status,
+                    CreateDate             = p.CreateDate,
+                    UpdateDate             = p.UpdateDate,
+                    CreateBy               = p.CreateBy,
+                    UpdateBy               = p.UpdateBy,
 
-                // -- Tong san luong tich luy den cuoi ToDate --
-                TotalOutput = totalOutputMap.TryGetValue(p.Id, out var total) ? total : 0,
+                    // -- Tong san luong tich luy den cuoi ToDate --
+                    TotalOutput = totalOutputMap.TryGetValue(p.Id, out var total) ? total : 0,
 
-                // -- Tong san luong trong khoang FromDate -> ToDate --
-                TodayOutput = todayOutputMap.TryGetValue(p.Id, out var today) ? today : 0
+                    // -- Tong san luong trong khoang FromDate -> ToDate --
+                    TodayOutput = todayOutputMap.TryGetValue(p.Id, out var today) ? today : 0
+                };
             }).ToList();
 
             // ----------------------------------------------------------------
@@ -622,6 +631,225 @@ namespace Sub_Services.Execute
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out d)) return d;
             return null;
+        }
+
+        // =====================================================================
+        //  HELPER: Tính sản lượng "effective" trong khoảng ngày [fromDate, toDate]
+        //  Cùng logic min-across-stages với GetTotalOutputByProductionInfo.
+        //  Trả về: ProductionInfoId → tổng output effective trong khoảng.
+        //  Cũng trả ra set các ProductionInfoId có DailyOutput trong khoảng (active).
+        // =====================================================================
+
+        /// <summary>
+        /// Tính sản lượng "effective" theo ProductionInfoId trong khoảng [fromDate, toDate].
+        /// Cùng logic min-across-stages như TotalOutput (cộng tổng detail, lấy min theo công đoạn).
+        /// Cũng trả ra HashSet các ProductionInfoId có DailyOutput trong khoảng (dùng để lọc tổ active).
+        /// </summary>
+        private async Task<(Dictionary<Guid, int> OutputMap, HashSet<Guid> ActiveInfoIds)>
+            GetOutputInRange(DateOnly fromDate, DateOnly toDate)
+        {
+            var rangeStart = fromDate.ToDateTime(TimeOnly.MinValue);
+            var rangeEnd   = toDate.ToDateTime(TimeOnly.MaxValue);
+
+            var dailyList = await _context.DailyOutputs
+                .Where(d => d.Status == 1
+                         && d.CreateDate >= rangeStart
+                         && d.CreateDate <= rangeEnd)
+                .Select(d => new { d.Id, d.ProductionInfoId, d.StyleInfoId })
+                .ToListAsync();
+
+            // Tập hợp các ProductionInfo có DailyOutput trong khoảng (tổ active)
+            var activeInfoIds = new HashSet<Guid>(dailyList.Select(d => d.ProductionInfoId));
+
+            if (!dailyList.Any())
+                return (new Dictionary<Guid, int>(), activeInfoIds);
+
+            var dailyIdList  = dailyList.Select(d => d.Id).ToList();
+            var dailyInfoMap = dailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
+
+            var infoToStyleInfo = dailyList
+                .Where(d => d.StyleInfoId != null)
+                .GroupBy(d => d.ProductionInfoId)
+                .ToDictionary(g => g.Key, g => g.First().StyleInfoId!.Value);
+
+            var styleInfoIds = infoToStyleInfo.Values.Distinct().ToList();
+            var expectedDetailCount = styleInfoIds.Any()
+                ? await _context.StyleDetails
+                    .Where(sd => sd.Status == 1 && styleInfoIds.Contains(sd.StyleInfoId))
+                    .GroupBy(sd => sd.StyleInfoId)
+                    .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count)
+                : new Dictionary<Guid, int>();
+
+            var detailList = await _context.DailyOutputDetails
+                .Where(dt => dt.DailyOutputId.HasValue
+                          && dt.OutputNumber.HasValue
+                          && dt.Status == 1
+                          && dailyIdList.Contains(dt.DailyOutputId!.Value))
+                .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
+                .ToListAsync();
+
+            // Cộng tổng theo (ProductionInfoId, StyleDetailId) toàn khoảng
+            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            foreach (var dt in detailList)
+            {
+                var infoId = dailyInfoMap[dt.DailyOutputId!.Value];
+                if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
+                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
+                var key = dt.StyleDetailId;
+                detMap[key] = (detMap.TryGetValue(key, out var v) ? v : 0) + dt.OutputNumber!.Value;
+            }
+
+            // Lấy min-across-stages (nếu thiếu công đoạn → 0)
+            var result = new Dictionary<Guid, int>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+            {
+                if (infoToStyleInfo.TryGetValue(infoId, out var styleInfoId) &&
+                    expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
+                {
+                    var recordedCount = detMap.Keys.Count(k => k != null);
+                    if (recordedCount < expectedCount)
+                    { result[infoId] = 0; continue; }
+                }
+                result[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
+            }
+
+            // Các ProductionInfo có DailyOutput nhưng không có detail nào → 0
+            foreach (var d in dailyList)
+            {
+                if (!result.ContainsKey(d.ProductionInfoId))
+                    result[d.ProductionInfoId] = 0;
+            }
+
+            return (result, activeInfoIds);
+        }
+
+        // =====================================================================
+        //  LINE PROGRESS: Lấy dữ liệu thống kê tiến độ theo Line cho khoảng ngày
+        // =====================================================================
+
+        /// <summary>
+        /// Lấy dữ liệu tổng hợp tiến độ sản xuất theo từng Department/Line cho khoảng [fromDate, toDate].
+        /// Cách tính giống trang Index: lấy TẤT CẢ ProductionInfo Status==1,
+        /// tính RangeOutput từ DailyOutputDetail trong khoảng (0 nếu chưa nhập),
+        /// tính TotalOutput tích lũy đến toDate, nhóm theo Department → Line.
+        /// </summary>
+        public async Task<LineProgress_Response> GetLineProgressData(DateOnly fromDate, DateOnly toDate)
+        {
+            // 1. Lấy ProductionInfo Status >= 0 (không tính mã bị khóa -1 hoặc đã xóa -2)
+            var infos = await _context.ProductionInfos
+                .AsNoTracking()
+                .Where(p => p.Status >= 0)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.ProductionDepartmentId,
+                    p.Line,
+                    p.Status,                    // cần để lọc Target chỉ Status==1
+                    Target   = p.Target ?? 0,
+                    TotalQty = p.TotalQty ?? 0
+                })
+                .ToListAsync();
+
+            if (!infos.Any())
+            {
+                return new LineProgress_Response
+                {
+                    FromDate    = fromDate.ToString("yyyy-MM-dd"),
+                    ToDate      = toDate.ToString("yyyy-MM-dd"),
+                    Departments = new List<LineProgress_DepartmentDto>()
+                };
+            }
+
+            // 2. Sản lượng trong khoảng [fromDate, toDate] — 0 cho mã chưa nhập
+            var (rangeOutputMap, _) = await GetOutputInRange(fromDate, toDate);
+
+            // 3. Tổng sản lượng tích lũy đến cuối toDate
+            var totalOutputMap = await GetTotalOutputByProductionInfo(toDate);
+
+            // Số ngày trong khoảng lọc (dùng để nhân target ngày → target kỳ)
+            var numberOfDays = (toDate.DayNumber - fromDate.DayNumber) + 1;
+
+            // 4. Lấy tên bộ phận
+            var deptIds = infos.Select(p => p.ProductionDepartmentId).Distinct().ToList();
+            var deptNames = await _context.ProductionDepartments
+                .AsNoTracking()
+                .Where(d => deptIds.Contains(d.Id))
+                .Select(d => new { d.Id, d.DepartmentName })
+                .ToDictionaryAsync(d => d.Id, d => d.DepartmentName);
+
+            // 5. Group theo Department → Line
+            var deptGroups = infos
+                .GroupBy(p => p.ProductionDepartmentId)
+                .Select(dg =>
+                {
+                    var lineGroups = dg
+                        .GroupBy(p => p.Line ?? "—")
+                        .Select(lg =>
+                        {
+                            // Target kỳ = target ngày × số ngày trong khoảng lọc (chỉ mã Status==1)
+                            var target        = lg.Where(p => p.Status == 1).Sum(p => p.Target) * numberOfDays;
+                            var totalQty      = lg.Where(p => p.Status == 1).Sum(p => p.TotalQty);
+                            // TotalQtyFixed: cố định, không đổi theo kỳ lọc (Status >= 0)
+                            var totalQtyFixed = lg.Where(p => p.Status >= 0).Sum(p => p.TotalQty);
+                            // RangeOutput và TotalOutput tính theo DailyOutput thực tế (không lọc status)
+                            var rangeOutput   = lg.Sum(p => rangeOutputMap.TryGetValue(p.Id, out var v) ? v : 0);
+                            var totalOutput   = lg.Sum(p => totalOutputMap.TryGetValue(p.Id, out var v2) ? v2 : 0);
+
+                            return new LineProgress_LineDto
+                            {
+                                Line           = lg.Key,
+                                Target         = target,
+                                TodayOutput    = rangeOutput,
+                                TotalOutput    = totalOutput,
+                                TotalQty       = totalQty,
+                                TotalQtyFixed  = totalQtyFixed,
+                                TodayOutputPct = target > 0 ? Math.Round((double)rangeOutput / target * 100, 1) : 0,
+                                // % hoàn thành dùng TotalQtyFixed (cố định)
+                                CompletionPct  = totalQtyFixed > 0 ? Math.Round((double)totalOutput / totalQtyFixed * 100, 1) : 0
+                            };
+                        })
+                        .OrderBy(l =>
+                            l.Line == "63" ? "043.5" :
+                            l.Line == null ? "" :
+                            l.Line.Length == 1 ? "00" + l.Line :
+                            l.Line.Length == 2 ? "0" + l.Line :
+                            l.Line)
+                        .ToList();
+
+                    var totalTarget      = lineGroups.Sum(l => l.Target);
+                    var totalRangeOutput = lineGroups.Sum(l => l.TodayOutput);
+                    var totalTotalOutput = lineGroups.Sum(l => l.TotalOutput);
+                    var totalTotalQty    = lineGroups.Sum(l => l.TotalQty);
+                    var totalQtyFixed    = lineGroups.Sum(l => l.TotalQtyFixed);
+
+                    var avgTargetPct = lineGroups.Any(l => l.Target > 0)
+                        ? Math.Round(lineGroups.Where(l => l.Target > 0).Average(l => l.TodayOutputPct), 1)
+                        : 0;
+
+                    return new LineProgress_DepartmentDto
+                    {
+                        DepartmentId     = dg.Key,
+                        DepartmentName   = deptNames.TryGetValue(dg.Key, out var n) ? n : "—",
+                        Lines            = lineGroups,
+                        TotalTarget      = totalTarget,
+                        TotalTodayOutput = totalRangeOutput,
+                        TotalTotalOutput = totalTotalOutput,
+                        TotalTotalQty    = totalTotalQty,
+                        TotalQtyFixed    = totalQtyFixed,
+                        TodayOutputPct   = totalTarget > 0 ? Math.Round((double)totalRangeOutput / totalTarget * 100, 1) : 0,
+                        AvgTargetPct     = avgTargetPct
+                    };
+                })
+                .OrderBy(d => d.DepartmentName)
+                .ToList();
+
+            return new LineProgress_Response
+            {
+                FromDate    = fromDate.ToString("yyyy-MM-dd"),
+                ToDate      = toDate.ToString("yyyy-MM-dd"),
+                Departments = deptGroups
+            };
         }
     }
 }

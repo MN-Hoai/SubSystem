@@ -305,6 +305,74 @@ namespace Sub_Services.Execute
         }
 
         // ---------------------------------------------------------------
+        // POST: Lưu danh sách trang được phép cho Role (không cần permission cụ thể)
+        // Dùng khi: bảng Permissions rỗng hoặc không muốn phân quyền chi tiết
+        // ---------------------------------------------------------------
+        public class Role_SavePageAccessRequest
+        {
+            public Guid        RoleId  { get; set; }
+            /// <summary>Danh sách PageId được phép truy cập</summary>
+            public List<Guid>  PageIds { get; set; } = new();
+        }
+
+        public async Task<(bool ok, string msg)> SaveRolePageAccess(Role_SavePageAccessRequest req)
+        {
+            try
+            {
+                var role = await _context.Roles.FindAsync(req.RoleId);
+                if (role == null) return (false, "Không tìm thấy role.");
+
+                // Lấy một Permission "VIEW" mặc định (hoặc tạo mới nếu chưa có)
+                var viewPerm = await _context.Permissions
+                    .FirstOrDefaultAsync(p => p.Code == "VIEW" && p.Status == 1);
+                if (viewPerm == null)
+                {
+                    viewPerm = new Permission
+                    {
+                        Id         = Guid.NewGuid(),
+                        Code       = "VIEW",
+                        Name       = "Xem",
+                        Keyword    = "",
+                        Status     = 1,
+                        CreateDate = DateTime.Now,
+                        UpdateDate = DateTime.Now
+                    };
+                    _context.Permissions.Add(viewPerm);
+                }
+
+                // Xóa toàn bộ quyền cũ của role này
+                var oldPerms = _context.RolePagePermissions.Where(rp => rp.RoleId == req.RoleId);
+                _context.RolePagePermissions.RemoveRange(oldPerms);
+
+                // Thêm mới từng page được chọn với permission VIEW
+                foreach (var pageId in req.PageIds ?? new())
+                {
+                    // Kiểm tra page tồn tại và active
+                    var pageExists = await _context.Pages.AnyAsync(p => p.Id == pageId && p.Status == 1);
+                    if (!pageExists) continue;
+
+                    _context.RolePagePermissions.Add(new RolePagePermission
+                    {
+                        Id           = Guid.NewGuid(),
+                        RoleId       = req.RoleId,
+                        PageId       = pageId,
+                        PermissionId = viewPerm.Id,
+                        Status       = 1,
+                        CreateDate   = DateTime.Now,
+                        UpdateDate   = DateTime.Now
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+                return (true, $"Đã lưu quyền truy cập {req.PageIds?.Count ?? 0} trang cho role.");
+            }
+            catch (Exception ex)
+            {
+                return (false, "Lỗi: " + ex.Message);
+            }
+        }
+
+        // ---------------------------------------------------------------
         // POST: Cập nhật trạng thái Role
         // ---------------------------------------------------------------
         public async Task<(bool ok, string msg)> SetRoleStatus(List<Guid> ids, int status)

@@ -396,10 +396,10 @@
             <button class="md-close" onclick="closePermModal()">&times;</button>
         </div>
         <div class="perm-top-bar">
-            <input type="text" class="perm-search" id="permSearch" placeholder="Tìm trang...">
+            <input type="text" class="perm-search" id="permSearch" placeholder="Tìm tên trang, đường dẫn...">
             <span class="perm-stats" id="permStats"></span>
-            <button class="btn btn-ghost btn-sm" onclick="grantAll()"><i class="fa-solid fa-check-double"></i> Cấp tất cả</button>
-            <button class="btn btn-ghost btn-sm" onclick="revokeAll()"><i class="fa-solid fa-xmark"></i> Thu hồi tất cả</button>
+            <button class="btn btn-ghost btn-sm" onclick="grantAll()"><i class="fa-solid fa-check-double"></i> Chọn tất cả</button>
+            <button class="btn btn-ghost btn-sm" onclick="revokeAll()"><i class="fa-solid fa-xmark"></i> Bỏ chọn tất cả</button>
         </div>
         <div class="perm-modal-body" id="permMatrixWrap">
             <div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>
@@ -813,147 +813,143 @@
         if (!selectedRole) return;
         document.getElementById('permModalRoleName').textContent = selectedRole.name;
         document.getElementById('permSearch').value = '';
+        document.getElementById('permStats').textContent = '';
         document.getElementById('permMatrixWrap').innerHTML = '<div class="rl-state"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></div>';
         permModal.classList.add('open');
-        // Load role detail (includes permission state)
-        fetch('/Role/GetDetail?id=' + encodeURIComponent(selectedRole.id))
-            .then(function(r) { return r.json(); })
-            .then(function(detail) {
-                buildPermMatrix(detail.pagePermissions || []);
-            }).catch(function() {
-                document.getElementById('permMatrixWrap').innerHTML = '<div class="rl-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải</p></div>';
+
+        // Load toàn bộ pages + trạng thái hiện tại của role
+        Promise.all([
+            fetch('/Role/GetPages').then(function(r) { return r.json(); }),
+            fetch('/Role/GetDetail?id=' + encodeURIComponent(selectedRole.id)).then(function(r) { return r.json(); })
+        ]).then(function(results) {
+            var allPages = results[0];
+            var detail   = results[1];
+
+            // Lấy set PageId đang được phép
+            var grantedPageIds = new Set();
+            (detail.pagePermissions || []).forEach(function(pp) {
+                grantedPageIds.add(pp.pageId);
             });
+
+            buildPageAccessMatrix(allPages, grantedPageIds);
+        }).catch(function() {
+            document.getElementById('permMatrixWrap').innerHTML = '<div class="rl-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải dữ liệu</p></div>';
+        });
     }
 
     function closePermModal() { permModal.classList.remove('open'); }
 
-    function buildPermMatrix(pages) {
-        permAllPages = pages;
-        permAllPerms = pages.length ? (pages[0].permissions || []).map(function(p) { return { id: p.id, code: p.code, name: p.name }; }) : [];
-        permMatrix = {};
-        pages.forEach(function(pg) {
-            permMatrix[pg.pageId] = {};
-            (pg.permissions || []).forEach(function(p) { permMatrix[pg.pageId][p.id] = p.granted || false; });
+    // pageChecked: Map<pageId, bool>
+    var pageChecked = {};
+    var allPagesForPerm = [];
+
+    function buildPageAccessMatrix(pages, grantedSet) {
+        allPagesForPerm = pages;
+        pageChecked = {};
+        pages.forEach(function(p) {
+            pageChecked[p.id] = grantedSet.has(p.id);
         });
-        renderPermMatrix(pages, '');
+        renderPageAccessMatrix('');
     }
 
-    function renderPermMatrix(pages, kw) {
+    function renderPageAccessMatrix(kw) {
         var wrap = document.getElementById('permMatrixWrap');
-        if (!pages.length) { wrap.innerHTML = '<div class="rl-state"><i class="fa-solid fa-file-lines"></i><p>Chưa có trang nào</p></div>'; updatePermStats(); return; }
+        var filtered = kw
+            ? allPagesForPerm.filter(function(p) {
+                return (p.name || '').toLowerCase().includes(kw) ||
+                       (p.path || '').toLowerCase().includes(kw);
+              })
+            : allPagesForPerm;
 
-        var filtered = kw ? pages.filter(function(p) { return (p.pageName||'').toLowerCase().includes(kw) || (p.path||'').toLowerCase().includes(kw); }) : pages;
-        permFiltered = filtered;
-
-        var html = '<table class="perm-tbl"><thead><tr><th style="min-width:220px;">Trang / Chức năng</th>';
-        permAllPerms.forEach(function(p) { html += '<th class="pc">' + esc(p.name) + '</th>'; });
-        html += '<th class="pc">Tất cả</th></tr></thead><tbody>';
-
-        // Group by parent
-        var noParent = filtered.filter(function(p) { return !p.parentId; });
-        var withParent = filtered.filter(function(p) { return !!p.parentId; });
-        var grpMap = {};
-        withParent.forEach(function(p) {
-            var key = p.parentId;
-            if (!grpMap[key]) grpMap[key] = { name: p.parentName || 'Nhóm', items: [] };
-            grpMap[key].items.push(p);
-        });
-
-        function rowHtml(pg, indent) {
-            var permsGranted = Object.values(permMatrix[pg.pageId] || {});
-            var allGrant = permsGranted.length && permsGranted.every(Boolean);
-            var r = '<tr><td>' + (indent ? '<span style="width:12px;display:inline-block;opacity:.4;">└</span> ' : '') +
-                '<strong>' + esc(pg.pageName) + '</strong>' +
-                (pg.path ? '<span class="perm-path">' + esc(pg.path) + '</span>' : '') + '</td>';
-            permAllPerms.forEach(function(p) {
-                var chk = permMatrix[pg.pageId] && permMatrix[pg.pageId][p.id];
-                r += '<td class="pc"><input type="checkbox" class="perm-cb" data-page="' + pg.pageId + '" data-perm="' + p.id + '"' + (chk ? ' checked' : '') + '></td>';
-            });
-            r += '<td class="pc"><input type="checkbox" class="row-all" data-page="' + pg.pageId + '"' + (allGrant && permAllPerms.length ? ' checked' : '') + '></td>';
-            r += '</tr>';
-            return r;
+        if (!filtered.length) {
+            wrap.innerHTML = '<div class="rl-state"><i class="fa-solid fa-inbox"></i><p>Không có trang nào</p></div>';
+            updatePermStats(); return;
         }
 
-        noParent.forEach(function(pg) {
-            if (grpMap[pg.pageId]) {
-                html += '<tr class="pgrp"><td colspan="' + (permAllPerms.length + 2) + '"><i class="fa-solid fa-folder"></i>' + esc(pg.pageName) + '</td></tr>';
-                html += rowHtml(pg, false);
-                grpMap[pg.pageId].items.forEach(function(c) { html += rowHtml(c, true); });
+        // Nhóm theo parent
+        var parents = filtered.filter(function(p) { return !p.parentId; });
+        var childMap = {};
+        filtered.filter(function(p) { return !!p.parentId; }).forEach(function(c) {
+            if (!childMap[c.parentId]) childMap[c.parentId] = [];
+            childMap[c.parentId].push(c);
+        });
+
+        var html = '<table class="perm-tbl"><thead><tr>' +
+            '<th style="min-width:240px;">Trang / Đường dẫn</th>' +
+            '<th class="pc" style="width:100px;">Cho phép</th>' +
+            '</tr></thead><tbody>';
+
+        function rowHtml(p, isChild) {
+            var chk = !!pageChecked[p.id];
+            return '<tr>' +
+                '<td>' + (isChild ? '<span style="width:14px;display:inline-block;opacity:.4;margin-right:4px;">└</span>' : '') +
+                    '<strong style="color:var(--ink-900);">' + esc(p.name || p.pageName || '') + '</strong>' +
+                    (p.path ? '<span class="perm-path" style="margin-left:6px;">' + esc(p.path) + '</span>' : '') +
+                '</td>' +
+                '<td class="pc"><input type="checkbox" class="perm-cb" data-id="' + p.id + '"' + (chk ? ' checked' : '') + '></td>' +
+                '</tr>';
+        }
+
+        parents.forEach(function(p) {
+            if (childMap[p.id] && childMap[p.id].length) {
+                html += '<tr class="pgrp"><td colspan="2"><i class="fa-solid fa-folder"></i> ' + esc(p.name || p.pageName || '') + '</td></tr>';
+                html += rowHtml(p, false);
+                childMap[p.id].forEach(function(c) { html += rowHtml(c, true); });
             } else {
-                html += rowHtml(pg, false);
+                html += rowHtml(p, false);
             }
         });
-        withParent.forEach(function(p) {
-            if (!filtered.find(function(x) { return x.pageId === p.parentId; })) html += rowHtml(p, false);
-        });
+        // Các child không có parent trong danh sách
+        filtered.filter(function(p) { return !!p.parentId && !filtered.find(function(x) { return x.id === p.parentId; }); })
+                .forEach(function(p) { html += rowHtml(p, false); });
 
         html += '</tbody></table>';
         wrap.innerHTML = html;
 
         wrap.querySelectorAll('.perm-cb').forEach(function(cb) {
             cb.addEventListener('change', function() {
-                if (!permMatrix[cb.dataset.page]) permMatrix[cb.dataset.page] = {};
-                permMatrix[cb.dataset.page][cb.dataset.perm] = cb.checked;
-                syncRowAll(cb.dataset.page);
-                updatePermStats();
-            });
-        });
-        wrap.querySelectorAll('.row-all').forEach(function(cb) {
-            cb.addEventListener('change', function() {
-                var pg = cb.dataset.page;
-                Object.keys(permMatrix[pg] || {}).forEach(function(pid) { permMatrix[pg][pid] = cb.checked; });
-                wrap.querySelectorAll('.perm-cb[data-page="' + pg + '"]').forEach(function(x) { x.checked = cb.checked; });
+                pageChecked[cb.dataset.id] = cb.checked;
                 updatePermStats();
             });
         });
         updatePermStats();
     }
 
-    function syncRowAll(pageId) {
-        var vals = Object.values(permMatrix[pageId] || {});
-        var all = vals.length && vals.every(Boolean);
-        var cb = document.querySelector('.row-all[data-page="' + pageId + '"]');
-        if (cb) cb.checked = all;
-    }
+    // Build matrix - kept for backward compat
+    function buildPermMatrix() {}
 
     function updatePermStats() {
-        var total = 0, granted = 0;
-        Object.values(permMatrix).forEach(function(pm) { Object.values(pm).forEach(function(v) { total++; if(v) granted++; }); });
-        document.getElementById('permStats').textContent = granted + '/' + total + ' quyền';
+        var total = Object.keys(pageChecked).length;
+        var granted = Object.values(pageChecked).filter(Boolean).length;
+        document.getElementById('permStats').textContent = granted + '/' + total + ' trang';
     }
 
     function grantAll() {
-        Object.keys(permMatrix).forEach(function(pg) { Object.keys(permMatrix[pg]).forEach(function(pm) { permMatrix[pg][pm] = true; }); });
-        renderPermMatrix(permAllPages, document.getElementById('permSearch').value.trim());
+        Object.keys(pageChecked).forEach(function(id) { pageChecked[id] = true; });
+        renderPageAccessMatrix(document.getElementById('permSearch').value.trim().toLowerCase());
     }
     function revokeAll() {
-        Object.keys(permMatrix).forEach(function(pg) { Object.keys(permMatrix[pg]).forEach(function(pm) { permMatrix[pg][pm] = false; }); });
-        renderPermMatrix(permAllPages, document.getElementById('permSearch').value.trim());
+        Object.keys(pageChecked).forEach(function(id) { pageChecked[id] = false; });
+        renderPageAccessMatrix(document.getElementById('permSearch').value.trim().toLowerCase());
     }
 
     var permSearchTimer;
     document.getElementById('permSearch').addEventListener('input', function() {
         clearTimeout(permSearchTimer);
         var kw = this.value.trim().toLowerCase();
-        permSearchTimer = setTimeout(function() { renderPermMatrix(permAllPages, kw); }, 220);
+        permSearchTimer = setTimeout(function() { renderPageAccessMatrix(kw); }, 220);
     });
 
     function savePerm() {
         if (!selectedRole) return;
-        var pagePerms = [];
-        Object.keys(permMatrix).forEach(function(pgId) {
-            var pids = Object.keys(permMatrix[pgId]).filter(function(pid) { return permMatrix[pgId][pid]; });
-            if (pids.length) pagePerms.push({ pageId: pgId, permissionIds: pids });
-        });
+        // Lấy danh sách pageId được tick
+        var pageIds = Object.keys(pageChecked).filter(function(id) { return pageChecked[id]; });
         var btn = document.getElementById('btnSavePerm');
         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
-        fetch('/Role/Upsert', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: selectedRole.id, name: selectedRole.name, code: selectedRole.code,
-                description: selectedRole.description, status: selectedRole.status,
-                pagePermissions: pagePerms
-            })
+        fetch('/Role/SavePageAccess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roleId: selectedRole.id, pageIds: pageIds })
         }).then(function(r) { return r.json(); }).then(function(d) {
             btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu phân quyền';
             toast(d.message, d.success);

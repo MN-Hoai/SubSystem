@@ -275,6 +275,56 @@ namespace Sub_Services.Execute
             }
         }
 
+        /// <summary>Đếm tổng số Page đang hoạt động trong DB (dùng để phát hiện chế độ mở).</summary>
+        public async Task<int> GetTotalActivePagesCount()
+            => await _context.Pages.CountAsync(p => p.Status == 1 && p.Path != null && p.Path != "");
+
+        /// <summary>Lấy tất cả Path của trang mà user được phép truy cập (qua Role).</summary>
+        public async Task<HashSet<string>> GetUserAllowedPaths(Guid userId)
+        {
+            // Lấy tất cả RoleId user đang có (status=1)
+            var roleIds = await _context.UserRoles
+                .Where(ur => ur.UserId == userId && ur.Status == 1)
+                .Select(ur => ur.RoleId)
+                .ToListAsync();
+
+            if (!roleIds.Any())
+            {
+                // Thử lấy qua UserPagePermission trực tiếp
+                var directPaths = await _context.UserPagePermissions
+                    .Where(up => up.UserId == userId && up.IsGranted == 1 && up.Status == 1)
+                    .Join(_context.Pages.Where(p => p.Status == 1 && p.Path != null && p.Path != ""),
+                        up => up.PageId, p => p.Id, (up, p) => p.Path)
+                    .Distinct().ToListAsync();
+                return new HashSet<string>(directPaths, StringComparer.OrdinalIgnoreCase);
+            }
+
+            // Lấy PageId từ RolePagePermission (chỉ cần tồn tại record = có quyền xem trang)
+            var pageIds = await _context.RolePagePermissions
+                .Where(rp => roleIds.Contains(rp.RoleId) && rp.Status == 1)
+                .Select(rp => rp.PageId)
+                .Distinct()
+                .ToListAsync();
+
+            // Map PageId → Path
+            var pathsFromRoles = await _context.Pages
+                .Where(p => pageIds.Contains(p.Id) && p.Status == 1 && p.Path != null && p.Path != "")
+                .Select(p => p.Path)
+                .ToListAsync();
+
+            // Lấy thêm qua UserPagePermission trực tiếp (IsGranted=1)
+            var pathsFromUser = await _context.UserPagePermissions
+                .Where(up => up.UserId == userId && up.IsGranted == 1 && up.Status == 1)
+                .Join(_context.Pages.Where(p => p.Status == 1 && p.Path != null && p.Path != ""),
+                    up => up.PageId, p => p.Id, (up, p) => p.Path)
+                .Distinct().ToListAsync();
+
+            var all = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in pathsFromRoles) all.Add(p);
+            foreach (var p in pathsFromUser) all.Add(p);
+            return all;
+        }
+
         /// <summary>Kiểm tra thông tin đăng nhập.</summary>
         public async Task<(bool Ok, string Message, Account_Item User)> VerifyLogin(string username, string password)
         {

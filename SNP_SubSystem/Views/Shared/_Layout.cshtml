@@ -9,6 +9,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <link href="~/css/main.css" rel="stylesheet" />
+    <style>
+        /* Nav link bị khóa do không có quyền */
+        .nav-item.nav-locked {
+            position: relative;
+            cursor: pointer !important;
+        }
+        .nav-item.nav-locked .label {
+            opacity: 0.5;
+        }
+        .nav-item.nav-locked > i:first-child {
+            opacity: 0.4;
+        }
+        .nav-item.nav-locked::after {
+            content: '\f023';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 9px;
+            position: absolute;
+            top: 7px;
+            right: 10px;
+            color: #94a3b8;
+        }
+    </style>
 </head>
 <body>
 
@@ -32,8 +55,8 @@
                 if (string.IsNullOrWhiteSpace(fullName)) fullName = User.Identity.Name;
                 var initials = !string.IsNullOrEmpty(fullName) && fullName.Length >= 2 ? fullName.Substring(0, 2).ToUpper() : "U";
                 
-                <div style="position: relative;" onmouseleave="document.getElementById('userMenu').style.display='none'">
-                    <button class="user-chip" aria-label="Tài khoản" onclick="document.getElementById('userMenu').style.display='block'">
+                <div style="position: relative;">
+                    <button class="user-chip" aria-label="Tài khoản" onclick="var m = document.getElementById('userMenu'); m.style.display = (m.style.display === 'block') ? 'none' : 'block';">
                         <div class="avatar">@initials</div>
                         <div class="user-meta">
                             <span class="user-name">@fullName</span>
@@ -187,6 +210,67 @@
         showMethod: 'fadeIn',
         hideMethod: 'fadeOut'
     };
+
+    // ══ Kiểm tra quyền nav link ══════════════════════════
+    @if (User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        <text>
+    (function() {
+        fetch('/Role/MyPermissions')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.isAdmin) return; // admin — không khóa gì
+
+                var allowedPaths = data.paths || [];
+
+                // Kiểm tra một href có được phép không
+                function isAllowed(href) {
+                    if (!href || href === '#' || href === '/' || href === '') return true;
+                    return allowedPaths.some(function(p) {
+                        return href.startsWith(p) || p.startsWith(href);
+                    });
+                }
+
+                // Hàm Swal thông báo không có quyền
+                function showNoAccess() {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Không có quyền truy cập',
+                        text: 'Tài khoản của bạn chưa được cấp quyền vào trang này. Vui lòng liên hệ quản trị viên.',
+                        confirmButtonText: 'Đã hiểu',
+                        confirmButtonColor: '#3a5fa8',
+                    });
+                }
+
+                // Áp dụng cho tất cả .nav-item trong sidebar
+                document.querySelectorAll('.sidebar .nav-item[href]').forEach(function(el) {
+                    var href = el.getAttribute('href');
+                    if (!isAllowed(href)) {
+                        el.classList.add('nav-locked');
+                        el.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            showNoAccess();
+                        });
+                    }
+                });
+
+                // Áp dụng cho các link có data-perm-check
+                document.querySelectorAll('[data-perm-check]').forEach(function(el) {
+                    var href = el.getAttribute('href') || el.dataset.href;
+                    if (!isAllowed(href)) {
+                        el.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            showNoAccess();
+                        });
+                    }
+                });
+            })
+            .catch(function() {
+                // Nếu không lấy được quyền, giữ nguyên mọi link
+            });
+    })();
+        </text>
+    }
 </script>
 <script src="~/js/site.js"></script>
 </html>

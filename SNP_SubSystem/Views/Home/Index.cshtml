@@ -309,30 +309,62 @@
     transform: translateX(3px);
 }
 
-/* ── Disabled card (Quản trị placeholder) ─────────────────────── */
-.hc-disabled {
-    opacity: .65;
-    cursor: default;
-    pointer-events: none;
+/* ── Locked card (không có quyền) ──────────────────────────────── */
+.hc-locked .hc-arrow i {
+    display: none;
 }
-.hc-disabled:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: var(--border);
-}
-
-/* ── Soon badge ─────────────────────────────────────────────────── */
-.hc-soon {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 7px;
-    border-radius: 20px;
-    background: var(--ink-200, #e5e7eb);
-    color: var(--ink-500);
-    letter-spacing: .4px;
-    text-transform: uppercase;
-    vertical-align: middle;
-    margin-left: 6px;
+.hc-locked .hc-arrow::after {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    content: '\f023'; /* fa-lock */
+    font-size: 13px;
+    color: var(--ink-400);
 }
 </style>
+
+@if (User.Identity != null && User.Identity.IsAuthenticated)
+{
+<script>
+(function() {
+    fetch('/Role/MyPermissions')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.isAdmin) return; // admin — không khóa gì
+
+            var allowedPaths = data.paths || [];
+
+            function isAllowed(href) {
+                if (!href || href === '#' || href === '/') return true;
+                return allowedPaths.some(function(p) {
+                    return href.startsWith(p) || p.startsWith(href);
+                });
+            }
+
+            function showNoAccess() {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Không có quyền truy cập',
+                    text: 'Tài khoản của bạn chưa được cấp quyền vào trang này. Vui lòng liên hệ quản trị viên.',
+                    confirmButtonText: 'Đã hiểu',
+                    confirmButtonColor: '#3a5fa8',
+                });
+                return false;
+            }
+
+            // Home cards
+            document.querySelectorAll('.home-card[href]').forEach(function(card) {
+                var href = card.getAttribute('href');
+                if (!isAllowed(href)) {
+                    card.classList.add('hc-locked');
+                    card.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        showNoAccess();
+                    });
+                }
+            });
+        })
+        .catch(function() { /* giữ nguyên nếu lỗi */ });
+})();
+</script>
+}
+

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Sub_Services.Execute;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace SNP_SubSystem.Controllers.Account
@@ -13,6 +15,30 @@ namespace SNP_SubSystem.Controllers.Account
         public RoleController(SubSystemService service)
         {
             _service = service;
+        }
+
+        // ---------------------------------------------------------------
+        // GET: Danh sách path được phép cho user đang đăng nhập
+        // GET /Role/MyPermissions
+        // ---------------------------------------------------------------
+        [HttpGet]
+        public async Task<IActionResult> MyPermissions()
+        {
+            // Admin bypass - trả về "*" ký hiệu được vào tất cả
+            var username = User.Identity?.Name ?? "";
+            if (string.Equals(username, "admin", StringComparison.OrdinalIgnoreCase))
+                return Ok(new { isAdmin = true, paths = (List<string>)null });
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Ok(new { isAdmin = false, paths = new List<string>() });
+
+            var totalPages = await _service.GetTotalActivePagesCount();
+            if (totalPages == 0)
+                return Ok(new { isAdmin = true, paths = (List<string>)null }); // chế độ mở
+
+            var paths = await _service.GetUserAllowedPaths(userId);
+            return Ok(new { isAdmin = false, paths = paths.ToList() });
         }
 
         // ---------------------------------------------------------------
@@ -171,6 +197,19 @@ namespace SNP_SubSystem.Controllers.Account
         {
             var list = await _service.GetPageList(keyword);
             return Ok(list);
+        }
+
+        // ---------------------------------------------------------------
+        // POST: Lưu danh sách trang được phép cho Role (tick page access)
+        // POST /Role/SavePageAccess
+        // ---------------------------------------------------------------
+        [HttpPost]
+        public async Task<IActionResult> SavePageAccess([FromBody] SubSystemService.Role_SavePageAccessRequest req)
+        {
+            if (req == null || req.RoleId == Guid.Empty)
+                return BadRequest(new { success = false, message = "Request không hợp lệ." });
+            var (ok, msg) = await _service.SaveRolePageAccess(req);
+            return ok ? Ok(new { success = true, message = msg }) : BadRequest(new { success = false, message = msg });
         }
 
         // ---------------------------------------------------------------

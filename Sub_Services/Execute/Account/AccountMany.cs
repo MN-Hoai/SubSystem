@@ -334,18 +334,22 @@ namespace Sub_Services.Execute
                 if (u == null)
                     return (false, "Tài khoản không tồn tại.", null);
 
-                // Kiểm tra trạng thái
-                if (u.Status != 1)
-                    return (false, "Tài khoản của bạn đang bị khoá.", null);
-
-                // Kiểm tra hạn sử dụng
-                if (u.ExpiryDate < DateTime.Now)
-                    return (false, "Tài khoản của bạn đã hết hạn sử dụng.", null);
-
                 // Kiểm tra mật khẩu
                 var hashedInput = HashPasswordWithSalt(password, u.HashCode);
                 if (hashedInput != u.PasswordHash)
                     return (false, "Mật khẩu không chính xác.", null);
+
+                // Kiểm tra trạng thái
+                if (u.Status != 1)
+                    return (false, "Tài khoản của bạn đang bị khoá.", null);
+
+                // Kiểm tra hạn sử dụng (nếu ngày không có giờ thì tính đến 23:59:59 của ngày đó)
+                var expiry = u.ExpiryDate;
+                if (expiry.TimeOfDay == TimeSpan.Zero)
+                    expiry = expiry.Date.AddDays(1).AddTicks(-1);
+
+                if (expiry < DateTime.Now)
+                    return (false, "Tài khoản đã hết hạn.", null);
 
                 var accountItem = new Account_Item
                 {
@@ -363,6 +367,26 @@ namespace Sub_Services.Execute
             catch (Exception ex)
             {
                 return (false, "Lỗi hệ thống: " + ex.Message, null);
+            }
+        }
+
+        /// <summary>Kiểm tra tài khoản có bị khoá hoặc hết hạn không.</summary>
+        public async Task<bool> IsUserExpiredOrLocked(Guid userId)
+        {
+            try
+            {
+                var u = await _context.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId);
+                if (u == null || u.Status != 1) return true;
+
+                var expiry = u.ExpiryDate;
+                if (expiry.TimeOfDay == TimeSpan.Zero)
+                    expiry = expiry.Date.AddDays(1).AddTicks(-1);
+
+                return expiry < DateTime.Now;
+            }
+            catch
+            {
+                return false;
             }
         }
 

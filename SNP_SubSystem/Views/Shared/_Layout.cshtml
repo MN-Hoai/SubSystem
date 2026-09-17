@@ -1,15 +1,37 @@
+@using Sub_Services.Execute
+@inject SubSystemService SubSystemService
+@{
+    var sysSettings = await SubSystemService.GetSystemSettingsAsync();
+    var sysTitle = sysSettings.GetValueOrDefault("SystemTitle", "");
+    if (string.IsNullOrEmpty(sysTitle)) sysTitle = "Sub_System Admin";
+    var sysLogo = sysSettings.GetValueOrDefault("SystemLogo", "");
+    var homeBg = sysSettings.GetValueOrDefault("HomeBackground", "");
+}
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@ViewData["Title"] - SNP SubSystem</title>
+    <title>@ViewData["Title"] - @Html.Raw(sysTitle)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     <link href="~/css/main.css" rel="stylesheet" />
     <style>
+        @if (ViewContext.RouteData.Values["Controller"]?.ToString() == "Home" && 
+             ViewContext.RouteData.Values["Action"]?.ToString() == "Index" && 
+             !string.IsNullOrEmpty(homeBg))
+        {
+            <text>
+            .app-main {
+                background-image: url('@homeBg');
+                background-size: cover;
+                background-position: center;
+                background-attachment: fixed;
+            }
+            </text>
+        }
         /* Nav link bị khóa do không có quyền */
         .nav-item.nav-locked {
             position: relative;
@@ -41,9 +63,16 @@
             <button class="burger" id="sidebarToggle" aria-label="Ẩn/mở thanh điều hướng">
                 <span class="bar"><span></span><span></span><span></span></span>
             </button>
-            <a asp-controller="Home" asp-action="Index" class="brand" style="text-decoration:none; color:inherit;">
-                <div class="brand-mark">S</div>
-                <div class="brand-word">Sub_System <em>Admin</em></div>
+            <a asp-controller="Home" asp-action="Index" class="brand" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:8px;">
+                @if (!string.IsNullOrEmpty(sysLogo))
+                {
+                    <img src="@sysLogo" alt="Logo" style="height: 32px; border-radius: 4px;" />
+                }
+                else
+                {
+                    <div class="brand-mark">S</div>
+                }
+                <div class="brand-word" style="font-size: 14px;">@Html.Raw(sysTitle)</div>
             </a>
         </div>
 
@@ -174,7 +203,7 @@
                     <i class="fa-solid fa-key"></i>
                     <span class="label">Phân quyền</span>
                 </a>
-                <a href="#" class="nav-item" data-tip="Cài đặt hệ thống (sắp ra mắt)">
+                <a asp-controller="Settings" asp-action="Index" class="nav-item @(currentCtrl == "Settings" ? "active" : "")" data-tip="Cài đặt hệ thống">
                     <i class="fa-solid fa-gear"></i>
                     <span class="label">Cài đặt</span>
                 </a>
@@ -210,6 +239,65 @@
         showMethod: 'fadeIn',
         hideMethod: 'fadeOut'
     };
+
+    // ══ Tự động kiểm tra phiên & đá ra khi cookie không còn / hết hạn ══
+    (function () {
+        function redirectToLogin() {
+            var returnUrl = window.location.pathname + window.location.search;
+            var target = '/Login';
+            if (returnUrl && returnUrl !== '/' && !returnUrl.startsWith('/Login')) {
+                target += '?returnUrl=' + encodeURIComponent(returnUrl);
+            }
+            window.location.href = target;
+        }
+
+        // Chặn fetch toàn cục: nếu nhận HTTP 401 thì lập tức đá ra đăng nhập
+        var origFetch = window.fetch;
+        window.fetch = async function () {
+            try {
+                var response = await origFetch.apply(this, arguments);
+                if (response && response.status === 401) {
+                    redirectToLogin();
+                }
+                return response;
+            } catch (err) {
+                throw err;
+            }
+        };
+
+        // Chặn jQuery ajax (nếu trang dùng jQuery)
+        if (window.jQuery) {
+            $(document).ajaxError(function (event, jqxhr) {
+                if (jqxhr && jqxhr.status === 401) {
+                    redirectToLogin();
+                }
+            });
+        }
+
+        // Khi người dùng chuyển tab quay lại (sau khi treo máy hoặc cookie hết hạn): kiểm tra ngay
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                origFetch('/Login/CheckSession', { method: 'GET' })
+                    .then(function (res) {
+                        if (res.status === 401) {
+                            redirectToLogin();
+                        }
+                    })
+                    .catch(function () {});
+            }
+        });
+
+        // Kiểm tra heartbeat định kỳ mỗi 5 phút
+        setInterval(function () {
+            origFetch('/Login/CheckSession', { method: 'GET' })
+                .then(function (res) {
+                    if (res.status === 401) {
+                        redirectToLogin();
+                    }
+                })
+                .catch(function () {});
+        }, 5 * 60 * 1000);
+    })();
 
     // ══ Kiểm tra quyền nav link ══════════════════════════
     @if (User.Identity != null && User.Identity.IsAuthenticated)

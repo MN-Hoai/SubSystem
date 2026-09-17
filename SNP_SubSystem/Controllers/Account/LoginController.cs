@@ -92,11 +92,36 @@ namespace SNP_SubSystem.Controllers.Account
             return Redirect("/");
         }
 
+        // GET: /Login/CheckSession
+        [HttpGet]
+        public async Task<IActionResult> CheckSession()
+        {
+            if (User.Identity == null || !User.Identity.IsAuthenticated || !Request.Cookies.ContainsKey(SNP_SubSystem.Middleware.PermissionMiddleware.CookieName))
+            {
+                return Unauthorized(new { authenticated = false, message = "Phiên làm việc đã hết hạn hoặc cookie không tồn tại." });
+            }
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userIdStr, out var userId))
+            {
+                bool isExpired = await _service.IsUserExpiredOrLocked(userId);
+                if (isExpired)
+                {
+                    await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    Response.Cookies.Delete(SNP_SubSystem.Middleware.PermissionMiddleware.CookieName);
+                    return Unauthorized(new { authenticated = false, message = "Tài khoản đã hết hạn hoặc bị khoá." });
+                }
+            }
+
+            return Ok(new { authenticated = true });
+        }
+
         // GET: /Login/Logout
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            Response.Cookies.Delete(SNP_SubSystem.Middleware.PermissionMiddleware.CookieName);
             return RedirectToAction("Index");
         }
     }

@@ -24,7 +24,23 @@ builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.C
         options.LogoutPath = "/Login/Logout";
         options.ExpireTimeSpan = TimeSpan.FromHours(8); // mặc định 8h
         options.SlidingExpiration = true; // gia hạn khi người dùng thao tác
-        options.Cookie.Name = "SNP.Auth.Session";
+        options.Cookie.Name = PermissionMiddleware.CookieName;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Events.OnRedirectToLogin = ctx =>
+        {
+            bool isAjax = ctx.Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                          || (!ctx.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase));
+            if (isAjax)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            }
+            else
+            {
+                ctx.Response.Redirect(ctx.RedirectUri);
+            }
+            return Task.CompletedTask;
+        };
     });
 
 var app = builder.Build();
@@ -35,9 +51,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthentication();

@@ -15,6 +15,8 @@ namespace SNP_SubSystem.Middleware
     {
         private readonly RequestDelegate _next;
 
+        public const string CookieName = "SNP.Auth.Session";
+
         // Path luôn được phép qua (public)
         private static readonly string[] _publicPrefixes = new[]
         {
@@ -26,6 +28,7 @@ namespace SNP_SubSystem.Middleware
             "/fonts",
             "/favicon",
             "/_framework",
+            "/Home/Error",
             "/Error",
         };
 
@@ -37,24 +40,9 @@ namespace SNP_SubSystem.Middleware
         public async Task InvokeAsync(HttpContext context, SubSystemService service)
         {
             var req = context.Request;
-
-            // ── 1. Chỉ xử lý request điều hướng trang của trình duyệt ──────────
-            // Trình duyệt khi navigate luôn gửi Accept: "text/html,..."
-            // fetch() / XHR gửi Accept: "*/*"  → KHÔNG chứa "text/html" → bỏ qua
-            // CSS/JS/images gửi Accept: "image/*", "text/css"... → cũng bỏ qua
-            bool isPageNavigation = req.Method == HttpMethods.Get
-                                    && req.Headers["Accept"].ToString()
-                                       .Contains("text/html", StringComparison.OrdinalIgnoreCase);
-
-            if (!isPageNavigation)
-            {
-                await _next(context);
-                return;
-            }
-
             var path = req.Path.Value ?? "/";
 
-            // ── 2. Public path → cho qua ─────────────────────────────────────────
+            // ── 1. Public path → cho qua không cần kiểm tra đăng nhập ─────────────
             foreach (var prefix in _publicPrefixes)
             {
                 if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -64,23 +52,70 @@ namespace SNP_SubSystem.Middleware
                 }
             }
 
-            // ── 3. Chưa đăng nhập → để CookieAuth xử lý redirect ────────────────
+            // ── 2. Kiểm tra đăng nhập & cookie xác thực ───────────────────────────
             var user = context.User;
-            if (user?.Identity == null || !user.Identity.IsAuthenticated)
+            bool isAuthenticated = user?.Identity != null && user.Identity.IsAuthenticated;
+            bool hasAuthCookie = req.Cookies.ContainsKey(CookieName);
+
+            // Nếu chưa đăng nhập hoặc cookie không còn tồn tại / hết hạn
+            if (!isAuthenticated || !hasAuthCookie)
             {
-                await _next(context);
+                // Dọn dẹp cookie nếu cookie cũ đã hết hạn hoặc không hợp lệ
+                if (hasAuthCookie && !isAuthenticated)
+                {
+                    context.Response.Cookies.Delete(CookieName);
+                }
+
+                bool isPageNavigation = req.Method == HttpMethods.Get
+                                        && req.Headers["Accept"].ToString()
+                                           .Contains("text/html", StringComparison.OrdinalIgnoreCase);
+
+                if (isPageNavigation)
+                {
+                    var returnUrl = req.Path + req.QueryString;
+                    var loginUrl = "/Login";
+                    if (!string.IsNullOrEmpty(returnUrl) && returnUrl != "/")
+                    {
+                        loginUrl += $"?returnUrl={System.Net.WebUtility.UrlEncode(returnUrl)}";
+                    }
+                    context.Response.Redirect(loginUrl);
+                }
+                else
+                {
+                    // Request AJAX / API: trả về 401 Unauthorized để client xử lý đá ra
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response.WriteAsync("{\"success\":false,\"message\":\"Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại.\",\"redirect\":\"/Login\"}");
+                }
                 return;
             }
 
-            // ── 4. Admin bypass ──────────────────────────────────────────────────
-            var username = user.Identity.Name ?? "";
+            // ── 3. Admin bypass ──────────────────────────────────────────────────
+            var username = user?.Identity?.Name ?? "";
             if (string.Equals(username, "admin", StringComparison.OrdinalIgnoreCase))
             {
                 await _next(context);
                 return;
             }
 
-            // ── 5. Trang chủ luôn được vào ───────────────────────────────────────
+            // ── 4. Request AJAX / API call của user đã đăng nhập ─────────────────
+            // Chỉ áp dụng kiểm tra phân quyền trang cho browser GET HTML
+            bool isPageNav = req.Method == HttpMethods.Get
+                             && req.Headers["Accept"].ToString()
+                                .Contains("text/html", StringComparison.OrdinalIgnoreCase);
+
+            if (!isPageNav)
+            {
+                await _next(context);
+                return;
+            }
+
+            // Chống lưu cache HTML để khi back trình duyệt sau đăng xuất không hiện lại trang cũ
+            context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            context.Response.Headers["Pragma"] = "no-cache";
+            context.Response.Headers["Expires"] = "0";
+
+            // ── 5. Trang chủ luôn được vào đối với user đã đăng nhập ─────────────
             if (path == "/" || path.Equals("/Home", StringComparison.OrdinalIgnoreCase)
                             || path.Equals("/Home/Index", StringComparison.OrdinalIgnoreCase))
             {
@@ -92,7 +127,17 @@ namespace SNP_SubSystem.Middleware
             var userIdStr = user.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!Guid.TryParse(userIdStr, out var userId))
             {
-                await _next(context);
+                // Claim userId không hợp lệ → đá ra đăng nhập lại
+                context.Response.Redirect("/Login");
+                return;
+            }
+
+            // Kiểm tra tài khoản trong DB có bị khoá hoặc hết hạn không
+            bool isExpiredOrLocked = await service.IsUserExpiredOrLocked(userId);
+            if (isExpiredOrLocked)
+            {
+                context.Response.Cookies.Delete(CookieName);
+                context.Response.Redirect("/Login");
                 return;
             }
 

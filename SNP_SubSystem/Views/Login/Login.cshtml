@@ -1,5 +1,12 @@
+@using Sub_Services.Execute
+@inject SubSystemService SubSystemService
 @{
     Layout = null; // Login page does not use the standard layout
+    var sysSettings = await SubSystemService.GetSystemSettingsAsync();
+    var sysTitle = sysSettings?.GetValueOrDefault("SystemTitle", "") ?? "";
+    if (string.IsNullOrEmpty(sysTitle)) sysTitle = "SNP SubSystem";
+    var sysLogo = sysSettings?.GetValueOrDefault("SystemLogo", "") ?? "";
+    var loginBg = sysSettings?.GetValueOrDefault("LoginBackground", "") ?? "";
 }
 
 <!DOCTYPE html>
@@ -7,7 +14,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Đăng nhập - Hệ thống Quản trị</title>
+    <title>Đăng nhập - @Html.Raw(sysTitle)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -34,9 +41,23 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-body);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(58, 95, 168, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(31, 58, 103, 0.1) 0px, transparent 50%);
+            @if (!string.IsNullOrEmpty(loginBg))
+            {
+                <text>
+                background-image: url('@loginBg');
+                background-size: cover;
+                background-position: center;
+                background-attachment: fixed;
+                </text>
+            }
+            else
+            {
+                <text>
+                background-image: 
+                    radial-gradient(at 0% 0%, rgba(58, 95, 168, 0.1) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(31, 58, 103, 0.1) 0px, transparent 50%);
+                </text>
+            }
             color: var(--text-dark);
             display: flex;
             align-items: center;
@@ -51,10 +72,13 @@
         }
 
         .login-card {
-            background: var(--bg-surface);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.05), 
-                        0 0 0 1px rgba(0,0,0,0.02);
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.1), 
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
             padding: 40px;
             position: relative;
             overflow: hidden;
@@ -98,7 +122,7 @@
 
         .login-subtitle {
             font-size: 14px;
-            color: var(--text-muted);
+            color: #3a5fa8;
             font-weight: 500;
         }
 
@@ -208,11 +232,20 @@
 <div class="login-wrapper">
     <div class="login-card">
         <div class="login-header">
-            <div class="login-icon">
-                <i class="fa-solid fa-fingerprint"></i>
-            </div>
+            @if (!string.IsNullOrEmpty(sysLogo))
+            {
+                <div style="text-align: center; margin-bottom: 16px;">
+                    <img src="@sysLogo" alt="Logo" style="max-height: 60px; border-radius: 8px;" />
+                </div>
+            }
+            else
+            {
+                <div class="login-icon">
+                    <i class="fa-solid fa-fingerprint"></i>
+                </div>
+            }
             <h1 class="login-title">Đăng Nhập</h1>
-            <p class="login-subtitle">Hệ thống quản trị SNP SubSystem</p>
+            <p class="login-subtitle">@Html.Raw(sysTitle)</p>
         </div>
 
         @if (!string.IsNullOrEmpty(ViewBag.Error))

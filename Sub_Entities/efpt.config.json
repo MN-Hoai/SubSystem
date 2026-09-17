@@ -67,6 +67,10 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[Setting]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[StyleDetail]",
          "ObjectType": 0
       },

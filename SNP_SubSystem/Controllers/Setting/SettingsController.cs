@@ -23,10 +23,10 @@ namespace SNP_SubSystem.Controllers.Setting
             var settings = await _subSystemService.GetSystemSettingsAsync();
             var model = new SettingsViewModel
             {
-                SystemTitle = settings.GetValueOrDefault("SystemTitle", "SNP SubSystem"),
-                SystemLogoUrl = settings.GetValueOrDefault("SystemLogo", "/assets/images/logo.png"),
-                LoginBackgroundUrl = settings.GetValueOrDefault("LoginBackground", "/assets/images/bg-login.jpg"),
-                HomeBackgroundUrl = settings.GetValueOrDefault("HomeBackground", "")
+                SystemTitle = settings?.GetValueOrDefault("SystemTitle", "SNP SubSystem") ?? "SNP SubSystem",
+                SystemLogoUrl = settings?.GetValueOrDefault("SystemLogo", "/assets/images/logo.png") ?? "/assets/images/logo.png",
+                LoginBackgroundUrl = settings?.GetValueOrDefault("LoginBackground", "/assets/images/bg-login.jpg") ?? "/assets/images/bg-login.jpg",
+                HomeBackgroundUrl = settings?.GetValueOrDefault("HomeBackground", "") ?? ""
             };
             return View("~/Views/Setting/Index.cshtml", model);
         }

@@ -26,6 +26,8 @@ namespace SNP_SubSystem.Middleware
             "/lib",
             "/images",
             "/fonts",
+            "/assets",
+            "/uploads",
             "/favicon",
             "/_framework",
             "/Home/Error",
@@ -128,15 +130,6 @@ namespace SNP_SubSystem.Middleware
             if (!Guid.TryParse(userIdStr, out var userId))
             {
                 // Claim userId không hợp lệ → đá ra đăng nhập lại
-                context.Response.Redirect("/Login");
-                return;
-            }
-
-            // Kiểm tra tài khoản trong DB có bị khoá hoặc hết hạn không
-            bool isExpiredOrLocked = await service.IsUserExpiredOrLocked(userId);
-            if (isExpiredOrLocked)
-            {
-                context.Response.Cookies.Delete(CookieName);
                 context.Response.Redirect("/Login");
                 return;
             }

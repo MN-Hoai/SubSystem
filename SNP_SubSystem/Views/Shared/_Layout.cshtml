@@ -2,10 +2,10 @@
 @inject SubSystemService SubSystemService
 @{
     var sysSettings = await SubSystemService.GetSystemSettingsAsync();
-    var sysTitle = sysSettings.GetValueOrDefault("SystemTitle", "");
+    var sysTitle = sysSettings?.GetValueOrDefault("SystemTitle", "") ?? "";
     if (string.IsNullOrEmpty(sysTitle)) sysTitle = "Sub_System Admin";
-    var sysLogo = sysSettings.GetValueOrDefault("SystemLogo", "");
-    var homeBg = sysSettings.GetValueOrDefault("HomeBackground", "");
+    var sysLogo = sysSettings?.GetValueOrDefault("SystemLogo", "") ?? "";
+    var homeBg = sysSettings?.GetValueOrDefault("HomeBackground", "") ?? "";
 }
 <!DOCTYPE html>
 <html lang="vi">

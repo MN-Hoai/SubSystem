@@ -3,10 +3,10 @@
 @{
     Layout = null; // Login page does not use the standard layout
     var sysSettings = await SubSystemService.GetSystemSettingsAsync();
-    var sysTitle = sysSettings.GetValueOrDefault("SystemTitle", "");
+    var sysTitle = sysSettings?.GetValueOrDefault("SystemTitle", "") ?? "";
     if (string.IsNullOrEmpty(sysTitle)) sysTitle = "SNP SubSystem";
-    var sysLogo = sysSettings.GetValueOrDefault("SystemLogo", "");
-    var loginBg = sysSettings.GetValueOrDefault("LoginBackground", "");
+    var sysLogo = sysSettings?.GetValueOrDefault("SystemLogo", "") ?? "";
+    var loginBg = sysSettings?.GetValueOrDefault("LoginBackground", "") ?? "";
 }
 
 <!DOCTYPE html>
@@ -72,10 +72,13 @@
         }
 
         .login-card {
-            background: var(--bg-surface);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.05), 
-                        0 0 0 1px rgba(0,0,0,0.02);
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.1), 
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
             padding: 40px;
             position: relative;
             overflow: hidden;
@@ -242,7 +245,7 @@
                 </div>
             }
             <h1 class="login-title">Đăng Nhập</h1>
-            <p class="login-subtitle">Support Process System @Html.Raw(sysTitle)</p>
+            <p class="login-subtitle">@Html.Raw(sysTitle)</p>
         </div>
 
         @if (!string.IsNullOrEmpty(ViewBag.Error))

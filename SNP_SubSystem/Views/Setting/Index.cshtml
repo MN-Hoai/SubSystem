@@ -2,102 +2,324 @@
 
 @{
     ViewData["Title"] = "Cài đặt hệ thống";
-    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card card-primary">
-                <div class="card-header">
-                    <h3 class="card-title">Cài đặt hệ thống</h3>
-                </div>
-                
-                @if (TempData["SuccessMessage"] != null)
-                {
-                    <div class="alert alert-success m-3">
-                        @TempData["SuccessMessage"]
-                    </div>
-                }
+<style>
+    /* Premium Settings UI */
+    .st-form-container {
+        padding: 32px;
+        background: var(--bg-surface);
+    }
+    
+    .st-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+    }
+    
+    @@media (max-width: 900px) {
+        .st-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 
-                <form asp-controller="Settings" asp-action="Save" method="post" enctype="multipart/form-data">
-                    <div class="card-body">
-                        <!-- System Title -->
-                        <div class="form-group">
-                            <label for="SystemTitle">Tiêu đề hệ thống (Header)</label>
-                            <input type="text" class="form-control" id="SystemTitle" name="SystemTitle" value="@Model.SystemTitle" placeholder="Nhập tiêu đề hệ thống">
-                        </div>
+    .st-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
 
-                        <!-- System Logo -->
-                        <div class="form-group">
-                            <label for="SystemLogoFile">Logo Hệ thống</label>
-                            <div class="input-group">
-                                <div class="custom-file">
-                                    <input type="file" class="custom-file-input" id="SystemLogoFile" name="SystemLogoFile" accept="image/*">
-                                    <label class="custom-file-label" for="SystemLogoFile">Chọn file</label>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <p>Logo hiện tại:</p>
-                                <img src="@Model.SystemLogoUrl" alt="System Logo" style="max-height: 50px; background-color: #343a40; padding: 5px;" />
-                            </div>
-                        </div>
+    .st-label {
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--ink-900);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .st-label i {
+        color: var(--accent-navy);
+        font-size: 16px;
+    }
 
-                        <!-- Login Background -->
-                        <div class="form-group">
-                            <label for="LoginBackgroundFile">Hình nền trang Đăng nhập</label>
-                            <div class="input-group">
-                                <div class="custom-file">
-                                    <input type="file" class="custom-file-input" id="LoginBackgroundFile" name="LoginBackgroundFile" accept="image/*">
-                                    <label class="custom-file-label" for="LoginBackgroundFile">Chọn file</label>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <p>Hình nền hiện tại:</p>
-                                <img src="@Model.LoginBackgroundUrl" alt="Login Background" style="max-height: 100px;" />
-                            </div>
-                        </div>
+    .st-input {
+        width: 100%;
+        padding: 14px 18px;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        font-size: 15px;
+        color: var(--ink-900);
+        background: var(--bg-canvas);
+        transition: all 0.3s ease;
+    }
 
-                        <!-- Home Background -->
-                        <div class="form-group">
-                            <label for="HomeBackgroundFile">Hình nền trang Home</label>
-                            <div class="input-group">
-                                <div class="custom-file">
-                                    <input type="file" class="custom-file-input" id="HomeBackgroundFile" name="HomeBackgroundFile" accept="image/*">
-                                    <label class="custom-file-label" for="HomeBackgroundFile">Chọn file</label>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                @if (!string.IsNullOrEmpty(Model.HomeBackgroundUrl))
-                                {
-                                    <p>Hình nền hiện tại:</p>
-                                    <img src="@Model.HomeBackgroundUrl" alt="Home Background" style="max-height: 100px;" />
-                                }
-                                else
-                                {
-                                    <p class="text-muted">Chưa có hình nền (sẽ dùng màu nền mặc định)</p>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="card-footer">
-                        <button type="submit" class="btn btn-primary">Lưu cấu hình</button>
-                    </div>
-                </form>
+    .st-input:focus {
+        border-color: var(--accent-navy);
+        box-shadow: 0 0 0 4px rgba(31, 58, 103, 0.12);
+        outline: none;
+        background: var(--bg-surface);
+    }
+
+    /* Drag & Drop Upload Zone */
+    .upload-zone {
+        position: relative;
+        border: 2px dashed var(--border-soft);
+        border-radius: 16px;
+        background: var(--bg-canvas);
+        padding: 28px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 220px;
+        overflow: hidden;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--accent-navy);
+        background: var(--accent-navy-soft);
+        transform: translateY(-2px);
+    }
+
+    .upload-input {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 10;
+    }
+
+    .upload-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        z-index: 5;
+        transition: opacity 0.3s;
+    }
+
+    .upload-icon {
+        font-size: 42px;
+        color: var(--accent-navy);
+        opacity: 0.8;
+        margin-bottom: 4px;
+    }
+
+    .upload-text {
+        font-size: 15px;
+        color: var(--ink-900);
+        font-weight: 700;
+    }
+    
+    .upload-hint {
+        font-size: 13px;
+        color: var(--ink-500);
+    }
+
+    /* Preview Image State */
+    .upload-preview {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        object-fit: cover;
+        z-index: 1;
+        display: none;
+        border-radius: 14px;
+        transition: filter 0.3s;
+    }
+    
+    /* Checkerboard for transparent PNGs (Logo) */
+    .checkerboard {
+        background-image: 
+          linear-gradient(45deg, #e5e5e5 25%, transparent 25%), 
+          linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), 
+          linear-gradient(45deg, transparent 75%, #e5e5e5 75%), 
+          linear-gradient(-45deg, transparent 75%, #e5e5e5 75%);
+        background-size: 16px 16px;
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        object-fit: contain !important;
+        padding: 20px;
+    }
+
+    .upload-zone.has-image .upload-preview {
+        display: block;
+    }
+    
+    .upload-zone.has-image .upload-content {
+        opacity: 0; 
+    }
+    
+    .upload-zone.has-image:hover .upload-preview {
+        filter: brightness(0.4) blur(2px);
+    }
+
+    .upload-zone.has-image:hover .upload-content {
+        opacity: 1;
+    }
+    
+    .upload-zone.has-image:hover .upload-text,
+    .upload-zone.has-image:hover .upload-hint,
+    .upload-zone.has-image:hover .upload-icon {
+        color: #ffffff;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .st-footer {
+        margin-top: 40px;
+        padding-top: 28px;
+        border-top: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .btn-save {
+        padding: 14px 40px;
+        font-size: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(31, 58, 103, 0.2);
+    }
+    .btn-save:hover {
+        box-shadow: 0 6px 16px rgba(31, 58, 103, 0.3);
+    }
+</style>
+
+<div class="content-area">
+    <div class="page-head">
+        <div class="page-head-left">
+            <div class="breadcrumb">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a><span class="sep">/</span><span class="current">Quản trị</span>
             </div>
+            <h1 class="page-title">Cài đặt hệ thống</h1>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-navy); margin-right: 8px;"></i>
+                Giao diện & Cấu hình
+            </div>
+        </div>
+        
+        <div class="st-form-container">
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert-success" style="background: #ecfdf5; border-left: 4px solid var(--success); color: #065f46; padding: 18px 20px; border-radius: 12px; margin-bottom: 32px; font-weight: 600; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(6, 95, 70, 0.05);">
+                    <i class="fa-solid fa-circle-check" style="font-size: 20px;"></i>
+                    @TempData["SuccessMessage"]
+                </div>
+            }
+
+            <form asp-controller="Settings" asp-action="Save" method="post" enctype="multipart/form-data">
+                
+                <div class="st-grid">
+                    <!-- Left Column -->
+                    <div style="display: flex; flex-direction: column; gap: 36px;">
+                        
+                        <div class="st-group">
+                            <label class="st-label" for="SystemTitle">
+                                <i class="fa-solid fa-heading"></i> Tiêu đề hệ thống
+                            </label>
+                            <input type="text" class="st-input" id="SystemTitle" name="SystemTitle" value="@Model.SystemTitle" placeholder="Nhập tên thương hiệu hoặc tiêu đề ứng dụng...">
+                        </div>
+
+                        <div class="st-group">
+                            <label class="st-label">
+                                <i class="fa-solid fa-leaf"></i> Logo thương hiệu
+                            </label>
+                            <div class="upload-zone @(!string.IsNullOrEmpty(Model.SystemLogoUrl) ? "has-image" : "")" id="zone-logo">
+                                <input type="file" class="upload-input" id="SystemLogoFile" name="SystemLogoFile" accept="image/*" onchange="previewImage(this, 'preview-logo', 'zone-logo')">
+                                <img src="@Model.SystemLogoUrl" id="preview-logo" class="upload-preview checkerboard" alt="Logo" />
+                                
+                                <div class="upload-content">
+                                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                                    <span class="upload-text">Nhấp hoặc kéo thả Logo vào đây</span>
+                                    <span class="upload-hint">Định dạng khuyên dùng: PNG nền trong suốt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div style="display: flex; flex-direction: column; gap: 36px;">
+                        
+                        <div class="st-group">
+                            <label class="st-label">
+                                <i class="fa-solid fa-image"></i> Hình nền trang Đăng nhập
+                            </label>
+                            <div class="upload-zone @(!string.IsNullOrEmpty(Model.LoginBackgroundUrl) ? "has-image" : "")" id="zone-login">
+                                <input type="file" class="upload-input" id="LoginBackgroundFile" name="LoginBackgroundFile" accept="image/*" onchange="previewImage(this, 'preview-login', 'zone-login')">
+                                <img src="@Model.LoginBackgroundUrl" id="preview-login" class="upload-preview" alt="Login Background" />
+                                
+                                <div class="upload-content">
+                                    <i class="fa-regular fa-image upload-icon"></i>
+                                    <span class="upload-text">Nhấp hoặc kéo thả Hình nền vào đây</span>
+                                    <span class="upload-hint">Độ phân giải tối ưu: 1920x1080px (Tối đa 5MB)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="st-group">
+                            <label class="st-label">
+                                <i class="fa-solid fa-desktop"></i> Hình nền trang Tổng quan
+                            </label>
+                            <div class="upload-zone @(!string.IsNullOrEmpty(Model.HomeBackgroundUrl) ? "has-image" : "")" id="zone-home">
+                                <input type="file" class="upload-input" id="HomeBackgroundFile" name="HomeBackgroundFile" accept="image/*" onchange="previewImage(this, 'preview-home', 'zone-home')">
+                                <img src="@Model.HomeBackgroundUrl" id="preview-home" class="upload-preview" alt="Home Background" />
+                                
+                                <div class="upload-content">
+                                    <i class="fa-solid fa-display upload-icon"></i>
+                                    <span class="upload-text">Nhấp hoặc kéo thả Hình nền vào đây</span>
+                                    <span class="upload-hint">Dùng cho background của trang chủ (Tùy chọn)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="st-footer">
+                    <button type="submit" class="btn btn-primary btn-save">
+                        <i class="fa-solid fa-check"></i> Lưu cập nhật
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        $(function () {
-            // Update custom file label on select
-            $('.custom-file-input').on('change', function() {
-                var fileName = $(this).val().split('\\').pop();
-                $(this).next('.custom-file-label').addClass("selected").html(fileName);
-            });
+<script>
+    // Xử lý xem trước hình ảnh trực tiếp qua FileReader (Cực nhanh và mượt mà)
+    function previewImage(input, imgId, zoneId) {
+        var zone = document.getElementById(zoneId);
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                var img = document.getElementById(imgId);
+                img.src = e.target.result;
+                zone.classList.add('has-image');
+            }
+            
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Xử lý hiệu ứng khi kéo thả file vào vùng upload
+    $(function() {
+        $('.upload-zone').on('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).addClass('dragover');
         });
-    </script>
-}
+        $('.upload-zone').on('dragleave drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).removeClass('dragover');
+        });
+    });
+</script>

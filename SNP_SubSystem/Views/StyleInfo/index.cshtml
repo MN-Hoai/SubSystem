@@ -73,9 +73,24 @@
 
 <!-- Context Menu -->
 <div id="siCtxMenu" class="si-ctx-menu">
+    <div id="ctxSelInfo" style="display:none;padding:5px 16px 9px;font-size:12px;color:var(--ink-500);font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px;">
+        Đã chọn: <span id="ctxSelCount" style="color:var(--primary);font-size:13px;"></span> mã hàng
+    </div>
     <button id="ctxEditStyle" class="ctx-si-btn"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);width:20px;"></i> Cập nhật</button>
     <div class="ctx-si-sep"></div>
     <button id="ctxDeleteStyle" class="ctx-si-btn ctx-si-danger"><i class="fa-solid fa-trash" style="width:20px;"></i> Xoá</button>
+    <button id="ctxBulkDelete" class="ctx-si-btn ctx-si-danger" style="display:none;"><i class="fa-solid fa-trash-can" style="width:20px;"></i> Xoá <span id="ctxBulkCount"></span> mã đã chọn</button>
+</div>
+
+<!-- Bulk Action Bar siBulkBar -->
+<div id="siBulkBar" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9998;background:var(--primary);color:#fff;border-radius:12px;padding:12px 20px;box-shadow:0 8px 28px rgba(59,130,246,.4);align-items:center;gap:16px;">
+    <span id="siBulkLabel" style="font-size:13.5px;font-weight:700;"></span>
+    <button id="siBulkDelete" style="padding:7px 16px;border-radius:8px;background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.35);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .18s;">
+        <i class="fa-solid fa-trash-can"></i> Xoá tất cả
+    </button>
+    <button id="siBulkClear" style="padding:7px 12px;border-radius:8px;background:transparent;color:rgba(255,255,255,.7);border:none;font-size:13px;cursor:pointer;font-family:inherit;">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
 </div>
 
 <!-- =====================================================================
@@ -121,13 +136,14 @@
      MODAL: Nhập Excel
      ===================================================================== -->
 <div id="modalSiExcel" class="si-modal-backdrop">
-    <div class="si-modal-box" style="max-width:540px;">
+    <div class="si-modal-box" style="max-width:580px;">
         <div class="si-modal-header">
             <h2 class="si-modal-title"><i class="fa-solid fa-file-import" style="color:var(--primary);"></i> Nhập StyleInfo từ Excel</h2>
             <button class="si-modal-close" id="btnCloseSiExcel">&times;</button>
         </div>
         <div class="si-modal-body">
-          
+
+
             <div class="si-form-group">
                 <label class="si-form-label">Bộ phận <span style="color:var(--danger);">*</span></label>
                 <select id="excelDeptSel" class="si-form-control">
@@ -154,6 +170,25 @@
         <div class="si-modal-footer">
             <button class="si-btn si-btn-ghost" id="btnCancelSiExcel">Huỷ</button>
             <button class="si-btn si-btn-primary" id="btnDoSiExcel" disabled><i class="fa-solid fa-upload"></i> Bắt đầu nhập</button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================================
+     MODAL: Xem chi tiết công đoạn (double-click)
+     ===================================================================== -->
+<div id="modalSiDetail" class="si-modal-backdrop">
+    <div class="si-modal-box" style="max-width:500px;">
+        <div class="si-modal-header">
+            <h2 class="si-modal-title" id="siDetailTitle"><i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Chi tiết công đoạn</h2>
+            <button class="si-modal-close" id="btnCloseSiDetail">&times;</button>
+        </div>
+        <div class="si-modal-body">
+            <div id="siDetailMeta" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+            <div id="siDetailSteps"></div>
+        </div>
+        <div class="si-modal-footer">
+            <button class="si-btn si-btn-ghost" id="btnCloseSiDetailFooter">Đóng</button>
         </div>
     </div>
 </div>
@@ -222,6 +257,19 @@
     .si-pag-btn:hover { border-color:var(--primary); color:var(--primary); }
     .si-pag-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; font-weight:700; }
     .si-pag-btn:disabled { opacity:.4; cursor:default; }
+    /* ── Multi-select ─────────────────────────────────────────────── */
+    #siTbody tr.si-ms-sel td  { background: rgba(59,130,246,.09) !important; }
+    #siTbody tr.si-ctx-active td { background: rgba(59,130,246,.15) !important; }
+    #siTbody tr { user-select: none; }
+    #siBulkBar { display: none; }
+    #siBulkBar.show { display: flex !important; }
+    #siBulkDelete:hover { background: rgba(255,255,255,.3) !important; }
+    /* ── Detail modal ───────────────────────────────────────────────────── */
+    .si-step-list { display:flex; flex-direction:column; gap:6px; }
+    .si-step-item { display:flex; align-items:center; gap:10px; padding:9px 14px; background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:8px; font-size:13.5px; }
+    .si-step-num { width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .si-meta-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 11px; border-radius:999px; font-size:12px; font-weight:600; background:var(--bg-canvas); border:1.5px solid var(--border); color:var(--ink-700-solid); }
+    .si-table tbody tr { cursor:pointer; }
 </style>
 
 <script>
@@ -240,11 +288,11 @@
     function onBkd(id) {
         document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
     }
-    ['modalSiForm','modalSiDelete','modalSiExcel'].forEach(id => {
+    ['modalSiForm','modalSiDelete','modalSiExcel','modalSiDetail'].forEach(id => {
         onBkd(id);
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') ['modalSiForm','modalSiDelete','modalSiExcel'].forEach(closeModal);
+        if (e.key === 'Escape') ['modalSiForm','modalSiDelete','modalSiExcel','modalSiDetail'].forEach(closeModal);
     });
 
     /* ===== STATE ============================================================= */
@@ -367,16 +415,178 @@
         if (e.key === 'Enter') loadTable(1);
     });
 
+    /* ===== DOUBLE-CLICK: Xem chi tiết công đoạn ============================== */
+    document.getElementById('siTbody').addEventListener('dblclick', e => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        openDetailModal(tr.dataset.id);
+    });
+
+    async function openDetailModal(id) {
+        document.getElementById('siDetailTitle').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--primary);"></i> Đang tải...';
+        document.getElementById('siDetailMeta').innerHTML = '';
+        document.getElementById('siDetailSteps').innerHTML = '';
+        openModal('modalSiDetail');
+        try {
+            const res  = await fetch('/StyleInfo/GetById?id=' + id);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            document.getElementById('siDetailTitle').innerHTML =
+                '<i class="fa-solid fa-list-check" style="color:var(--primary);"></i> ' + esc(data.styleCode);
+
+            document.getElementById('siDetailMeta').innerHTML =
+                '<span class="si-meta-chip"><i class="fa-solid fa-building"></i>' + esc(data.departmentName || '') + '</span>' +
+                (data.keyword ? '<span class="si-meta-chip"><i class="fa-solid fa-tag"></i>' + esc(data.keyword) + '</span>' : '') +
+                '<span class="si-meta-chip"><i class="fa-solid fa-layer-group"></i>' + (data.details ? data.details.length : 0) + ' công đoạn</span>';
+
+            const steps = data.details || [];
+            if (!steps.length) {
+                document.getElementById('siDetailSteps').innerHTML =
+                    '<div style="text-align:center;padding:28px;color:var(--ink-400);font-size:13px;"><i class="fa-solid fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>Chưa có công đoạn nào.</div>';
+            } else {
+                document.getElementById('siDetailSteps').innerHTML =
+                    '<div class="si-step-list">' +
+                    steps.map((d, i) =>
+                        '<div class="si-step-item">' +
+                        '<div class="si-step-num">' + (i + 1) + '</div>' +
+                        '<span>' + esc(d.detailName) + '</span>' +
+                        '</div>'
+                    ).join('') +
+                    '</div>';
+            }
+        } catch(e) {
+            document.getElementById('siDetailSteps').innerHTML =
+                '<div style="color:var(--danger);padding:16px;font-size:13px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi: ' + esc(e.message) + '</div>';
+        }
+    }
+
+    document.getElementById('btnCloseSiDetail').addEventListener('click', () => closeModal('modalSiDetail'));
+    document.getElementById('btnCloseSiDetailFooter').addEventListener('click', () => closeModal('modalSiDetail'));
+
+    /* ===== MULTI-SELECT: Drag / Ctrl+Click / Shift+Click =================== */
+    const tbody       = document.getElementById('siTbody');
+    const bulkBar     = document.getElementById('siBulkBar');
+    const bulkLabel   = document.getElementById('siBulkLabel');
+    const bulkDelete  = document.getElementById('siBulkDelete');
+    const bulkClear   = document.getElementById('siBulkClear');
+    let ms_dragging = false;
+    let ms_lastIdx  = -1;
+
+    function ms_rows()       { return Array.from(tbody.querySelectorAll('tr[data-id]')); }
+    function ms_set(tr, on)  { on ? tr.classList.add('si-ms-sel') : tr.classList.remove('si-ms-sel'); }
+    function ms_selected()   { return ms_rows().filter(r => r.classList.contains('si-ms-sel')); }
+    function ms_clearAll()   { ms_rows().forEach(r => r.classList.remove('si-ms-sel','si-ctx-active')); updateBulkBar(); }
+    function ms_selectRange(a, b) {
+        const rows = ms_rows(), lo = Math.min(a,b), hi = Math.max(a,b);
+        for (let i = lo; i <= hi; i++) if (rows[i]) ms_set(rows[i], true);
+    }
+
+    function updateBulkBar() {
+        const sel = ms_selected();
+        if (sel.length > 0) {
+            bulkLabel.textContent = 'Đang chọn ' + sel.length + ' mã hàng';
+            bulkBar.classList.add('show');
+        } else {
+            bulkBar.classList.remove('show');
+        }
+    }
+
+    tbody.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) { ms_clearAll(); return; }
+        const rows = ms_rows(), idx = rows.indexOf(tr);
+        if (e.shiftKey && ms_lastIdx > -1) {
+            e.preventDefault();
+            ms_clearAll();
+            ms_selectRange(ms_lastIdx, idx);
+        } else if (e.ctrlKey) {
+            ms_set(tr, !tr.classList.contains('si-ms-sel'));
+            ms_lastIdx = idx;
+        } else {
+            ms_clearAll();
+            ms_set(tr, true);
+            ms_lastIdx  = idx;
+            ms_dragging = true;
+        }
+        updateBulkBar();
+    });
+
+    tbody.addEventListener('mouseover', e => {
+        if (!ms_dragging) return;
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const idx = ms_rows().indexOf(tr);
+        if (ms_lastIdx > -1) { ms_clearAll(); ms_selectRange(ms_lastIdx, idx); }
+        updateBulkBar();
+    });
+
+    document.addEventListener('mouseup', () => { ms_dragging = false; });
+    tbody.addEventListener('selectstart', e => { if (ms_dragging || e.shiftKey) e.preventDefault(); });
+
+    bulkClear.addEventListener('click', ms_clearAll);
+
+    async function doBulkDelete(ids) {
+        const btn = bulkDelete;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xoá...';
+        try {
+            const res  = await fetch('/StyleInfo/BulkDelete', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ ids })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast('success', data.message);
+                ms_clearAll();
+                loadTable(currentPage);
+            } else { toast('error', data.message || 'Lỗi.'); }
+        } catch(e) { toast('error', 'Lỗi kết nối: ' + e.message); }
+        finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Xoá tất cả';
+        }
+    }
+
+    bulkDelete.addEventListener('click', () => {
+        const ids = ms_selected().map(r => r.dataset.id);
+        if (!ids.length) return;
+        if (!confirm('Xoá ' + ids.length + ' mã hàng đã chọn? Hành động này không thể phục hồi.')) return;
+        doBulkDelete(ids);
+    });
+
     /* ===== CONTEXT MENU ====================================================== */
     const ctxMenu = document.getElementById('siCtxMenu');
     document.getElementById('siTbody').addEventListener('contextmenu', e => {
         const tr = e.target.closest('tr[data-id]');
         if (!tr) return;
         e.preventDefault();
+
+        // Nếu tr không nằm trong vùng đã chọn thì chọn lại chỉ row này
+        if (!tr.classList.contains('si-ms-sel')) {
+            ms_clearAll();
+            ms_set(tr, true);
+            ms_lastIdx = ms_rows().indexOf(tr);
+            updateBulkBar();
+        }
+
         activeRow = tr;
+        const sel = ms_selected();
+        const multi = sel.length > 1;
+
         document.querySelectorAll('#siTbody tr').forEach(r => r.classList.remove('si-ctx-active'));
-        tr.classList.add('si-ctx-active');
-        const mW = 190, mH = 100;
+        sel.forEach(r => r.classList.add('si-ctx-active'));
+
+        // Context menu: show/hide theo mode
+        document.getElementById('ctxSelInfo').style.display = multi ? 'block' : 'none';
+        if (multi) document.getElementById('ctxSelCount').textContent = sel.length;
+        document.getElementById('ctxEditStyle').style.display  = multi ? 'none' : 'block';
+        document.getElementById('ctxDeleteStyle').style.display = multi ? 'none' : 'block';
+        document.getElementById('ctxBulkDelete').style.display  = multi ? 'block' : 'none';
+        if (multi) document.getElementById('ctxBulkCount').textContent = sel.length;
+
+        const mW = 220, mH = 120;
         ctxMenu.style.left = (e.clientX + mW > window.innerWidth ? e.clientX - mW : e.clientX) + 'px';
         ctxMenu.style.top  = (e.clientY + mH > window.innerHeight ? e.clientY - mH : e.clientY) + 'px';
         ctxMenu.style.display = 'block';
@@ -392,6 +602,13 @@
         if (!activeRow) return; hideCtx();
         document.getElementById('siDeleteInfoBox').textContent = activeRow.dataset.code;
         openModal('modalSiDelete');
+    });
+    document.getElementById('ctxBulkDelete').addEventListener('click', () => {
+        hideCtx();
+        const ids = ms_selected().map(r => r.dataset.id);
+        if (!ids.length) return;
+        if (!confirm('Xoá ' + ids.length + ' mã hàng đã chọn? Hành động này không thể phục hồi.')) return;
+        doBulkDelete(ids);
     });
 
     /* ===== FORM: Create / Update ============================================= */

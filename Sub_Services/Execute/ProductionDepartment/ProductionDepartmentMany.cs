@@ -449,7 +449,8 @@ namespace Sub_Services.Execute
         {
             var query = _context.ProductionMachines
                 .AsNoTracking()
-                .Where(m => m.Status >= -1); // loại trừ đã xóa (-2)
+                .Where(m => m.Status == 1                                      // máy đang hoạt động
+                         && m.ProductLayoutItems.Any(li => li.Status == 1));   // còn trong layout
 
             if (machineStatus.HasValue)
                 query = query.Where(m => m.Status == machineStatus.Value);

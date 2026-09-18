@@ -323,3 +323,320 @@
         });
     });
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PANEL: Sao lưu & Khôi phục
+     ═══════════════════════════════════════════════════════════════════ -->
+<style>
+    /* ── Backup Panel ───────────────────────────────────────────────── */
+    .bk-panel      { margin-top: 24px; }
+    .bk-grid       { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
+    @@media(max-width:860px){ .bk-grid{ grid-template-columns:1fr; } }
+    .bk-card       { background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:14px; padding:22px 24px; }
+    .bk-card-title { font-size:14px; font-weight:700; color:var(--ink-900); display:flex; align-items:center; gap:9px; margin-bottom:18px; }
+    .bk-card-title i { color:var(--primary); font-size:16px; }
+    .bk-row        { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+    .bk-label      { font-size:13px; font-weight:600; color:var(--ink-700-solid); min-width:140px; }
+    .bk-input      { border:1.5px solid var(--border); border-radius:8px; padding:7px 12px; font-size:13px; font-family:inherit; background:var(--bg-surface); color:var(--ink-900); outline:none; transition:border-color .18s; }
+    .bk-input:focus{ border-color:var(--primary); }
+    .bk-toggle     { position:relative; display:inline-block; width:44px; height:24px; }
+    .bk-toggle input{ opacity:0; width:0; height:0; }
+    .bk-slider     { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:24px; transition:.25s; }
+    .bk-slider::before{ content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.25s; }
+    .bk-toggle input:checked + .bk-slider { background:var(--primary); }
+    .bk-toggle input:checked + .bk-slider::before { transform:translateX(20px); }
+    .bk-btn        { display:inline-flex; align-items:center; gap:7px; padding:8px 18px; border-radius:8px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; border:none; transition:all .18s; }
+    .bk-btn-primary{ background:var(--primary); color:#fff; }
+    .bk-btn-primary:hover{ filter:brightness(1.1); }
+    .bk-btn-primary:disabled{ opacity:.5; cursor:default; }
+    .bk-btn-ghost  { background:var(--bg-surface); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+    .bk-btn-ghost:hover{ border-color:var(--primary); color:var(--primary); }
+    .bk-btn-danger { background:rgba(239,68,68,.1); color:var(--danger); border:1.5px solid rgba(239,68,68,.3); padding:5px 10px; font-size:12px; border-radius:6px; font-family:inherit; font-weight:700; cursor:pointer; transition:all .15s; }
+    .bk-btn-danger:hover{ background:var(--danger); color:#fff; }
+    .bk-status-ok  { color:var(--success); font-size:12px; font-weight:700; }
+    .bk-status-err { color:var(--danger);  font-size:12px; font-weight:700; }
+    /* ── Backup Table ───────────────────────────────────────────────── */
+    .bk-table      { width:100%; border-collapse:collapse; font-size:13px; }
+    .bk-table th   { padding:9px 14px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-500); background:var(--bg-canvas); border-bottom:1px solid var(--border); text-align:left; }
+    .bk-table td   { padding:11px 14px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+    .bk-table tbody tr:last-child td { border-bottom:none; }
+    .bk-table tbody tr:hover td { background:rgba(59,130,246,.03); }
+    .bk-empty      { text-align:center; padding:32px; color:var(--ink-400); font-size:13px; }
+    .bk-actions    { display:flex; gap:6px; flex-wrap:wrap; }
+    .bk-badge-file { font-family:monospace; font-size:12.5px; background:var(--bg-canvas); border:1px solid var(--border); border-radius:5px; padding:2px 8px; color:var(--ink-700-solid); }
+</style>
+
+<div class="content-area bk-panel">
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title">
+                <i class="fa-solid fa-database" style="color:var(--primary);margin-right:8px;"></i>
+                Sao lưu &amp; Khôi phục dữ liệu
+            </div>
+        </div>
+        <div class="st-form-container">
+
+            <div class="bk-grid">
+                <!-- Card: Cấu hình tự động -->
+                <div class="bk-card">
+                    <div class="bk-card-title"><i class="fa-solid fa-clock-rotate-left"></i> Sao lưu tự động</div>
+                    <div class="bk-row">
+                        <span class="bk-label">Bật tự động</span>
+                        <label class="bk-toggle">
+                            <input type="checkbox" id="bkAutoEnabled">
+                            <span class="bk-slider"></span>
+                        </label>
+                        <span id="bkAutoLabel" style="font-size:12px;color:var(--ink-500);">Tắt</span>
+                    </div>
+                    <div class="bk-row">
+                        <span class="bk-label">Cách mỗi (giờ)</span>
+                        <input type="number" id="bkInterval" class="bk-input" style="width:90px;" min="1" max="8760" value="24">
+                    </div>
+                    <div class="bk-row">
+                        <span class="bk-label">Giữ tối đa (file)</span>
+                        <input type="number" id="bkMaxKeep" class="bk-input" style="width:90px;" min="1" max="365" value="30">
+                    </div>
+                    <div class="bk-row">
+                        <span class="bk-label">Thư mục lưu</span>
+                        <input type="text" id="bkFolder" class="bk-input" style="flex:1;min-width:180px;" placeholder="wwwroot/backups">
+                    </div>
+                    <div style="margin-top:6px;">
+                        <button class="bk-btn bk-btn-primary" id="bkSaveCfg">
+                            <i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình
+                        </button>
+                        <span id="bkCfgMsg" style="margin-left:12px;font-size:12px;"></span>
+                    </div>
+                </div>
+
+                <!-- Card: Sao lưu thủ công -->
+                <div class="bk-card">
+                    <div class="bk-card-title"><i class="fa-solid fa-hand-pointer"></i> Sao lưu thủ công</div>
+                    <p style="font-size:13px;color:var(--ink-600);line-height:1.6;margin-bottom:18px;">
+                        Tạo bản sao lưu ngay lập tức. File <code>.bak</code> được lưu vào thư mục cấu hình.
+                        Quá trình thường mất vài giây đến vài phút tùy kích thước dữ liệu.
+                    </p>
+                    <button class="bk-btn bk-btn-primary" id="bkRunNow" style="font-size:14px;padding:10px 24px;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Sao lưu ngay
+                    </button>
+                    <div id="bkRunMsg" style="margin-top:14px;font-size:13px;display:none;"></div>
+                </div>
+            </div>
+
+            <!-- Bảng danh sách backup -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <span style="font-size:14px;font-weight:700;color:var(--ink-900);">
+                    <i class="fa-solid fa-folder-open" style="color:var(--primary);margin-right:6px;"></i>
+                    Danh sách bản sao lưu
+                </span>
+                <button class="bk-btn bk-btn-ghost" id="bkRefresh" style="padding:6px 14px;font-size:12px;">
+                    <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+                </button>
+            </div>
+
+            <div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;">
+                <div id="bkTableWrap">
+                    <div class="bk-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...</div>
+                </div>
+            </div>
+
+            <!-- Modal xác nhận khôi phục -->
+            <div id="bkRestoreModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,14,26,.5);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
+                <div style="background:var(--bg-surface);border-radius:14px;padding:28px 30px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.22);">
+                    <div style="font-size:16px;font-weight:700;color:var(--danger);display:flex;align-items:center;gap:9px;margin-bottom:14px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Xác nhận khôi phục
+                    </div>
+                    <p style="font-size:13.5px;color:var(--ink-700-solid);line-height:1.6;margin-bottom:8px;">
+                        Sẽ khôi phục database từ file:<br>
+                        <strong id="bkRestoreFileName" style="font-family:monospace;color:var(--primary);"></strong>
+                    </p>
+                    <p style="font-size:12.5px;color:var(--danger);margin-bottom:20px;">
+                        ⚠ Toàn bộ dữ liệu hiện tại sẽ bị <strong>thay thế</strong>. Web app sẽ tạm ngắt kết nối vài giây trong quá trình khôi phục.
+                    </p>
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                        <button id="bkRestoreCancel" class="bk-btn bk-btn-ghost">Huỷ</button>
+                        <button id="bkRestoreConfirm" class="bk-btn" style="background:var(--danger);color:#fff;">
+                            <i class="fa-solid fa-rotate-left"></i> Xác nhận khôi phục
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    function toast(type, msg) {
+        const fn = { success: toastr.success, error: toastr.error, info: toastr.info };
+        (fn[type] || toastr.info).call(toastr, msg);
+    }
+
+    // ── Load config ──────────────────────────────────────────────────
+    async function loadConfig() {
+        try {
+            const res  = await fetch('/Backup/GetStatus');
+            const data = await res.json();
+            document.getElementById('bkAutoEnabled').checked = !!data.autoBackupEnabled;
+            document.getElementById('bkInterval').value      = data.autoBackupIntervalHours || 24;
+            document.getElementById('bkMaxKeep').value       = data.maxKeepFiles || 30;
+            document.getElementById('bkFolder').value        = data.folderPath || 'wwwroot/backups';
+            updateAutoLabel();
+        } catch(e) { console.error(e); }
+    }
+
+    function updateAutoLabel() {
+        const on = document.getElementById('bkAutoEnabled').checked;
+        document.getElementById('bkAutoLabel').textContent = on ? 'Bật' : 'Tắt';
+    }
+    document.getElementById('bkAutoEnabled').addEventListener('change', updateAutoLabel);
+
+    // ── Save config ──────────────────────────────────────────────────
+    document.getElementById('bkSaveCfg').addEventListener('click', async () => {
+        const btn = document.getElementById('bkSaveCfg');
+        const msg = document.getElementById('bkCfgMsg');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        try {
+            const res  = await fetch('/Backup/UpdateConfig', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    autoBackupEnabled:       document.getElementById('bkAutoEnabled').checked,
+                    autoBackupIntervalHours: parseInt(document.getElementById('bkInterval').value) || 24,
+                    maxKeepFiles:            parseInt(document.getElementById('bkMaxKeep').value)  || 30,
+                    folderPath:              document.getElementById('bkFolder').value.trim()
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                msg.innerHTML = '<span class="bk-status-ok"><i class="fa-solid fa-check"></i> Đã lưu</span>';
+                toast('success', data.message);
+            } else {
+                msg.innerHTML = '<span class="bk-status-err">Lỗi: ' + data.message + '</span>';
+            }
+        } catch(e) {
+            msg.innerHTML = '<span class="bk-status-err">Lỗi kết nối</span>';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình';
+        }
+    });
+
+    // ── Run Now ──────────────────────────────────────────────────────
+    document.getElementById('bkRunNow').addEventListener('click', async () => {
+        const btn = document.getElementById('bkRunNow');
+        const msgEl = document.getElementById('bkRunMsg');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang sao lưu...';
+        msgEl.style.display = 'none';
+        try {
+            const res  = await fetch('/Backup/RunNow', { method: 'POST' });
+            const data = await res.json();
+            msgEl.style.display = 'block';
+            if (data.success) {
+                msgEl.innerHTML = '<span class="bk-status-ok"><i class="fa-solid fa-check-circle"></i> ' + data.message + '</span>';
+                toast('success', data.message);
+                loadList();
+            } else {
+                msgEl.innerHTML = '<span class="bk-status-err"><i class="fa-solid fa-triangle-exclamation"></i> ' + data.message + '</span>';
+                toast('error', data.message);
+            }
+        } catch(e) {
+            msgEl.style.display = 'block';
+            msgEl.innerHTML = '<span class="bk-status-err">Lỗi kết nối: ' + e.message + '</span>';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Sao lưu ngay';
+        }
+    });
+
+    // ── Load list ────────────────────────────────────────────────────
+    async function loadList() {
+        const wrap = document.getElementById('bkTableWrap');
+        wrap.innerHTML = '<div class="bk-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải...</div>';
+        try {
+            const res  = await fetch('/Backup/GetList');
+            const list = await res.json();
+            if (!list.length) {
+                wrap.innerHTML = '<div class="bk-empty"><i class="fa-solid fa-inbox"></i> Chưa có bản sao lưu nào.</div>';
+                return;
+            }
+            let html = '<table class="bk-table"><thead><tr>'
+                + '<th>#</th><th>Tên file</th><th>Ngày tạo</th><th>Kích thước</th><th style="width:180px;">Thao tác</th>'
+                + '</tr></thead><tbody>';
+            list.forEach((f, i) => {
+                html += '<tr>'
+                    + '<td style="color:var(--ink-400);font-size:12px;">' + (i+1) + '</td>'
+                    + '<td><span class="bk-badge-file">' + esc(f.fileName) + '</span></td>'
+                    + '<td style="color:var(--ink-500);font-size:12.5px;">' + esc(f.createdAt) + '</td>'
+                    + '<td style="font-size:12.5px;">' + esc(f.sizeDisplay) + '</td>'
+                    + '<td><div class="bk-actions">'
+                    + '<a href="/Backup/Download?file=' + encodeURIComponent(f.fileName) + '" class="bk-btn bk-btn-ghost" style="padding:5px 10px;font-size:11px;" title="Tải về"><i class="fa-solid fa-download"></i></a>'
+                    + '<button class="bk-btn bk-btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="openRestore(\'' + esc(f.fileName) + '\')" title="Khôi phục"><i class="fa-solid fa-rotate-left" style="color:var(--primary);"></i></button>'
+                    + '<button class="bk-btn bk-btn-danger" onclick="deleteFile(\'' + esc(f.fileName) + '\',this)" title="Xóa"><i class="fa-solid fa-trash"></i></button>'
+                    + '</div></td></tr>';
+            });
+            html += '</tbody></table>';
+            wrap.innerHTML = html;
+        } catch(e) {
+            wrap.innerHTML = '<div class="bk-empty" style="color:var(--danger);">Lỗi tải danh sách: ' + e.message + '</div>';
+        }
+    }
+
+    document.getElementById('bkRefresh').addEventListener('click', loadList);
+
+    // ── Delete file ──────────────────────────────────────────────────
+    window.deleteFile = async function(fileName, btn) {
+        if (!confirm('Xóa file backup "' + fileName + '"?')) return;
+        btn.disabled = true;
+        try {
+            const res  = await fetch('/Backup/Delete?file=' + encodeURIComponent(fileName), { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) { toast('success', data.message); loadList(); }
+            else              { toast('error', data.message); btn.disabled = false; }
+        } catch(e) { toast('error', e.message); btn.disabled = false; }
+    };
+
+    // ── Restore ──────────────────────────────────────────────────────
+    var pendingRestore = '';
+    window.openRestore = function(fileName) {
+        pendingRestore = fileName;
+        document.getElementById('bkRestoreFileName').textContent = fileName;
+        document.getElementById('bkRestoreModal').style.display = 'flex';
+    };
+    document.getElementById('bkRestoreCancel').addEventListener('click', () => {
+        document.getElementById('bkRestoreModal').style.display = 'none';
+    });
+    document.getElementById('bkRestoreConfirm').addEventListener('click', async () => {
+        const btn = document.getElementById('bkRestoreConfirm');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang khôi phục...';
+        try {
+            const res  = await fetch('/Backup/Restore', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ fileName: pendingRestore })
+            });
+            const data = await res.json();
+            document.getElementById('bkRestoreModal').style.display = 'none';
+            if (data.success) toast('success', data.message);
+            else              toast('error', data.message);
+        } catch(e) {
+            toast('error', 'Lỗi kết nối: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Xác nhận khôi phục';
+        }
+    });
+
+    // ── Helper ───────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────
+    loadConfig();
+    loadList();
+})();
+</script>

@@ -116,6 +116,23 @@
 .lp-mono { font-family:'Courier New',monospace; font-weight:800; color:var(--accent-navy); }
 .lp-mini-prog { height:5px; background:var(--border-soft); border-radius:3px; overflow:hidden; min-width:50px; }
 .lp-mini-fill { height:100%; border-radius:3px; }
+
+/* ── Excel drag-select ───────────────────────────────────── */
+.lp-tbl { user-select:none; }
+.lp-tbl td[data-col] { cursor:cell; }
+.lp-tbl td.lp-sel { background:rgba(59,130,246,.13) !important; outline:1.5px solid rgba(59,130,246,.45); outline-offset:-1px; }
+.lp-stat-bar { display:none; align-items:center; gap:0; flex-wrap:wrap;
+    background:var(--bg-canvas); border:1.5px solid var(--border); border-top:none;
+    border-radius:0 0 10px 10px; padding:5px 12px; font-size:12px; }
+.lp-stat-bar.show { display:flex; }
+.lp-stat-hd { font-size:10.5px; font-weight:700; color:var(--ink-400); padding-right:10px; white-space:nowrap; }
+.lp-stat-group { display:flex; align-items:center; gap:4px; padding:3px 10px;
+    border-right:1px solid var(--border-soft); white-space:nowrap; }
+.lp-stat-group:last-child { border-right:none; }
+.lp-stat-col { font-size:11px; font-weight:800; color:var(--primary); padding-right:3px; }
+.lp-stat-lbl { color:var(--ink-400); font-size:11px; }
+.lp-stat-val { color:var(--ink-900); font-weight:800; font-size:12px; margin-left:2px; }
+.lp-stat-sep { color:var(--border); margin:0 3px; font-size:13px; }
 </style>
 
 <div class="lp-page">
@@ -331,8 +348,8 @@
         var minW   = Math.max(520, depts.length * 200);
         overviewWrap.style.minWidth = minW + 'px';
 
-        // Stacked datasets: một dataset per Line (cho SL kỳ)
-        // Grouped: SL kỳ (stacked) | Target (single bar) | Tổng SL tích lũy (single bar)
+        // Stacked datasets: một dataset per Line (cho SL Ngày)
+        // Grouped: SL Ngày (stacked) | Target (single bar) | Tổng SL tích lũy (single bar)
         var lineDatasets = allLines.map(function(lineName) {
             return {
                 label: 'Tổ ' + lineName,
@@ -350,7 +367,7 @@
         });
 
         var dsTarget = {
-            label: 'Target kỳ',
+            label: 'Target Ngày',
             data: depts.map(function(d){ return d.totalTarget; }),
             backgroundColor: 'rgba(245,158,11,0.25)',
             borderColor: '#f59e0b',
@@ -399,30 +416,39 @@
                             font:{ size:11.5, weight:'600', family:'Manrope' } }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15,23,42,.92)',
-                        titleFont: { size:13, weight:'700', family:'Manrope' },
-                        bodyFont: { size:11.5, family:'Manrope' },
-                        padding: 12, cornerRadius: 9,
+                        backgroundColor: 'rgba(10,18,36,.96)',
+                        titleFont: { size:15, weight:'800', family:'Manrope' },
+                        bodyFont:  { size:13, weight:'600', family:'Manrope' },
+                        footerFont:{ size:11.5, family:'Manrope' },
+                        padding: { top:14, bottom:14, left:18, right:18 },
+                        cornerRadius: 12,
+                        displayColors: true,
+                        boxWidth: 12, boxHeight: 12, boxPadding: 5,
+                        borderColor: 'rgba(255,255,255,.12)',
+                        borderWidth: 1,
+                        titleColor: '#f8fafc',
+                        bodyColor:  '#cbd5e1',
+                        multiKeyBackground: 'transparent',
                         callbacks: {
                             title: function(items) {
                                 var dept = depts[items[0].dataIndex];
                                 var cp = dept.totalQtyFixed > 0
                                     ? Math.round(dept.totalTotalOutput / dept.totalQtyFixed * 100) : 0;
-                                return dept.departmentName
-                                    + ' — SL ngày: ' + fmt(dept.totalTodayOutput) + '/' + fmt(dept.totalTarget)
-                                    + ' (' + dept.todayOutputPct + '%)'
-                                    + ' | ĐH: ' + fmt(dept.totalTotalOutput) + '/' + fmt(dept.totalQtyFixed)
-                                    + ' (' + cp + '%)';
+                                return [
+                                    'Bộ phận ' + dept.departmentName,
+                                    'SL trong ngày: ' + fmt(dept.totalTodayOutput) + ' / ' + fmt(dept.totalTarget) + '  (' + dept.todayOutputPct + '%)',
+                                    'Đơn hàng: ' + fmt(dept.totalTotalOutput) + ' / ' + fmt(dept.totalQtyFixed) + '  (' + cp + '%)'
+                                ];
                             },
                             label: function(ctx) {
                                 if (ctx.raw === 0) return null;
-                                return ctx.dataset.label + ': ' + fmt(ctx.raw);
+                                return '  ' + ctx.dataset.label + ':  ' + fmt(ctx.raw);
                             }
                         }
                     },
                     datalabels: {
                         display: function(ctx) {
-                            // Chỉ hiện label tổng SL kỳ (dataset cuối cùng của stack SL)
+                            // Chỉ hiện label tổng SL Ngày (dataset cuối cùng của stack SL)
                             if (ctx.dataset.stack !== 'sl') return false;
                             var isLastLine = ctx.datasetIndex === lineDatasets.length - 1;
                             return isLastLine && ctx.dataset.data[ctx.dataIndex] > 0;
@@ -490,15 +516,15 @@
 
         var html = '';
 
-        // ── LEFT: KPI + Bar chart (SL kỳ vs Target per line) ──
+        // ── LEFT: KPI + Bar chart (SL Ngày vs Target per line) ──
         html += '<div class="lp-card">';
         html += '<div class="lp-card-head">';
-        html += '<div class="lp-card-title"><i class="fa-solid fa-gauge-high" style="color:var(--accent-navy);"></i> ' + esc(dept.departmentName) + ' — Sản lượng kỳ</div>';
+        html += '<div class="lp-card-title"><i class="fa-solid fa-gauge-high" style="color:var(--accent-navy);"></i> ' + esc(dept.departmentName) + ' — Sản lượng Ngày</div>';
         html += '</div><div class="lp-card-body">';
 
-        // KPI 3 cột: Target kỳ, SL kỳ, Tổng ĐH
+        // KPI 3 cột: Target Ngày, SL Ngày, Tổng ĐH
         html += '<div class="lp-kpi-row" style="grid-template-columns:1fr 1fr 1fr;">';
-        html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Target kỳ</div>';
+        html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Target Ngày</div>';
         html += '<div class="lp-kpi-val">' + fmt(dept.totalTarget) + '</div></div>';
         html += '<div class="lp-kpi"><div class="lp-kpi-lbl">Sản lượng đạt</div>';
         html += '<div class="lp-kpi-val">' + fmt(dept.totalTodayOutput);
@@ -533,12 +559,12 @@
             var cp2 = l.completionPct  || 0;
             html += '<tr>';
             html += '<td><span class="lp-dot" style="background:' + (lineColorMap[l.line]||'#999') + ';"></span><span class="lp-mono">' + esc(l.line) + '</span></td>';
-            html += '<td style="font-weight:700;">' + fmt(l.todayOutput) + '</td>';
-            html += '<td>' + fmt(l.target) + '</td>';
-            html += '<td><span class="' + pctC(dp2) + '">' + dp2 + '%</span></td>';
-            html += '<td style="font-weight:700;color:var(--accent-navy);">' + fmt(l.totalOutput) + '</td>';
-            html += '<td style="color:var(--ink-500);">' + fmt(l.totalQtyFixed) + '</td>';
-            html += '<td>';
+            html += '<td data-col="1" data-val="' + (l.todayOutput||0) + '" style="font-weight:700;">' + fmt(l.todayOutput) + '</td>';
+            html += '<td data-col="2" data-val="' + (l.target||0)     + '">' + fmt(l.target) + '</td>';
+            html += '<td data-col="3" data-val="' + dp2               + '"><span class="' + pctC(dp2) + '">' + dp2 + '%</span></td>';
+            html += '<td data-col="4" data-val="' + (l.totalOutput||0)   + '" style="font-weight:700;color:var(--accent-navy);">' + fmt(l.totalOutput) + '</td>';
+            html += '<td data-col="5" data-val="' + (l.totalQtyFixed||0) + '" style="color:var(--ink-500);">' + fmt(l.totalQtyFixed) + '</td>';
+            html += '<td data-col="6" data-val="' + cp2 + '">';
             html += '<div style="display:flex;align-items:center;gap:6px;">';
             html += '<div class="lp-mini-prog" style="flex:1;"><div class="lp-mini-fill" style="width:' + Math.min(cp2,100) + '%;background:' + pctCol(cp2) + ';"></div></div>';
             html += '<span class="' + pctC(cp2) + '" style="font-weight:700;min-width:34px;text-align:right;">' + cp2 + '%</span>';
@@ -546,11 +572,13 @@
             html += '</tr>';
         });
         html += '</tbody></table>';
+        html += '<div class="lp-stat-bar" id="lpStatBar"></div>';
         html += '</div></div>'; // card-body + card
 
         detailGrid.innerHTML = html;
         renderDetailBar(lines);
         renderDetailDoughnut(lines, dept);
+        setTimeout(initTableSelect, 0);
     }
 
     function renderDetailBar(lines) {
@@ -567,7 +595,7 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Sản lượng kỳ',
+                        label: 'Sản lượng Ngày',
                         data: lines.map(function(l){ return l.todayOutput; }),
                         backgroundColor: colors.map(function(c){ return clrA(c, 0.82); }),
                         borderColor: colors,
@@ -599,13 +627,29 @@
                             font:{ size:11, weight:'600', family:'Manrope' } }
                     },
                     tooltip: {
-                        backgroundColor:'rgba(15,23,42,.92)',
-                        titleFont:{ size:12, weight:'700', family:'Manrope' },
-                        bodyFont:{ size:11, family:'Manrope' },
-                        padding:10, cornerRadius:8,
+                        backgroundColor: 'rgba(10,18,36,.96)',
+                        titleFont: { size:14, weight:'800', family:'Manrope' },
+                        bodyFont:  { size:13, weight:'600', family:'Manrope' },
+                        padding: { top:13, bottom:13, left:17, right:17 },
+                        cornerRadius: 11,
+                        displayColors: true,
+                        boxWidth: 11, boxHeight: 11, boxPadding: 4,
+                        borderColor: 'rgba(255,255,255,.12)',
+                        borderWidth: 1,
+                        titleColor: '#f8fafc',
+                        bodyColor:  '#cbd5e1',
                         callbacks: {
+                            title: function(items) {
+                                return ' ' + items[0].label;
+                            },
+                            label: function(ctx) {
+                                if (ctx.datasetIndex === 0)
+                                    return '  SL Ngày: ' + fmt(ctx.raw);
+                                return '  Target: ' + fmt(ctx.raw);
+                            },
                             afterLabel: function(ctx) {
-                                if (ctx.datasetIndex===0) return '% Đạt: ' + lines[ctx.dataIndex].todayOutputPct + '%';
+                                if (ctx.datasetIndex === 0)
+                                    return '  % Đạt: ' + lines[ctx.dataIndex].todayOutputPct + '%';
                                 return '';
                             }
                         }
@@ -677,18 +721,28 @@
                             }
                         }
                     },
-                    tooltip:{
-                        backgroundColor:'rgba(15,23,42,.92)',
-                        titleFont:{ size:12, weight:'700', family:'Manrope' },
-                        bodyFont:{ size:11, family:'Manrope' },
-                        padding:10, cornerRadius:8,
-                        callbacks:{
+                    tooltip: {
+                        backgroundColor: 'rgba(10,18,36,.96)',
+                        titleFont: { size:14, weight:'800', family:'Manrope' },
+                        bodyFont:  { size:13, weight:'600', family:'Manrope' },
+                        padding: { top:13, bottom:13, left:17, right:17 },
+                        cornerRadius: 11,
+                        displayColors: true,
+                        boxWidth: 11, boxHeight: 11, boxPadding: 4,
+                        borderColor: 'rgba(255,255,255,.12)',
+                        borderWidth: 1,
+                        titleColor: '#f8fafc',
+                        bodyColor:  '#cbd5e1',
+                        callbacks: {
+                            title: function(ctx) {
+                                return ' ' + ctx[0].label;
+                            },
                             label: function(ctx) {
                                 var l = lines[ctx.dataIndex];
                                 return [
-                                    'Tổng SL tích lũy: ' + fmt(l.totalOutput),
-                                    'Tổng Qty đơn hàng: ' + fmt(l.totalQtyFixed),
-                                    'Hoàn thành: ' + l.completionPct + '%'
+                                    '  Tổng SL tích lũy:  ' + fmt(l.totalOutput),
+                                    '  Tổng Qty đơn hàng: ' + fmt(l.totalQtyFixed),
+                                    '  Hoàn thành:        ' + l.completionPct + '%'
                                 ];
                             }
                         }
@@ -697,6 +751,90 @@
                 }
             },
             plugins:[ChartDataLabels]
+        });
+    }
+
+    // ── Excel-like drag-select stats ──────────────────────────
+    var COL_NAMES = {
+        '1':'SL Ngày','2':'Target','3':'% Target',
+        '4':'Tổng SL','5':'Tổng Qty','6':'% SL/Qty'
+    };
+    var PCT_COLS = {'3':true,'6':true};
+
+    function initTableSelect() {
+        var tbl = detailGrid.querySelector('.lp-tbl');
+        var bar = document.getElementById('lpStatBar');
+        if (!tbl || !bar) return;
+
+        var dragging = false, startCol = -1, selCells = [];
+
+        function clearSel() {
+            selCells.forEach(function(c){ c.classList.remove('lp-sel'); });
+            selCells = [];
+            bar.className = 'lp-stat-bar';
+            bar.innerHTML = '';
+        }
+
+        function fmtStat(v, isPct) {
+            return isPct ? v.toFixed(1) + '%' : fmt(Math.round(v));
+        }
+
+        function updateBar() {
+            if (!selCells.length) { bar.className = 'lp-stat-bar'; bar.innerHTML = ''; return; }
+            var byCol = {};
+            selCells.forEach(function(td) {
+                var c = td.dataset.col; if (!c) return;
+                if (!byCol[c]) byCol[c] = [];
+                byCol[c].push(parseFloat(td.dataset.val) || 0);
+            });
+            var h = '<span class="lp-stat-hd"><i class="fa-solid fa-table-cells-large" style="margin-right:5px;"></i>Chọn:</span>';
+            Object.keys(byCol).sort().forEach(function(col) {
+                var vals  = byCol[col];
+                var cnt   = vals.length;
+                var sum   = vals.reduce(function(a,b){return a+b;},0);
+                var avg   = cnt ? sum/cnt : 0;
+                var isPct = !!PCT_COLS[col];
+                h += '<div class="lp-stat-group">';
+                h += '<span class="lp-stat-col">' + (COL_NAMES[col]||('C'+col)) + '</span>';
+                h += '<span class="lp-stat-lbl">Đếm</span><span class="lp-stat-val">' + cnt + '</span>';
+                h += '<span class="lp-stat-sep">|</span>';
+                h += '<span class="lp-stat-lbl">Tổng</span><span class="lp-stat-val">' + fmtStat(sum,isPct) + '</span>';
+                h += '<span class="lp-stat-sep">|</span>';
+                h += '<span class="lp-stat-lbl">TB</span><span class="lp-stat-val">' + fmtStat(avg,isPct) + '</span>';
+                h += '</div>';
+            });
+            bar.innerHTML = h;
+            bar.className = 'lp-stat-bar show';
+        }
+
+        tbl.addEventListener('mousedown', function(e) {
+            var td = e.target.closest('td[data-col]');
+            if (!td) { clearSel(); return; }
+            e.preventDefault();
+            dragging = true; startCol = td.dataset.col;
+            clearSel();
+            td.classList.add('lp-sel'); selCells = [td];
+            updateBar();
+        });
+
+        tbl.addEventListener('mouseover', function(e) {
+            if (!dragging) return;
+            var td = e.target.closest('td[data-col]');
+            if (!td || td.dataset.col !== startCol) return;
+            var tds    = Array.from(tbl.querySelectorAll('td[data-col="'+startCol+'"]'));
+            var allSel = Array.from(tbl.querySelectorAll('td[data-col]'));
+            var si = tds.indexOf(selCells[0]), ei = tds.indexOf(td);
+            if (si < 0 || ei < 0) return;
+            var lo = Math.min(si,ei), hi = Math.max(si,ei);
+            allSel.forEach(function(c){ c.classList.remove('lp-sel'); }); selCells = [];
+            for (var i=lo;i<=hi;i++){ tds[i].classList.add('lp-sel'); selCells.push(tds[i]); }
+            updateBar();
+        });
+
+        document.addEventListener('mouseup', function(){ dragging = false; });
+        tbl.addEventListener('selectstart', function(e){ if(dragging) e.preventDefault(); });
+        document.addEventListener('mousedown', function(e){
+            if (!tbl.contains(e.target)) clearSel();
         });
     }
 

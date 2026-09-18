@@ -2120,22 +2120,29 @@
             var emptyKeys = selectedCellKeys.filter(function (k) { return !machines[k]; });
             if (!emptyKeys.length) return;
 
-            // Tìm số thứ tự tiếp theo
-            var existingNumbers = [];
+            // Tập hợp số đã dùng (từ máy trong picker + máy đang trên canvas)
+            var usedNumbers = new Set();
             pickerMachines.forEach(function (pm) {
-                var match = (pm.machineNumber || '').match(/^Máy\s+(\d+)$/i);
-                if (match) existingNumbers.push(parseInt(match[1]));
+                var match = (pm.machineNumber || '').match(/^(\d+)$/);
+                if (match) usedNumbers.add(parseInt(match[1]));
             });
             Object.keys(machines).forEach(function (k) {
-                var match = (machines[k].name || '').match(/^Máy\s+(\d+)$/i);
-                if (match) existingNumbers.push(parseInt(match[1]));
+                var match = (machines[k].name || '').match(/^(\d+)$/);
+                if (match) usedNumbers.add(parseInt(match[1]));
             });
 
-            var nextNum = 1;
-            if (existingNumbers.length) nextNum = Math.max.apply(null, existingNumbers) + 1;
+            // Hàm lấy số tự nhiên nhỏ nhất chưa dùng, bắt đầu từ 1
+            function nextAvailable(used) {
+                var n = 1;
+                while (used.has(n)) n++;
+                return n;
+            }
 
             emptyKeys.forEach(function (key) {
-                var machineName = 'Máy ' + nextNum;
+                var nextNum    = nextAvailable(usedNumbers);
+                var machineName = String(nextNum);
+                usedNumbers.add(nextNum); // đánh dấu đã dùng cho ô tiếp theo
+
                 // Kiểm tra xem tên có trùng trong pickerMachines không
                 var existing = pickerMachines.find(function (pm) {
                     return (pm.machineNumber || '').toLowerCase() === machineName.toLowerCase();
@@ -2169,7 +2176,6 @@
 
                 var parts = key.split('-');
                 renderCell(parseInt(parts[0]), parseInt(parts[1]));
-                nextNum++;
             });
 
             updateStats();

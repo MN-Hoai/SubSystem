@@ -992,16 +992,25 @@
         list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang tải...</span></div>';
         addPickerItems = [];
 
-        if (!DEPT_ID) { renderAddPickerList(''); return; }
+        if (!DEPT_ID) {
+            list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i><span>Không xác định được bộ phận. Vui lòng quay lại và thử lại.</span></div>';
+            return;
+        }
 
-        fetch('/ProductionDepartment/GetProductionInfosByDept?deptId=' + encodeURIComponent(DEPT_ID))
-            .then(function (r) { return r.json(); })
+        var url = '/ProductionDepartment/GetProductionInfosByDept?deptId=' + encodeURIComponent(DEPT_ID);
+        if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+
+        fetch(url)
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
             .then(function (list) {
                 addPickerItems = list;
                 renderAddPickerList(document.getElementById('addPickerSearch').value);
             })
-            .catch(function () {
-                list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải danh sách</span></div>';
+            .catch(function (e) {
+                list_el.innerHTML = '<div class="add-picker-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>Lỗi tải danh sách: ' + e.message + '</span></div>';
             });
     }
 
@@ -1033,7 +1042,15 @@
                 '<div class="add-picker-item-info">' +
                     '<div class="add-picker-item-sp">' + esc(p.spmain || '—') + '</div>' +
                     '<div class="add-picker-item-style">' + esc(p.style || '—') + '</div>' +
-                    (p.line || p.color ? '<div class="add-picker-item-meta">' + esc(p.line||'') + (p.color ? ' · ' + esc(p.color) : '') + '</div>' : '') +
+                    '<div class="add-picker-item-meta">' +
+                        (p.line  ? esc(p.line)  : '') +
+                        (p.line && p.color ? ' · ' : '') +
+                        (p.color ? esc(p.color) : '') +
+                        (p.line || p.color ? ' &nbsp;·&nbsp; ' : '') +
+                        (p.status === 1 ? '<span style="color:var(--success);font-size:10px;font-weight:700;">● Đang SX</span>' :
+                         p.status === 0 ? '<span style="color:var(--accent-gold,#d97706);font-size:10px;font-weight:700;">● Chờ SX</span>' :
+                         p.status === 2 ? '<span style="color:var(--ink-400);font-size:10px;font-weight:700;">● Hoàn thành</span>' : '') +
+                    '</div>' +
                 '</div>' +
                 (isSelected ? '<i class="fa-solid fa-circle-check add-picker-item-check"></i>' : '');
 

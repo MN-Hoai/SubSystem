@@ -34,6 +34,7 @@ namespace Sub_Services.Execute
         {
             public Guid   Id                     { get; set; }
             public Guid   ProductionDepartmentId { get; set; }
+            public string DepartmentName         { get; set; }
             public string StyleCode              { get; set; }
             public string Keyword                { get; set; }
             public int    Status                 { get; set; }
@@ -152,10 +153,16 @@ namespace Sub_Services.Execute
 
             if (si == null) return null;
 
+            var deptName = await _context.ProductionDepartments
+                .Where(d => d.Id == si.ProductionDepartmentId)
+                .Select(d => d.DepartmentName)
+                .FirstOrDefaultAsync() ?? "";
+
             return new StyleInfoDetail
             {
                 Id                     = si.Id,
                 ProductionDepartmentId = si.ProductionDepartmentId,
+                DepartmentName         = deptName,
                 StyleCode              = si.StyleCode,
                 Keyword                = si.Keyword,
                 Status                 = si.Status,
@@ -244,6 +251,35 @@ namespace Sub_Services.Execute
             return (true, "Đã xoá StyleInfo thành công.");
         }
 
+        /// <summary>Xoá mềm nhiều StyleInfo cùng lúc.</summary>
+        public async Task<(int Deleted, string Message)> BulkSoftDeleteStyleInfo(List<Guid> ids)
+        {
+            if (ids == null || ids.Count == 0)
+                return (0, "Không có mã nào được chọn.");
+
+            var list = await _context.StyleInfos
+                .Include(s => s.StyleDetails)
+                .Where(s => ids.Contains(s.Id) && s.Status >= 0)
+                .ToListAsync();
+
+            if (!list.Any()) return (0, "Không tìm thấy mã nào hợp lệ để xoá.");
+
+            var now = DateTime.Now;
+            foreach (var si in list)
+            {
+                si.Status     = -1;
+                si.UpdateDate = now;
+                foreach (var d in si.StyleDetails.Where(d => d.Status >= 0))
+                {
+                    d.Status     = -1;
+                    d.UpdateDate = now;
+                }
+            }
+            await _context.SaveChangesAsync();
+            return (list.Count, $"Đã xoá {list.Count} mã hàng thành công.");
+        }
+
+
         /// <summary>
         /// Nhập hàng loạt StyleInfo từ Excel.
         /// Match theo StyleCode + DeptId → update; không match → tạo mới.
@@ -285,11 +321,11 @@ namespace Sub_Services.Execute
                     var codeKey = row.StyleCode.Trim().ToUpper();
                     if (existingDict.TryGetValue(codeKey, out var si))
                     {
-                        // Update
+                        // Update — chỉ cập nhật keyword nếu có, KHÔNG xoá detail cũ
                         if (!string.IsNullOrWhiteSpace(row.Keyword))
                             si.Keyword = row.Keyword.Trim();
                         si.UpdateDate = now;
-                        await SyncStyleDetails(si.Id, row.Details, now);
+                        await AppendStyleDetails(si.Id, row.Details, now);
                         updated++;
                     }
                     else
@@ -307,7 +343,7 @@ namespace Sub_Services.Execute
                         };
                         _context.StyleInfos.Add(newSi);
                         await _context.SaveChangesAsync();
-                        await SyncStyleDetails(newSi.Id, row.Details, now);
+                        await AppendStyleDetails(newSi.Id, row.Details, now);
                         existingDict[codeKey] = newSi;
                         created++;
                     }
@@ -327,6 +363,10 @@ namespace Sub_Services.Execute
 
         #region Private Helpers
 
+        /// <summary>
+        /// Sync StyleDetails theo chế độ REPLACE (dùng cho form thủ công).
+        /// Detail không còn trong danh sách mới sẽ bị xoá mềm.
+        /// </summary>
         private async Task SyncStyleDetails(Guid styleInfoId, List<string> newNames, DateTime now)
         {
             var existing = await _context.StyleDetails
@@ -367,41 +407,86 @@ namespace Sub_Services.Execute
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Append-only: chỉ thêm detail mới, KHÔNG xoá detail cũ.
+        /// Dùng cho import Excel — detail đã có vẫn giữ nguyên.
+        /// </summary>
+        private async Task AppendStyleDetails(Guid styleInfoId, List<string> newNames, DateTime now)
+        {
+            if (newNames == null || newNames.Count == 0) return;
+
+            var existingNames = await _context.StyleDetails
+                .Where(d => d.StyleInfoId == styleInfoId && d.Status >= 0)
+                .Select(d => d.DetailName.ToLower())
+                .ToHashSetAsync();
+
+            foreach (var name in newNames.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()))
+            {
+                if (!existingNames.Contains(name.ToLower()))
+                {
+                    _context.StyleDetails.Add(new Sub_Entities.Entities.StyleDetail
+                    {
+                        Id          = Guid.NewGuid(),
+                        StyleInfoId = styleInfoId,
+                        DetailName  = name,
+                        Status      = 1,
+                        CreateDate  = now,
+                        UpdateDate  = now,
+                    });
+                    existingNames.Add(name.ToLower()); // tránh thêm trùng trong cùng batch
+                }
+            }
+            await _context.SaveChangesAsync();
+        }
+
         private static string BuildKeyword(string manual, string styleCode)
         {
             if (!string.IsNullOrWhiteSpace(manual)) return manual.Trim();
             return styleCode?.Trim().ToUpperInvariant().Replace(" ", "") ?? "";
         }
 
+        /// <summary>
+        /// Đọc Excel format DỌC:
+        ///   Cột A = StyleCode  (lặp lại cho mỗi detail)
+        ///   Cột B = Keyword    (chỉ cần điền 1 lần cho StyleCode, các dòng sau để trống)
+        ///   Cột C = DetailName (mỗi dòng 1 công đoạn; để trống = chỉ tạo/cập nhật header)
+        /// Gộp các dòng có cùng StyleCode thành 1 StyleInfoImport_Row.
+        /// </summary>
         private static List<StyleInfoImport_Row> ParseStyleInfoExcel(Stream stream)
         {
-            var rows = new List<StyleInfoImport_Row>();
+            var dict = new Dictionary<string, StyleInfoImport_Row>(StringComparer.OrdinalIgnoreCase);
+            var order = new List<string>(); // giữ thứ tự xuất hiện
+
             using var wb = new XLWorkbook(stream);
-            var ws = wb.Worksheet(1);
+            var ws      = wb.Worksheet(1);
             var lastRow = ws.LastRowUsed()?.RowNumber() ?? 1;
-            var lastCol = ws.LastColumnUsed()?.ColumnNumber() ?? 2;
 
             for (int r = 2; r <= lastRow; r++)
             {
                 var styleCode = ws.Cell(r, 1).GetString()?.Trim();
                 if (string.IsNullOrWhiteSpace(styleCode)) continue;
 
-                var row = new StyleInfoImport_Row
-                {
-                    StyleCode = styleCode,
-                    Keyword   = ws.Cell(r, 2).GetString()?.Trim(),
-                };
+                var keyword    = ws.Cell(r, 2).GetString()?.Trim();
+                var detailName = ws.Cell(r, 3).GetString()?.Trim();
 
-                // Cột C trở đi là DetailName (dynamic)
-                for (int c = 3; c <= lastCol; c++)
+                var key = styleCode.ToUpper();
+                if (!dict.TryGetValue(key, out var row))
                 {
-                    var detailName = ws.Cell(r, c).GetString()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(detailName))
-                        row.Details.Add(detailName);
+                    row = new StyleInfoImport_Row { StyleCode = styleCode };
+                    dict[key] = row;
+                    order.Add(key);
                 }
-                rows.Add(row);
+
+                // Keyword: lấy giá trị đầu tiên không rỗng
+                if (string.IsNullOrWhiteSpace(row.Keyword) && !string.IsNullOrWhiteSpace(keyword))
+                    row.Keyword = keyword;
+
+                // Detail: thêm nếu không trống
+                if (!string.IsNullOrWhiteSpace(detailName))
+                    row.Details.Add(detailName);
             }
-            return rows;
+
+            return order.Select(k => dict[k]).ToList();
         }
 
         #endregion

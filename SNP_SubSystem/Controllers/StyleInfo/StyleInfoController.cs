@@ -69,6 +69,28 @@ namespace SNP_SubSystem.Controllers.StyleInfo
             return ok ? Ok(new { success = true, message = msg }) : BadRequest(new { success = false, message = msg });
         }
 
+        // ── BULK DELETE ───────────────────────────────────────────────────
+        // POST /StyleInfo/BulkDelete
+        [HttpPost]
+        public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest req)
+        {
+            if (req?.Ids == null || req.Ids.Count == 0)
+                return BadRequest(new { success = false, message = "Không có mã nào được chọn." });
+
+            var guids = new System.Collections.Generic.List<Guid>();
+            foreach (var s in req.Ids)
+                if (Guid.TryParse(s, out var g)) guids.Add(g);
+
+            if (!guids.Any())
+                return BadRequest(new { success = false, message = "Danh sách Id không hợp lệ." });
+
+            var (count, msg) = await _service.BulkSoftDeleteStyleInfo(guids);
+            return count > 0
+                ? Ok(new { success = true, message = msg, deleted = count })
+                : BadRequest(new { success = false, message = msg });
+        }
+
+
         // ── IMPORT EXCEL ──────────────────────────────────────────────────
         // POST /StyleInfo/ImportExcel  (multipart/form-data: deptId + file)
         [HttpPost]
@@ -103,27 +125,74 @@ namespace SNP_SubSystem.Controllers.StyleInfo
             using var wb = new ClosedXML.Excel.XLWorkbook();
             var ws = wb.AddWorksheet("StyleInfo");
 
-            // Header row
+            // ── Header row ─────────────────────────────────────────────────
             ws.Cell(1, 1).Value = "StyleCode *";
             ws.Cell(1, 2).Value = "Keyword (tự động nếu trống)";
-            ws.Cell(1, 3).Value = "Tên công đoạn 1";
-            ws.Cell(1, 4).Value = "Tên công đoạn 2";
-            ws.Cell(1, 5).Value = "Tên công đoạn 3";
+            ws.Cell(1, 3).Value = "Tên công đoạn (mỗi dòng 1 công đoạn)";
 
-            // Style header
-            var hdr = ws.Range(1, 1, 1, 5);
+            var hdr = ws.Range(1, 1, 1, 3);
             hdr.Style.Font.Bold = true;
             hdr.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#3B82F6");
             hdr.Style.Font.FontColor       = ClosedXML.Excel.XLColor.White;
 
-            // Sample data
+            // ── Sample data — format DỌC ───────────────────────────────────
+            // StyleCode ST001 với 3 công đoạn
             ws.Cell(2, 1).Value = "ST001";
-            ws.Cell(2, 2).Value = "";
+            ws.Cell(2, 2).Value = "keyword1";
             ws.Cell(2, 3).Value = "Cắt vải";
-            ws.Cell(2, 4).Value = "May thân trước";
-            ws.Cell(2, 5).Value = "Hoàn thiện";
+
+            ws.Cell(3, 1).Value = "ST001";
+            ws.Cell(3, 2).Value = "";           // keyword chỉ cần điền 1 lần
+            ws.Cell(3, 3).Value = "May thân trước";
+
+            ws.Cell(4, 1).Value = "ST001";
+            ws.Cell(4, 2).Value = "";
+            ws.Cell(4, 3).Value = "Hoàn thiện";
+
+            // StyleCode ST002 với 2 công đoạn
+            ws.Cell(5, 1).Value = "ST002";
+            ws.Cell(5, 2).Value = "";
+            ws.Cell(5, 3).Value = "Cắt";
+
+            ws.Cell(6, 1).Value = "ST002";
+            ws.Cell(6, 2).Value = "";
+            ws.Cell(6, 3).Value = "May";
+
+            // StyleCode ST003 không có công đoạn (chỉ tạo header)
+            ws.Cell(7, 1).Value = "ST003";
+            ws.Cell(7, 2).Value = "keyword3";
+            ws.Cell(7, 3).Value = "";
+
+            // ── Styling ────────────────────────────────────────────────────
+            // Tô màu xen kẽ theo nhóm StyleCode để dễ đọc
+            var grp1 = ws.Range(2, 1, 4, 3);
+            grp1.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#EFF6FF");
+
+            var grp2 = ws.Range(5, 1, 6, 3);
+            grp2.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#F0FDF4");
 
             ws.Columns().AdjustToContents();
+            ws.Column(3).Width = Math.Max(ws.Column(3).Width, 36);
+
+            // ── Sheet hướng dẫn ────────────────────────────────────────────
+            var noteSheet = wb.AddWorksheet("Hướng dẫn");
+            noteSheet.Cell(1, 1).Value = "HƯỚNG DẪN NHẬP FILE EXCEL — StyleInfo";
+            noteSheet.Cell(1, 1).Style.Font.Bold = true;
+            noteSheet.Cell(1, 1).Style.Font.FontSize = 14;
+
+            noteSheet.Cell(3, 1).Value = "Cột A (StyleCode *)";
+            noteSheet.Cell(3, 2).Value = "Bắt buộc. Lặp lại trên mỗi dòng nếu StyleCode có nhiều công đoạn.";
+            noteSheet.Cell(4, 1).Value = "Cột B (Keyword)";
+            noteSheet.Cell(4, 2).Value = "Không bắt buộc. Chỉ cần điền 1 lần cho mỗi StyleCode.";
+            noteSheet.Cell(5, 1).Value = "Cột C (Tên công đoạn)";
+            noteSheet.Cell(5, 2).Value = "Mỗi dòng là 1 công đoạn. Để trống nếu chỉ muốn tạo / cập nhật StyleCode.";
+            noteSheet.Cell(7, 1).Value = "LƯU Ý:";
+            noteSheet.Cell(7, 1).Style.Font.Bold = true;
+            noteSheet.Cell(8, 1).Value = "- Nếu StyleCode đã tồn tại: chỉ THÊM công đoạn mới, KHÔNG xoá công đoạn cũ.";
+            noteSheet.Cell(9, 1).Value = "- Nếu StyleCode chưa tồn tại: tạo mới StyleCode và thêm tất cả công đoạn.";
+            noteSheet.Cell(10, 1).Value = "- Dòng 1 là tiêu đề, không đọc dữ liệu từ dòng 1.";
+            noteSheet.Columns().AdjustToContents();
+            noteSheet.Column(2).Width = 70;
 
             using var ms = new System.IO.MemoryStream();
             wb.SaveAs(ms);
@@ -133,5 +202,6 @@ namespace SNP_SubSystem.Controllers.StyleInfo
         }
 
         public class IdRequest { public string Id { get; set; } }
+        public class BulkDeleteRequest { public System.Collections.Generic.List<string> Ids { get; set; } }
     }
 }

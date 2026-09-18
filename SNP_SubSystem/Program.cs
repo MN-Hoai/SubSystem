@@ -15,6 +15,10 @@ builder.Services.AddDbContext<SNP_SubSystemDBContext>(options =>
 // Dang ky SubSystemService vao DI container
 builder.Services.AddScoped<SubSystemService>();
 
+// Dang ky Backup service
+builder.Services.AddSingleton<SNP_SubSystem.Services.BackupService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SNP_SubSystem.Services.BackupService>());
+
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)

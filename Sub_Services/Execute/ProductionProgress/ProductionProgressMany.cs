@@ -26,10 +26,9 @@ namespace Sub_Services.Execute
         {
             var dateLimit = toDate.ToDateTime(TimeOnly.MaxValue);
 
-            // 1. DailyOutput có StyleInfoId để biết mã hàng thuộc StyleInfo nào
             var dailyList = await _context.DailyOutputs
                 .Where(d => d.Status == 1 && d.CreateDate <= dateLimit)
-                .Select(d => new { d.Id, d.ProductionInfoId, d.StyleInfoId, d.TotalOutputNumber })
+                .Select(d => new { d.Id, d.ProductionInfoId })
                 .ToListAsync();
 
             if (!dailyList.Any())
@@ -38,22 +37,7 @@ namespace Sub_Services.Execute
             var dailyIdList  = dailyList.Select(d => d.Id).ToList();
             var dailyInfoMap = dailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
 
-            // ProductionInfoId → StyleInfoId (lấy cái đầu tiên khác null)
-            var infoToStyleInfo = dailyList
-                .Where(d => d.StyleInfoId != null)
-                .GroupBy(d => d.ProductionInfoId)
-                .ToDictionary(g => g.Key, g => g.First().StyleInfoId!.Value);
-
-            // 2. Số công đoạn kỳ vọng của mỗi StyleInfo
-            var styleInfoIds = infoToStyleInfo.Values.Distinct().ToList();
-            var expectedDetailCount = await _context.StyleDetails
-                 .Where(sd => sd.Status == 1 && styleInfoIds.Contains(sd.StyleInfoId))
-.GroupBy(sd => sd.StyleInfoId)
-               
-                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
-
-            // 3. Toàn bộ Detail thực tế
+            // Lấy tất cả DailyOutputDetail có output
             var detailList = await _context.DailyOutputDetails
                 .Where(dt => dt.DailyOutputId.HasValue
                           && dt.OutputNumber.HasValue
@@ -62,60 +46,94 @@ namespace Sub_Services.Execute
                 .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
                 .ToListAsync();
 
-            // 4. Góm theo (ProductionInfoId, StyleDetailId) → cộng tổng
-            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            if (!detailList.Any())
+                return dailyList.GroupBy(d => d.ProductionInfoId)
+                    .ToDictionary(g => g.Key, _ => 0);
+
+            // Lấy StyleInfoId từ StyleDetail (đáng tin cậy hơn DailyOutput.StyleInfoId)
+            var allStyleDetailIds = detailList
+                .Select(dt => dt.StyleDetailId)  // Guid non-nullable
+                .Distinct().ToList();
+
+            var detailToStyleInfo = await _context.StyleDetails
+                .Where(sd => allStyleDetailIds.Contains(sd.Id))
+                .Select(sd => new { sd.Id, sd.StyleInfoId })
+                .ToDictionaryAsync(x => x.Id, x => x.StyleInfoId);
+
+            // Số chi tiết kỳ vọng từ bảng StyleDetail (tham chiếu chính xác)
+            var allStyleInfoIds = detailToStyleInfo.Values.Distinct().ToList();
+            var expectedDetailCount = await _context.StyleDetails
+                .Where(sd => sd.Status == 1 && allStyleInfoIds.Contains(sd.StyleInfoId))
+                .GroupBy(sd => sd.StyleInfoId)
+                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
+
+            // Góm theo (ProductionInfoId, StyleDetailId) → cộng tổng tất cả máy
+            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid, int>>();
             foreach (var dt in detailList)
             {
-                var infoId = dailyInfoMap[dt.DailyOutputId!.Value];
+                var infoId   = dailyInfoMap[dt.DailyOutputId!.Value];
+                var detailId = dt.StyleDetailId;  // Guid non-nullable
                 if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
-                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
-                var key = dt.StyleDetailId;
-                detMap[key] = (detMap.TryGetValue(key, out var v) ? v : 0) + dt.OutputNumber!.Value;
+                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid, int>();
+                detMap[detailId] = (detMap.TryGetValue(detailId, out var v) ? v : 0) + dt.OutputNumber!.Value;
             }
 
-            // 5. Kiểm tra đủ công đoạn chưa, nếu thiếu bất kỳ → 0
+            // Xác định StyleInfoId cho mỗi ProductionInfo (từ StyleDetail đã nhập)
+            var infoToStyleInfo = new Dictionary<Guid, Guid>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+            {
+                foreach (var detailId in detMap.Keys)
+                {
+                    if (detailToStyleInfo.TryGetValue(detailId, out var si))
+                    {
+                        infoToStyleInfo[infoId] = si;
+                        break;
+                    }
+                }
+            }
+
+            // Kiểm tra đủ công đoạn → lấy Min; thiếu → 0; không biết StyleInfo → 0
             var result = new Dictionary<Guid, int>();
             foreach (var (infoId, detMap) in perInfoPerDetail)
             {
-                if (infoToStyleInfo.TryGetValue(infoId, out var styleInfoId) &&
-                    expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
-                {
-                    var recordedCount = detMap.Keys.Count(k => k != null);
-                    if (recordedCount < expectedCount)
-                    {
-                        result[infoId] = 0;  // Chưa đủ công đoạn
-                        continue;
-                    }
-                }
+                if (!infoToStyleInfo.TryGetValue(infoId, out var styleInfoId))
+                    { result[infoId] = 0; continue; }
+
+                if (!expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
+                    { result[infoId] = 0; continue; }
+
+                var recordedCount = detMap.Count;
+                if (recordedCount < expectedCount)
+                    { result[infoId] = 0; continue; }
+
                 result[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
             }
 
-            // Fallback: không có detail nào cả → 0
+            // Fallback: không có detail nào → 0
             foreach (var d in dailyList)
-            {
                 if (!result.ContainsKey(d.ProductionInfoId))
                     result[d.ProductionInfoId] = 0;
-            }
 
             return result;
         }
 
         /// <summary>
-        /// Tính TodayOutput "effective" cho ngày hôm nay thực tế.
-        /// Cùng logic với TotalOutput: thiếu bất kỳ công đoạn → 0.
-        /// Không bị ảnh hưởng bởi filter toDate của người dùng.
+        /// Tính TodayOutput "effective" cho ngày toDate.
+        /// Chỉ lấy Min khi số StyleDetail đã nhập == số StyleDetail định nghĩa trong DB.
+        /// StyleInfoId được xác định từ chính StyleDetail đã nhập (không phụ thuộc DailyOutput.StyleInfoId).
         /// </summary>
         private async Task<Dictionary<Guid, int>> GetTodayOutputByProductionInfo(DateOnly toDate)
         {
-            var today      = DateOnly.FromDateTime(DateTime.Today);
-            var todayStart = today.ToDateTime(TimeOnly.MinValue);
-            var todayEnd   = today.ToDateTime(TimeOnly.MaxValue);
+            var targetDate = toDate == default ? DateOnly.FromDateTime(DateTime.Today) : toDate;
+            var todayStart = targetDate.ToDateTime(TimeOnly.MinValue);
+            var todayEnd   = targetDate.ToDateTime(TimeOnly.MaxValue);
 
             var dailyList = await _context.DailyOutputs
                 .Where(d => d.Status == 1
                          && d.CreateDate >= todayStart
                          && d.CreateDate <= todayEnd)
-                .Select(d => new { d.Id, d.ProductionInfoId, d.StyleInfoId, d.TotalOutputNumber })
+                .Select(d => new { d.Id, d.ProductionInfoId })
                 .ToListAsync();
 
             if (!dailyList.Any())
@@ -124,19 +142,7 @@ namespace Sub_Services.Execute
             var dailyIdList  = dailyList.Select(d => d.Id).ToList();
             var dailyInfoMap = dailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
 
-            var infoToStyleInfo = dailyList
-                .Where(d => d.StyleInfoId != null)
-                .GroupBy(d => d.ProductionInfoId)
-                .ToDictionary(g => g.Key, g => g.First().StyleInfoId!.Value);
-
-            var styleInfoIds = infoToStyleInfo.Values.Distinct().ToList();
-            var expectedDetailCount = await _context.StyleDetails
-                .Where(sd => sd.Status == 1
-                          && styleInfoIds.Contains(sd.StyleInfoId))
-                .GroupBy(sd => sd.StyleInfoId)
-                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
-
+            // Lấy tất cả DailyOutputDetail trong ngày có output
             var detailList = await _context.DailyOutputDetails
                 .Where(dt => dt.DailyOutputId.HasValue
                           && dt.OutputNumber.HasValue
@@ -145,37 +151,73 @@ namespace Sub_Services.Execute
                 .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
                 .ToListAsync();
 
-            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            if (!detailList.Any())
+                return dailyList.GroupBy(d => d.ProductionInfoId)
+                    .ToDictionary(g => g.Key, _ => 0);
+
+            // Lấy StyleInfoId từ StyleDetail đã nhập (không dựa vào DailyOutput.StyleInfoId)
+            var allStyleDetailIds = detailList
+                .Select(dt => dt.StyleDetailId)  // Guid non-nullable
+                .Distinct().ToList();
+
+            var detailToStyleInfo = await _context.StyleDetails
+                .Where(sd => allStyleDetailIds.Contains(sd.Id))
+                .Select(sd => new { sd.Id, sd.StyleInfoId })
+                .ToDictionaryAsync(x => x.Id, x => x.StyleInfoId);
+
+            // Số chi tiết kỳ vọng từ bảng StyleDetail
+            var allStyleInfoIds = detailToStyleInfo.Values.Distinct().ToList();
+            var expectedDetailCount = await _context.StyleDetails
+                .Where(sd => sd.Status == 1 && allStyleInfoIds.Contains(sd.StyleInfoId))
+                .GroupBy(sd => sd.StyleInfoId)
+                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
+
+            // Góm theo (ProductionInfoId, StyleDetailId) → cộng tổng tất cả máy
+            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid, int>>();
             foreach (var dt in detailList)
             {
-                var infoId = dailyInfoMap[dt.DailyOutputId!.Value];
+                var infoId   = dailyInfoMap[dt.DailyOutputId!.Value];
+                var detailId = dt.StyleDetailId;  // Guid non-nullable
                 if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
-                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
-                var key = dt.StyleDetailId;
-                detMap[key] = (detMap.TryGetValue(key, out var v) ? v : 0) + dt.OutputNumber!.Value;
+                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid, int>();
+                detMap[detailId] = (detMap.TryGetValue(detailId, out var v) ? v : 0) + dt.OutputNumber!.Value;
             }
 
+            // Xác định StyleInfoId cho mỗi ProductionInfo từ StyleDetail đã nhập
+            var infoToStyleInfo = new Dictionary<Guid, Guid>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+            {
+                foreach (var detailId in detMap.Keys)
+                {
+                    if (detailToStyleInfo.TryGetValue(detailId, out var si))
+                    {
+                        infoToStyleInfo[infoId] = si;
+                        break;
+                    }
+                }
+            }
+
+            // Kiểm tra đủ công đoạn → lấy Min; thiếu → 0; không biết StyleInfo → 0
             var result = new Dictionary<Guid, int>();
             foreach (var (infoId, detMap) in perInfoPerDetail)
             {
-                if (infoToStyleInfo.TryGetValue(infoId, out var styleInfoId) &&
-                    expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
-                {
-                    var recordedCount = detMap.Keys.Count(k => k != null);
-                    if (recordedCount < expectedCount)
-                    {
-                        result[infoId] = 0;  // Chưa đủ công đoạn trong ngày
-                        continue;
-                    }
-                }
+                if (!infoToStyleInfo.TryGetValue(infoId, out var styleInfoId))
+                    { result[infoId] = 0; continue; }
+
+                if (!expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
+                    { result[infoId] = 0; continue; }
+
+                var recordedCount = detMap.Count;
+                if (recordedCount < expectedCount)
+                    { result[infoId] = 0; continue; }
+
                 result[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
             }
 
             foreach (var d in dailyList)
-            {
                 if (!result.ContainsKey(d.ProductionInfoId))
                     result[d.ProductionInfoId] = 0;
-            }
 
             return result;
         }
@@ -642,8 +684,8 @@ namespace Sub_Services.Execute
 
         /// <summary>
         /// Tính sản lượng "effective" theo ProductionInfoId trong khoảng [fromDate, toDate].
-        /// Cùng logic min-across-stages như TotalOutput (cộng tổng detail, lấy min theo công đoạn).
-        /// Cũng trả ra HashSet các ProductionInfoId có DailyOutput trong khoảng (dùng để lọc tổ active).
+        /// Logic: StyleInfoId lấy từ StyleDetail đã nhập (không phụ thuộc DailyOutput.StyleInfoId).
+        /// Chỉ lấy Min khi số detail đã nhập == số detail định nghĩa trong bảng StyleDetail.
         /// </summary>
         private async Task<(Dictionary<Guid, int> OutputMap, HashSet<Guid> ActiveInfoIds)>
             GetOutputInRange(DateOnly fromDate, DateOnly toDate)
@@ -655,7 +697,7 @@ namespace Sub_Services.Execute
                 .Where(d => d.Status == 1
                          && d.CreateDate >= rangeStart
                          && d.CreateDate <= rangeEnd)
-                .Select(d => new { d.Id, d.ProductionInfoId, d.StyleInfoId })
+                .Select(d => new { d.Id, d.ProductionInfoId })
                 .ToListAsync();
 
             // Tập hợp các ProductionInfo có DailyOutput trong khoảng (tổ active)
@@ -667,20 +709,7 @@ namespace Sub_Services.Execute
             var dailyIdList  = dailyList.Select(d => d.Id).ToList();
             var dailyInfoMap = dailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
 
-            var infoToStyleInfo = dailyList
-                .Where(d => d.StyleInfoId != null)
-                .GroupBy(d => d.ProductionInfoId)
-                .ToDictionary(g => g.Key, g => g.First().StyleInfoId!.Value);
-
-            var styleInfoIds = infoToStyleInfo.Values.Distinct().ToList();
-            var expectedDetailCount = styleInfoIds.Any()
-                ? await _context.StyleDetails
-                    .Where(sd => sd.Status == 1 && styleInfoIds.Contains(sd.StyleInfoId))
-                    .GroupBy(sd => sd.StyleInfoId)
-                    .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
-                    .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count)
-                : new Dictionary<Guid, int>();
-
+            // Lấy tất cả DailyOutputDetail trong khoảng có output
             var detailList = await _context.DailyOutputDetails
                 .Where(dt => dt.DailyOutputId.HasValue
                           && dt.OutputNumber.HasValue
@@ -689,37 +718,74 @@ namespace Sub_Services.Execute
                 .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
                 .ToListAsync();
 
+            if (!detailList.Any())
+                return (dailyList.GroupBy(d => d.ProductionInfoId)
+                    .ToDictionary(g => g.Key, _ => 0), activeInfoIds);
+
+            // Lấy StyleInfoId từ StyleDetail đã nhập (không dựa vào DailyOutput.StyleInfoId)
+            var allStyleDetailIds = detailList
+                .Select(dt => dt.StyleDetailId)  // Guid non-nullable
+                .Distinct().ToList();
+
+            var detailToStyleInfo = await _context.StyleDetails
+                .Where(sd => allStyleDetailIds.Contains(sd.Id))
+                .Select(sd => new { sd.Id, sd.StyleInfoId })
+                .ToDictionaryAsync(x => x.Id, x => x.StyleInfoId);
+
+            // Số chi tiết kỳ vọng từ bảng StyleDetail
+            var allStyleInfoIds = detailToStyleInfo.Values.Distinct().ToList();
+            var expectedDetailCount = await _context.StyleDetails
+                .Where(sd => sd.Status == 1 && allStyleInfoIds.Contains(sd.StyleInfoId))
+                .GroupBy(sd => sd.StyleInfoId)
+                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
+
             // Cộng tổng theo (ProductionInfoId, StyleDetailId) toàn khoảng
-            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid, int>>();
             foreach (var dt in detailList)
             {
-                var infoId = dailyInfoMap[dt.DailyOutputId!.Value];
+                var infoId   = dailyInfoMap[dt.DailyOutputId!.Value];
+                var detailId = dt.StyleDetailId;  // Guid non-nullable
                 if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
-                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
-                var key = dt.StyleDetailId;
-                detMap[key] = (detMap.TryGetValue(key, out var v) ? v : 0) + dt.OutputNumber!.Value;
+                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid, int>();
+                detMap[detailId] = (detMap.TryGetValue(detailId, out var v) ? v : 0) + dt.OutputNumber!.Value;
             }
 
-            // Lấy min-across-stages (nếu thiếu công đoạn → 0)
+            // Xác định StyleInfoId cho mỗi ProductionInfo từ StyleDetail đã nhập
+            var infoToStyleInfo = new Dictionary<Guid, Guid>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+            {
+                foreach (var detailId in detMap.Keys)
+                {
+                    if (detailToStyleInfo.TryGetValue(detailId, out var si))
+                    {
+                        infoToStyleInfo[infoId] = si;
+                        break;
+                    }
+                }
+            }
+
+            // Kiểm tra đủ công đoạn → Min; thiếu → 0; không biết StyleInfo → 0
             var result = new Dictionary<Guid, int>();
             foreach (var (infoId, detMap) in perInfoPerDetail)
             {
-                if (infoToStyleInfo.TryGetValue(infoId, out var styleInfoId) &&
-                    expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
-                {
-                    var recordedCount = detMap.Keys.Count(k => k != null);
-                    if (recordedCount < expectedCount)
+                if (!infoToStyleInfo.TryGetValue(infoId, out var styleInfoId))
                     { result[infoId] = 0; continue; }
-                }
+
+                if (!expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
+                    { result[infoId] = 0; continue; }
+
+                var recordedCount = detMap.Count;
+                if (recordedCount < expectedCount)
+                    { result[infoId] = 0; continue; }
+
                 result[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
             }
 
             // Các ProductionInfo có DailyOutput nhưng không có detail nào → 0
             foreach (var d in dailyList)
-            {
                 if (!result.ContainsKey(d.ProductionInfoId))
                     result[d.ProductionInfoId] = 0;
-            }
 
             return (result, activeInfoIds);
         }

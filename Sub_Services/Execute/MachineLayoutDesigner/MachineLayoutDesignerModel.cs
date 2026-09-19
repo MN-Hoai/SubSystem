@@ -121,14 +121,17 @@ namespace Sub_Services.Execute
         /// <summary>Thông tin ngắn gọn về mã đang chạy trên máy để hiển thị và search.</summary>
         public class MachineLayout_ProductionCodeBrief
         {
-            public string Spmain      { get; set; }
-            public string Style       { get; set; }
-            public string Line        { get; set; }
-            public string Color       { get; set; }
-            /// <summary>Sản lượng hôm nay (sum qua DailyOutput).</summary>
-            public int    TodayOutput { get; set; }
+            public Guid   ProductionInfoId { get; set; }
+            public string Spmain          { get; set; }
+            public string Style           { get; set; }
+            public string Line            { get; set; }
+            public string Color           { get; set; }
             /// <summary>Target ngày (từ ProductionInfo.Target).</summary>
-            public int?   Target      { get; set; }
+            public int?   Target          { get; set; }
+            /// <summary>Sản lượng hôm nay: min(tổng từng công đoạn) khi đủ công đoạn, ngược lại = 0.</summary>
+            public int    TodayOutput     { get; set; }
+            /// <summary>Phần trăm đạt target hôm nay (TodayOutput / Target * 100).</summary>
+            public double TodayOutputPct  { get; set; }
         }
 
 

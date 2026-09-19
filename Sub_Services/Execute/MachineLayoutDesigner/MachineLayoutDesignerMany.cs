@@ -113,8 +113,11 @@ namespace Sub_Services.Execute
         /// </summary>
         public async Task<List<MachineLayout_LayoutDto>> GetAllLayouts(Guid? departmentId = null)
         {
-            var today = DateTime.Today;
+            var today      = DateTime.Today;
+            var todayStart = today;
+            var todayEnd   = today.AddDays(1).AddTicks(-1);
 
+            // === PHASE 1: Load cấu trúc layout, items, production codes ===
             var query = _context.ProductionDepartmentLayouts
                 .AsNoTracking()
                 .Where(l => l.Status == 1);
@@ -122,7 +125,7 @@ namespace Sub_Services.Execute
             if (departmentId.HasValue && departmentId != Guid.Empty)
                 query = query.Where(l => l.ProductionDepartmentId == departmentId.Value);
 
-            return await query
+            var layouts = await query
                 .OrderBy(l => l.ProductionDepartment.DepartmentName)
                 .ThenByDescending(l => l.CreateDate)
                 .Select(l => new MachineLayout_LayoutDto
@@ -150,19 +153,21 @@ namespace Sub_Services.Execute
                             Keyword     = i.Keyword,
                             Status      = i.ProductionMachine.Status ?? 1,
                             SortOrder   = i.SortOrder,
-                            // Các mã sản xuất đang chạy trên máy, kèm sản lượng hôm nay
+                            // Lấy danh sách ProductionInfo đang chạy trên máy (chưa có output)
                             ProductionCodes = i.ProductionMachine.DailyOutputs
                                 .Where(d => d.Status == 1 && d.ProductionInfo != null && d.ProductionInfo.Status == 1)
                                 .GroupBy(d => d.ProductionInfoId)
                                 .Select(g => new MachineLayout_ProductionCodeBrief
                                 {
-                                    Spmain      = g.First().ProductionInfo.Spmain,
-                                    Style       = g.First().ProductionInfo.Style,
-                                    Line        = g.First().ProductionInfo.Line,
-                                    Color       = g.First().ProductionInfo.Color,
-                                    Target      = g.First().ProductionInfo.Target,
-                                    TodayOutput = g.Where(d => d.CreateDate.Date == today)
-                                                   .Sum(d => d.TotalOutputNumber ?? 0)
+                                    ProductionInfoId = g.Key,
+                                    Spmain = g.First().ProductionInfo.Spmain,
+                                    Style  = g.First().ProductionInfo.Style,
+                                    Line   = g.First().ProductionInfo.Line,
+                                    Color  = g.First().ProductionInfo.Color,
+                                    Target = g.First().ProductionInfo.Target,
+                                    // TodayOutput sẽ được tính lại ở Phase 2
+                                    TodayOutput    = 0,
+                                    TodayOutputPct = 0
                                 })
                                 .ToList()
                         })
@@ -170,6 +175,100 @@ namespace Sub_Services.Execute
                         .ToList()
                 })
                 .ToListAsync();
+
+            if (!layouts.Any()) return layouts;
+
+            // === PHASE 2: Tính TodayOutput bằng logic min-across-stages ===
+            // Lấy tất cả DailyOutput hôm nay
+            var allMachineIds = layouts
+                .SelectMany(l => l.Items)
+                .Select(i => i.MachineId)   // Guid non-nullable
+                .Distinct().ToList();
+
+            var todayDailyList = await _context.DailyOutputs
+                .Where(d => d.Status == 1
+                         && d.CreateDate >= todayStart
+                         && d.CreateDate <= todayEnd
+                         && allMachineIds.Contains(d.ProductionMachineId))
+                .Select(d => new { d.Id, d.ProductionInfoId, MachineId = d.ProductionMachineId })
+                .ToListAsync();
+
+            if (!todayDailyList.Any()) return layouts;
+
+            var todayDailyIds = todayDailyList.Select(d => d.Id).ToList();
+            var dailyInfoMap  = todayDailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
+
+            // Lấy tất cả detail hôm nay
+            var detailList = await _context.DailyOutputDetails
+                .Where(dt => dt.DailyOutputId.HasValue
+                          && dt.OutputNumber.HasValue
+                          && dt.Status == 1
+                          && todayDailyIds.Contains(dt.DailyOutputId!.Value))
+                .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
+                .ToListAsync();
+
+            if (!detailList.Any()) return layouts;
+
+            // Lấy StyleInfoId từ StyleDetail đã nhập
+            var allStyleDetailIds = detailList.Select(dt => dt.StyleDetailId).Distinct().ToList();
+            var detailToStyleInfo = await _context.StyleDetails
+                .Where(sd => allStyleDetailIds.Contains(sd.Id))
+                .Select(sd => new { sd.Id, sd.StyleInfoId })
+                .ToDictionaryAsync(x => x.Id, x => x.StyleInfoId);
+
+            // Số chi tiết kỳ vọng từ bảng StyleDetail
+            var allStyleInfoIds = detailToStyleInfo.Values.Distinct().ToList();
+            var expectedDetailCount = await _context.StyleDetails
+                .Where(sd => sd.Status == 1 && allStyleInfoIds.Contains(sd.StyleInfoId))
+                .GroupBy(sd => sd.StyleInfoId)
+                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
+
+            // Góm theo (ProductionInfoId, StyleDetailId) → cộng tổng tất cả máy
+            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid, int>>();
+            foreach (var dt in detailList)
+            {
+                var infoId   = dailyInfoMap[dt.DailyOutputId!.Value];
+                var detailId = dt.StyleDetailId;
+                if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
+                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid, int>();
+                detMap[detailId] = (detMap.TryGetValue(detailId, out var v) ? v : 0) + dt.OutputNumber!.Value;
+            }
+
+            // Xác định StyleInfoId từ StyleDetail đã nhập
+            var infoToStyleInfo = new Dictionary<Guid, Guid>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+                foreach (var detailId in detMap.Keys)
+                    if (detailToStyleInfo.TryGetValue(detailId, out var si))
+                    { infoToStyleInfo[infoId] = si; break; }
+
+            // Tính TodayOutput (min khi đủ công đoạn, 0 nếu thiếu)
+            var todayOutputMap = new Dictionary<Guid, int>();
+            foreach (var (infoId, detMap) in perInfoPerDetail)
+            {
+                if (!infoToStyleInfo.TryGetValue(infoId, out var styleInfoId))
+                    { todayOutputMap[infoId] = 0; continue; }
+                if (!expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
+                    { todayOutputMap[infoId] = 0; continue; }
+                if (detMap.Count < expectedCount)
+                    { todayOutputMap[infoId] = 0; continue; }
+                todayOutputMap[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
+            }
+
+            // Gán lại TodayOutput và TodayOutputPct vào từng ProductionCode
+            foreach (var layout in layouts)
+                foreach (var item in layout.Items)
+                    foreach (var code in item.ProductionCodes)
+                    {
+                        var output = todayOutputMap.TryGetValue(code.ProductionInfoId, out var o) ? o : 0;
+                        var target = code.Target ?? 0;
+                        code.TodayOutput    = output;
+                        code.TodayOutputPct = target > 0
+                            ? Math.Round((double)output / target * 100, 1)
+                            : 0;
+                    }
+
+            return layouts;
         }
     }
 }

@@ -327,21 +327,24 @@ namespace Sub_Services.Execute
 
             var allProdInfoCache = await _context.ProductionInfos
                 .AsNoTracking()
-                .Where(p => p.Status >= 0 && p.ProductionDepartmentId == deptId)
+                .Where(p => p.Status == 1 && p.ProductionDepartmentId == deptId)
                 .ToListAsync();
 
             // Cache StyleInfo: StyleCode (upper) → StyleInfoId
+            // CHỈ lấy StyleInfo của bộ phận này (deptId) — mỗi bộ phận có công đoạn riêng
             var styleInfoCache = await _context.StyleInfos
                 .AsNoTracking()
-                .Where(s => s.Status == 1)
+                .Where(s => s.Status == 1 && s.ProductionDepartmentId == deptId)
                 .ToDictionaryAsync(
                     s => (s.StyleCode ?? "").Trim().ToUpperInvariant(),
                     s => s.Id);
 
             // Cache StyleDetail: (styleInfoId, detailName) → StyleDetail
+            // Chỉ lấy các StyleDetail thuộc StyleInfo của bộ phận này
+            var deptStyleInfoIds = styleInfoCache.Values.ToHashSet();
             var allStyleDetails = await _context.StyleDetails
                 .AsNoTracking()
-                .Where(sd => sd.Status == 1)
+                .Where(sd => sd.Status == 1 && deptStyleInfoIds.Contains(sd.StyleInfoId))
                 .ToListAsync();
             var styleDetailCache = allStyleDetails
                 .GroupBy(sd => (sd.StyleInfoId, (sd.DetailName ?? "").Trim().ToUpperInvariant()))
@@ -409,11 +412,14 @@ namespace Sub_Services.Execute
                     // 3. Tìm StyleInfoId từ cache
                     Guid? styleInfoId = null;
 
-                    // Ưu tiên 1: lấy từ DailyOutput đã có (nhanh nhất)
+                    // Ưu tiên 1: lấy từ DailyOutput đã có, verify StyleInfo thuộc đúng bộ phận
                     var doStyleId = await _context.DailyOutputs
                         .Where(d => d.ProductionInfoId == productionInfo.Id
                                  && d.ProductionMachineId == machine.Id
-                                 && d.StyleInfoId != null)
+                                 && d.StyleInfoId != null
+                                 && _context.StyleInfos.Any(s => s.Id == d.StyleInfoId
+                                                              && s.ProductionDepartmentId == deptId
+                                                              && s.Status == 1))
                         .Select(d => d.StyleInfoId)
                         .FirstOrDefaultAsync();
                     styleInfoId = doStyleId;

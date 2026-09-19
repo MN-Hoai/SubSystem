@@ -573,56 +573,118 @@ namespace Sub_Services.Execute
         /// <summary>
         /// Chi tiết công đoạn (StyleDetail) của một ProductionInfo,
         /// kèm tổng đã nhập hôm nay (hoặc ngày được chỉ định) để hiển thị khi ghi sản lượng.
+        /// Luôn lọc StyleInfo theo ProductionDepartmentId — vì mỗi bộ phận có công đoạn riêng
+        /// dù cùng một mã hàng.
         /// </summary>
         public async Task<List<RecordOutput_StyleDetailDto>> GetStyleDetailsForRecording(
-            Guid productionInfoId, Guid machineId, DateOnly? date = null)
+            Guid productionInfoId, Guid machineId, DateOnly? date = null, Guid? departmentId = null)
         {
             var targetDate = date ?? DateOnly.FromDateTime(DateTime.Today);
             var targetDt   = targetDate.ToDateTime(TimeOnly.MinValue);
 
-            // Tìm StyleInfoId — thử nhiều cách:
-            // 1. Qua DailyOutput.StyleInfoId (bất kỳ máy nào đang may mã này)
-            Guid? styleInfoId = await _context.DailyOutputs
+            // Kiểm tra ProductionInfo có Status == 1 không
+            var infoOk = await _context.ProductionInfos
+                .AsNoTracking()
+                .AnyAsync(p => p.Id == productionInfoId && p.Status == 1);
+
+            if (!infoOk)
+            {
+                return new List<RecordOutput_StyleDetailDto>
+                {
+                    new RecordOutput_StyleDetailDto
+                    {
+                        StyleDetailId = Guid.Empty,
+                        DetailName    = "⚠ Mã hàng không ở trạng thái hoạt động",
+                        TodayTotal    = 0
+                    }
+                };
+            }
+
+            // Xác định bộ phận cần lọc:
+            // Ưu tiên departmentId được truyền vào, nếu không thì lấy từ máy
+            Guid effectiveDeptId;
+            if (departmentId.HasValue && departmentId != Guid.Empty)
+            {
+                effectiveDeptId = departmentId.Value;
+            }
+            else
+            {
+                // Lấy ProductionDepartmentId của máy hiện tại
+                effectiveDeptId = await _context.ProductionMachines
+                    .Where(m => m.Id == machineId)
+                    .Select(m => m.ProductionDepartmentId)
+                    .FirstOrDefaultAsync();  // Guid.Empty nếu không tìm thấy (default của Guid)
+            }
+
+            // Danh sách máy thuộc bộ phận (để lọc DailyOutput)
+            var validMachineIds = _context.ProductionMachines
+                .Where(m => m.ProductionDepartmentId == effectiveDeptId && (m.Status == null || m.Status == 1))
+                .Select(m => m.Id);
+
+            // -------------------------------------------------------
+            // Tìm StyleInfoId — thử theo thứ tự ưu tiên:
+            // Tất cả đều phải filter theo effectiveDeptId vì StyleInfo
+            // có ProductionDepartmentId riêng cho từng bộ phận.
+            // -------------------------------------------------------
+            Guid? styleInfoId = null;
+
+            // 1. Qua DailyOutput.StyleInfoId (bộ phận hiện tại, đang active)
+            var styleInfoIdFromDaily = await _context.DailyOutputs
                 .Where(d => d.ProductionInfoId == productionInfoId
                          && d.StyleInfoId != null
-                         && d.Status == 1)
+                         && d.Status == 1
+                         && validMachineIds.Contains(d.ProductionMachineId))
                 .Select(d => d.StyleInfoId)
                 .FirstOrDefaultAsync();
 
+            if (styleInfoIdFromDaily.HasValue)
+            {
+                // Kiểm tra StyleInfo này có đúng bộ phận không
+                var siDeptOk = await _context.StyleInfos
+                    .AnyAsync(s => s.Id == styleInfoIdFromDaily.Value
+                               && s.ProductionDepartmentId == effectiveDeptId
+                               && s.Status == 1);
+                if (siDeptOk) styleInfoId = styleInfoIdFromDaily;
+            }
+
             if (styleInfoId == null)
             {
-                // 2. Qua ProductionInfo.Keyword → StyleInfo.StyleCode
+                // 2. Qua ProductionInfo.Keyword / Style → StyleInfo của đúng bộ phận
                 var info = await _context.ProductionInfos
                     .AsNoTracking()
                     .FirstOrDefaultAsync(p => p.Id == productionInfoId);
 
                 if (info != null)
                 {
-                    // Thử Keyword trước
+                    // 2a. Thử Keyword trước
                     if (!string.IsNullOrEmpty(info.Keyword))
                     {
                         var si = await _context.StyleInfos
                             .AsNoTracking()
-                            .FirstOrDefaultAsync(s => s.StyleCode == info.Keyword && s.Status == 1);
+                            .FirstOrDefaultAsync(s => s.StyleCode == info.Keyword
+                                                   && s.ProductionDepartmentId == effectiveDeptId
+                                                   && s.Status == 1);
                         styleInfoId = si?.Id;
                     }
 
-                    // Fallback: tìm theo Style name khớp với StyleCode hoặc Keyword
+                    // 2b. Fallback: tìm theo Style name
                     if (styleInfoId == null && !string.IsNullOrEmpty(info.Style))
                     {
                         var si = await _context.StyleInfos
                             .AsNoTracking()
                             .FirstOrDefaultAsync(s =>
                                 (s.StyleCode == info.Style || s.Keyword == info.Style)
+                                && s.ProductionDepartmentId == effectiveDeptId
                                 && s.Status == 1);
                         styleInfoId = si?.Id;
                     }
 
-                    // Fallback 2: tìm StyleDetail trực tiếp qua DailyOutputDetail đã từng lưu
+                    // 2c. Fallback: qua DailyOutputDetail đã từng lưu (đúng bộ phận)
                     if (styleInfoId == null)
                     {
                         var existingDetailId = await _context.DailyOutputDetails
                             .Where(dt => dt.DailyOutput.ProductionInfoId == productionInfoId
+                                      && validMachineIds.Contains(dt.DailyOutput.ProductionMachineId)
                                       && dt.Status == 1
                                       && dt.StyleDetailId != null)
                             .Select(dt => (Guid?)dt.StyleDetailId)
@@ -631,7 +693,8 @@ namespace Sub_Services.Execute
                         if (existingDetailId.HasValue)
                         {
                             styleInfoId = await _context.StyleDetails
-                                .Where(sd => sd.Id == existingDetailId.Value)
+                                .Where(sd => sd.Id == existingDetailId.Value
+                                          && sd.StyleInfo.ProductionDepartmentId == effectiveDeptId)
                                 .Select(sd => (Guid?)sd.StyleInfoId)
                                 .FirstOrDefaultAsync();
                         }
@@ -641,19 +704,20 @@ namespace Sub_Services.Execute
 
             if (styleInfoId == null)
             {
-                // Không tìm được style — trả về placeholder để user biết
                 return new List<RecordOutput_StyleDetailDto>
                 {
                     new RecordOutput_StyleDetailDto
                     {
                         StyleDetailId = Guid.Empty,
-                        DetailName    = "⚠ Không tìm được công đoạn (chưa gắn style)",
+                        DetailName    = "⚠ Không tìm được công đoạn (chưa gắn style cho bộ phận này)",
                         TodayTotal    = 0
                     }
                 };
             }
 
-            // Lấy danh sách StyleDetail
+            // -------------------------------------------------------
+            // Lấy danh sách StyleDetail của StyleInfo đúng bộ phận
+            // -------------------------------------------------------
             var details = await _context.StyleDetails
                 .AsNoTracking()
                 .Where(sd => sd.StyleInfoId == styleInfoId && sd.Status == 1)
@@ -668,18 +732,17 @@ namespace Sub_Services.Execute
                     new RecordOutput_StyleDetailDto
                     {
                         StyleDetailId = Guid.Empty,
-                        DetailName    = "⚠ Style chưa có công đoạn nào",
+                        DetailName    = "⚠ Style chưa có công đoạn nào (bộ phận: " + effectiveDeptId + ")",
                         TodayTotal    = 0
                     }
                 };
             }
 
-            // Tổng đã nhập hôm nay per detail:
-            // Lấy TẤT CẢ máy đang may mã này (không chỉ machineId)
-            // để số liệu nhất quán với TodayOutput ở card
+            // -------------------------------------------------------
+            // Tổng đã nhập hôm nay của MÁY HIỆN TẠI
+            // -------------------------------------------------------
             var todayDetailIds = details.Select(d => d.Id).ToList();
 
-            // Tổng của MÁY HIỆN TẠI (machineId) để hiển thị trong modal
             var todayDailyOutputIds = await _context.DailyOutputs
                 .Where(d => d.ProductionInfoId    == productionInfoId
                          && d.ProductionMachineId == machineId

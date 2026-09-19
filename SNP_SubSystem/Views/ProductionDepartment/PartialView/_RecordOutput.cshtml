@@ -634,7 +634,8 @@
         var url = '/ProductionDepartment/GetStyleDetailsForRecording' +
             '?productionInfoId=' + encodeURIComponent(currentCode.productionInfoId) +
             '&machineId='        + encodeURIComponent(currentCode.machineId) +
-            '&date='             + encodeURIComponent(dateVal);
+            '&date='             + encodeURIComponent(dateVal) +
+            (selectedMachine && selectedMachine.deptId ? '&departmentId=' + encodeURIComponent(selectedMachine.deptId) : '');
         fetch(url)
             .then(function(r){ return r.json(); })
             .then(function(list){ currentDetails = list; renderDetailInputs(); })

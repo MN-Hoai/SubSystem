@@ -10,9 +10,9 @@
        HELPERS
        ===================================================== */
     var STATUS = {
-        1: { cls: 'active',      label: 'Hoạt động',       icon: 'fa-check',  tipFn: function(n){ return n + ' — Đang hoạt động'; } },
-        2: { cls: 'inactive',    label: 'Ngừng hoạt động', icon: 'fa-xmark',  tipFn: function(n){ return n + ' — Ngừng hoạt động'; } },
-        3: { cls: 'maintenance', label: 'Bảo trì',          icon: 'fa-wrench', tipFn: function(n){ return n + ' — Đang bảo trì'; } }
+         1: { cls: 'active',      label: 'Hoạt động',       icon: 'fa-circle-check', tipFn: function(n){ return n + ' — Đang hoạt động'; } },
+         0: { cls: 'maintenance', label: 'Bảo trì',          icon: 'fa-wrench',       tipFn: function(n){ return n + ' — Đang bảo trì'; } },
+        '-1': { cls: 'inactive',  label: 'Ngừng hoạt động', icon: 'fa-circle-xmark', tipFn: function(n){ return n + ' — Ngừng hoạt động'; } }
     };
 
     function esc(str) {
@@ -165,9 +165,9 @@
             for (var c = 1; c <= cols; c++) {
                 var it = map[r + '-' + c];
                 if (!it) { cntEmpty++; }
-                else if (it.status === 1) cntActive++;
-                else if (it.status === 2) cntInactive++;
-                else if (it.status === 3) cntMaint++;
+                else if (it.status === 1)  cntActive++;
+                else if (it.status === 0)  cntMaint++;
+                else if (it.status === -1) cntInactive++;
                 else cntEmpty++;
             }
         }
@@ -175,12 +175,16 @@
         var sec = document.createElement('div');
         sec.className = 'atd-section';
         sec.dataset.dept = layout.departmentId || '';
-        sec.style.animationDelay = (idx * 0.07) + 's';
+        sec.style.animationDelay = (idx * 0.08) + 's';
 
         var deptIcons = { 'Cắt': 'fa-scissors', 'May': 'fa-shirt', 'Hoàn thiện': 'fa-temperature-three-quarters', 'Kiểm tra': 'fa-magnifying-glass-chart', 'Đóng gói': 'fa-box' };
         var icon = 'fa-gears';
         var deptName = layout.departmentName || '';
         Object.keys(deptIcons).forEach(function(k) { if (deptName.indexOf(k) >= 0) icon = deptIcons[k]; });
+
+        var occupied = cntActive + cntInactive + cntMaint;
+        var occPct   = total > 0 ? Math.round(occupied / total * 100) : 0;
+        var occColor = occPct >= 80 ? 'var(--success)' : occPct >= 50 ? 'var(--accent-gold)' : 'var(--danger)';
 
         sec.innerHTML =
             '<div class="atd-section-head">' +
@@ -188,14 +192,31 @@
                     '<div class="atd-dept-badge"><i class="fa-solid ' + esc(icon) + '"></i></div>' +
                     '<div>' +
                         '<h2 class="atd-section-name">' + esc(deptName) + '</h2>' +
-                        '<div class="atd-section-meta">' + esc(layout.name) + ' &nbsp;·&nbsp; ' + rows + ' hàng × ' + cols + ' cột &nbsp;·&nbsp; ' + total + ' ô</div>' +
+                        '<div class="atd-section-meta">' +
+                            '<span>' + esc(layout.name) + '</span>' +
+                            '<span class="atd-meta-sep">|</span>' +
+                            '<span>' + rows + ' hàng × ' + cols + ' cột</span>' +
+                            '<span class="atd-meta-sep">|</span>' +
+                            '<span>' + total + ' ô</span>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
-                '<div class="atd-section-stats">' +
-                    (cntActive   ? '<div class="atd-stat s-active"><i class="fa-solid fa-check fa-xs"></i>' + cntActive + ' hoạt động</div>' : '') +
-                    (cntInactive ? '<div class="atd-stat s-inactive"><i class="fa-solid fa-xmark fa-xs"></i>' + cntInactive + ' ngừng</div>' : '') +
-                    (cntMaint    ? '<div class="atd-stat s-maint"><i class="fa-solid fa-wrench fa-xs"></i>' + cntMaint + ' bảo trì</div>' : '') +
-                    (cntEmpty    ? '<div class="atd-stat s-empty"><i class="fa-regular fa-square fa-xs"></i>' + cntEmpty + ' trống</div>' : '') +
+                '<div class="atd-section-right">' +
+                    '<div class="atd-occ-badge">' +
+                        '<div>' +
+                            '<div class="atd-occ-label">Tỷ lệ sử dụng</div>' +
+                            '<div class="atd-occ-value" style="color:' + occColor + '">' + occPct + '%</div>' +
+                        '</div>' +
+                        '<div class="atd-occ-bar-wrap">' +
+                            '<div class="atd-occ-bar-fill" style="width:' + occPct + '%;background:' + occColor + ';"></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="atd-section-stats">' +
+                        (cntActive   ? '<div class="atd-stat s-active"><i class="fa-solid fa-circle-check fa-xs"></i>' + cntActive + ' hoạt động</div>' : '') +
+                        (cntMaint    ? '<div class="atd-stat s-maint"><i class="fa-solid fa-wrench fa-xs"></i>' + cntMaint + ' bảo trì</div>' : '') +
+                        (cntInactive ? '<div class="atd-stat s-inactive"><i class="fa-solid fa-circle-xmark fa-xs"></i>' + cntInactive + ' ngừng</div>' : '') +
+                        (cntEmpty    ? '<div class="atd-stat s-empty"><i class="fa-regular fa-square fa-xs"></i>' + cntEmpty + ' trống</div>' : '') +
+                    '</div>' +
                 '</div>' +
             '</div>';
 
@@ -233,7 +254,7 @@
             cell.classList.add('empty');
             if (codeSearch) cell.style.opacity = '0.15';
             cell.innerHTML =
-                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+              
                 '<div class="empty-inner">' +
                     '<i class="fa-regular fa-square-dashed"></i>' +
                     '<span>Ô trống</span>' +
@@ -241,14 +262,14 @@
             return cell;
         }
 
-        var st = STATUS[item.status] || STATUS[1];
+        var st = STATUS[String(item.status)] || STATUS[1];
 
         // Apply status filter
-        if (statusFilter && item.status !== parseInt(statusFilter)) {
+        if (statusFilter !== '' && statusFilter !== null && statusFilter !== undefined && item.status !== Number(statusFilter)) {
             cell.classList.add('empty');
             if (codeSearch) cell.style.opacity = '0.15';
             cell.innerHTML =
-                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+             
                 '<div class="empty-inner"><i class="fa-regular fa-square-dashed"></i><span>Ô trống</span></div>';
             return cell;
         }
@@ -265,7 +286,7 @@
                 cell.classList.add('empty');
                 cell.style.opacity = '0.3';
                 cell.innerHTML =
-                    '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+                   
                     '<div class="empty-inner"><i class="fa-solid fa-eye-slash"></i><span style="font-size:9px;">Không khớp</span></div>';
                 return cell;
             }
@@ -277,7 +298,7 @@
             cell.classList.add('empty');
             cell.style.opacity = '0.2';
             cell.innerHTML =
-                '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+              
                 '<div class="empty-inner"><i class="fa-solid fa-eye-slash"></i><span style="font-size:9px;">Không có mã</span></div>';
             return cell;
         }
@@ -291,8 +312,7 @@
 
         // Nổi bật ô khi khớp tìm kiếm mã
         if (codeSearch && codeMatched) {
-            cell.style.outline = '2.5px solid var(--accent-navy)';
-            cell.style.outlineOffset = '-2px';
+            cell.classList.add('code-match');
         }
 
         cell.classList.add(st.cls);
@@ -306,19 +326,91 @@
             + '&dept='        + encodeURIComponent(deptName)
             + '&deptId='      + encodeURIComponent(deptId || '');
 
+        // Build info rows: SP / Tổ / Style kèm sản lượng hôm nay
+        var codes = item.productionCodes || [];
+        var infoHtml = '';
+        if (codes.length > 0) {
+            // Sắp xếp: mã có sản lượng hôm nay lên trước
+            var sorted = codes.slice().sort(function(a, b) {
+                return (b.todayOutput || 0) - (a.todayOutput || 0);
+            });
+            var top      = sorted[0];
+            var spVal    = top.spmain || top.style || '';
+            var lineVal  = top.line   || '';
+            var styleVal = top.style  || '';
+            var todayVal = top.todayOutput || 0;
+
+            infoHtml += '<div class="atd-cell-info">';
+   // Tổ (Line)
+            if (lineVal) {
+                infoHtml +=
+                    '<div class="atd-cell-info-row">' +
+                        '<span class="atd-cell-info-label">Line</span>' +
+                        '<span class="atd-cell-info-value line">' + esc(lineVal.substring(0, 16)) + '</span>' +
+                    '</div>';
+            }
+              // Style (chỉ hiện nếu khác SP)
+            if (styleVal && styleVal !== spVal) {
+                infoHtml +=
+                    '<div class="atd-cell-info-row">' +
+                        '<span class="atd-cell-info-label">Style</span>' +
+                        '<span class="atd-cell-info-value">' + esc(styleVal.substring(0, 14)) + '</span>' +
+                    '</div>';
+            }
+
+            // SP / Mã chính
+            if (spVal) {
+                infoHtml +=
+                    '<div class="atd-cell-info-row">' +
+                        '<span class="atd-cell-info-label">SP</span>' +
+                        '<span class="atd-cell-info-value sp">' + esc(spVal.substring(0, 14)) + '</span>' +
+                        (todayVal > 0
+                            ? '<span class="atd-cell-today">\u25b2\u00a0' + todayVal.toLocaleString('vi-VN') + '</span>'
+                            : '') +
+                    '</div>';
+            }
+
+         
+
+          
+            // Nếu có nhiều hơn 1 mã thì badge "+N mã khác"
+            if (sorted.length > 1) {
+                infoHtml +=
+                    '<div style="margin-top:1px;">' +
+                        '<span class="atd-code-chip more">+' + (sorted.length - 1) + ' m\xe3 kh\xe1c</span>' +
+                    '</div>';
+            }
+
+            infoHtml += '</div>';
+        }
+
+        // Tính % target cho mã hàng đầu tiên (quan trọng nhất)
+        var targetPctHtml = '';
+        if (codes.length > 0) {
+            var topCode   = (typeof sorted !== 'undefined' ? sorted : codes)[0];
+            var todayOut  = topCode ? (topCode.todayOutput || 0) : 0;
+            var targetVal = topCode ? (topCode.target  || 0) : 0;
+            if (targetVal > 0) {
+                var pct      = Math.min(Math.round(todayOut / targetVal * 100), 100);
+                var pctColor = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--accent-gold)' : 'var(--danger)';
+                targetPctHtml = '<span class="atd-target-pct" style="color:' + pctColor + ';border-color:' + pctColor + ';">' + pct + '%</span>';
+            }
+        }
+
         cell.innerHTML =
-            '<span class="atd-cell-pos">' + esc(posLabel) + '</span>' +
+           
             '<div class="atd-cell-inner">' +
                 '<div class="atd-cell-top">' +
                     '<div class="atd-cell-icon"><i class="fa-solid ' + st.icon + '"></i></div>' +
-                    '<div class="atd-cell-status-dot"></div>' +
+                    (targetPctHtml || '<div class="atd-cell-status-dot"></div>') +
                 '</div>' +
                 '<div class="atd-cell-name">' + highlight(machineName) + '</div>' +
-                (remark ? '<div class="atd-cell-code">' + highlight(remark) + '</div>' : '') +
+                (remark ? '<div class="atd-cell-code"><i class="fa-solid fa-hashtag" style="font-size:8px;margin-right:2px;"></i>' + highlight(remark) + '</div>' : '') +
+                infoHtml +
             '</div>' +
             '<div class="atd-cell-footer">' +
                 '<span class="atd-cell-status-label">' + esc(st.label) + '</span>' +
-                '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;color:var(--ink-300);"></i>' +
+                '<i class="fa-solid fa-arrow-up-right-from-square atd-cell-link-icon"></i>' +
             '</div>' +
             '<div class="atd-cell-bar"></div>';
 
@@ -487,62 +579,152 @@
 </script>
 <style>
     /* ============================================================
-       ATDepartment — Machine Layout View
+       ATDepartment — Machine Layout View  (UPGRADED UI)
        ============================================================ */
 
-    /* Page wrapper */
-    .atd-page { padding: 0; }
+    /* Page wrapper — nằm bên trong content-area, chiếm phần còn lại */
+    .atd-page { padding: 0; display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
 
-    /* ---- Top bar ---- */
+    /* ---- HERO TOP BAR ---- */
     .atd-topbar {
+        flex-shrink: 0;
+        background: linear-gradient(135deg, var(--accent-navy) 0%, #142b55 60%, #0d1f40 100%);
+        padding: 18px 28px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 20px 28px 16px;
-        border-bottom: 1px solid var(--border);
-        background: var(--bg-surface);
         gap: 16px;
         flex-wrap: wrap;
+        position: relative;
+        overflow: hidden;
     }
 
-    .atd-topbar-left .atd-breadcrumb {
+    /* decorative orb */
+    .atd-topbar::before {
+        content: '';
+        position: absolute;
+        right: -60px; top: -60px;
+        width: 220px; height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,255,255,.06) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .atd-topbar::after {
+        content: '';
+        position: absolute;
+        left: 40%; bottom: -80px;
+        width: 180px; height: 180px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(192,149,78,.12) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .atd-topbar-left { position:relative; z-index:1; }
+
+    .atd-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         font-size: 12px;
-        color: var(--ink-500);
-        margin-bottom: 4px;
+        color: rgba(255,255,255,.55);
+        margin-bottom: 6px;
+        font-weight: 500;
     }
-
-    .atd-topbar-left .atd-breadcrumb .sep { margin: 0 6px; color: var(--ink-300); }
-    .atd-topbar-left .atd-breadcrumb .cur { color: var(--ink-700-solid); font-weight: 600; }
+    .atd-breadcrumb a { color: rgba(255,255,255,.55); text-decoration:none; transition:color .18s; }
+    .atd-breadcrumb a:hover { color: rgba(255,255,255,.9); }
+    .atd-breadcrumb .sep { font-size:10px; }
+    .atd-breadcrumb .cur { color: rgba(255,255,255,.85); font-weight:600; }
 
     .atd-page-title {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 800;
-        color: var(--ink-900);
-        letter-spacing: -.3px;
-        margin: 0;
+        color: #fff;
+        letter-spacing: -.4px;
+        margin: 0 0 2px;
+        line-height: 1.15;
+    }
+    .atd-page-sub {
+        font-size: 13px;
+        color: rgba(255,255,255,.5);
+        font-weight: 500;
     }
 
-    .atd-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .atd-topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+    }
 
-    /* ---- Filter bar ---- */
+    /* Clock chip — hiển thị trong page-actions */
+    .atd-clock-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 14px;
+        color: var(--ink-700-solid);
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .atd-clock-chip i { color: var(--accent-navy); font-size:12px; }
+
+    /* hero action buttons */
+    .btn-hero {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 16px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        font-family: inherit;
+        transition: background .18s, opacity .18s, transform .15s;
+        white-space: nowrap;
+    }
+    .btn-hero-ghost {
+        background: rgba(255,255,255,.12);
+        color: #fff;
+        border: 1.5px solid rgba(255,255,255,.22);
+        backdrop-filter: blur(6px);
+    }
+    .btn-hero-ghost:hover { background: rgba(255,255,255,.2); transform:translateY(-1px); }
+    .btn-hero-gold {
+        background: linear-gradient(135deg, var(--accent-gold) 0%, #a87b3a 100%);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(192,149,78,.35);
+    }
+    .btn-hero-gold:hover { opacity:.9; transform:translateY(-1px); }
+
+    /* ---- FILTER BAR (card style) ---- */
     .atd-filter {
+        flex-shrink: 0;
         display: flex;
         align-items: flex-end;
-        gap: 12px;
+        border-radius: 12px;
+        gap: 10px;
         padding: 14px 28px;
         background: var(--bg-surface);
         border-bottom: 1px solid var(--border);
         flex-wrap: wrap;
+        box-shadow: 0 1px 0 var(--border), 0 4px 12px rgba(22,33,62,.04);
     }
 
-    .atd-filter-group { display: flex; flex-direction: column; gap: 5px; }
+    .atd-filter-group { display: flex; flex-direction: column; gap: 4px; }
 
     .atd-filter-label {
-        font-size: 11.5px;
+        font-size: 10.5px;
         font-weight: 700;
         color: var(--ink-500);
         text-transform: uppercase;
-        letter-spacing: .5px;
+        letter-spacing: .6px;
     }
 
     .atd-filter select,
@@ -556,8 +738,8 @@
         color: var(--ink-900);
         background: var(--bg-canvas);
         outline: none;
-        min-width: 160px;
-        transition: border-color .2s, box-shadow .2s;
+        min-width: 155px;
+        transition: border-color .2s, box-shadow .2s, background .2s;
         appearance: none;
     }
 
@@ -568,45 +750,89 @@
         background: #fff;
     }
 
+    /* select arrow */
+    .atd-select-wrap { position:relative; }
+    .atd-select-wrap::after {
+        content: '\f107';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 10px;
+        color: var(--ink-400);
+        position: absolute;
+        right: 11px; top:50%; transform:translateY(-50%);
+        pointer-events: none;
+    }
+    .atd-select-wrap select { padding-right: 28px !important; }
+
     .atd-search-wrap { position: relative; }
-    .atd-search-wrap i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-300); font-size: 13px; }
+    .atd-search-wrap i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-400); font-size: 12px; }
     .atd-search-wrap input { padding-left: 32px !important; }
 
     .atd-filter-actions { display: flex; gap: 8px; }
 
+    /* code search result badge */
+    .atd-code-badge {
+        display: none;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent-navy);
+        background: var(--accent-navy-soft);
+        padding: 5px 11px;
+        border-radius: 999px;
+        white-space: nowrap;
+        align-self: flex-end;
+        border: 1.5px solid rgba(31,58,103,.15);
+    }
+    .atd-code-badge.visible { display: inline-flex; }
+
     /* ---- Scroll body ---- */
     .atd-body {
+        flex: 1;
         overflow-y: auto;
-        padding: 24px 28px 32px;
+        padding-top: 22px ;
         display: flex;
         flex-direction: column;
-        gap: 32px;
+        gap: 28px;
+        background: var(--bg-canvas);
     }
 
-    /* ---- Legend ---- */
-    .atd-legend {
+    /* ---- Legend bar ---- */
+    .atd-legend-bar {
         display: flex;
         align-items: center;
-        gap: 18px;
+        gap: 20px;
         flex-wrap: wrap;
+        padding: 10px 18px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow-sm);
+    }
+    .atd-legend-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink-300);
+        text-transform: uppercase;
+        letter-spacing: .6px;
     }
 
     .atd-legend-item {
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 12px;
+        gap: 7px;
+        font-size: 12.5px;
         font-weight: 600;
-        color: var(--ink-500);
+        color: var(--ink-600);
     }
 
     .legend-dot {
-        width: 10px;
-        height: 10px;
+        width: 11px;
+        height: 11px;
         border-radius: 3px;
         flex-shrink: 0;
     }
-
     .legend-dot.active      { background: var(--success); }
     .legend-dot.inactive    { background: var(--danger); }
     .legend-dot.maintenance { background: var(--accent-gold); }
@@ -616,32 +842,40 @@
     .atd-section {
         display: flex;
         flex-direction: column;
-        gap: 14px;
-        animation: fadeSlide .4s ease both;
+        gap: 0;
+        animation: atdFadeSlide .45s ease both;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(22,33,62,.06), 0 8px 24px rgba(22,33,62,.04);
+        border: 1px solid var(--border);
     }
 
+    /* ---- Section header ---- */
     .atd-section-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
         flex-wrap: wrap;
+        padding: 16px 22px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
     }
 
-    .atd-section-title-group { display: flex; align-items: center; gap: 12px; }
+    .atd-section-title-group { display: flex; align-items: center; gap: 14px; }
 
     .atd-dept-badge {
-        width: 40px;
-        height: 40px;
-        border-radius: 11px;
-        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        background: linear-gradient(135deg, var(--accent-navy) 0%, #142b55 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         color: #fff;
-        font-size: 16px;
+        font-size: 18px;
         flex-shrink: 0;
-        box-shadow: 0 4px 12px rgba(31,58,103,.22);
+        box-shadow: 0 4px 14px rgba(31,58,103,.28);
     }
 
     .atd-section-name {
@@ -654,15 +888,48 @@
 
     .atd-section-meta {
         font-size: 12px;
-        color: var(--ink-500);
-        margin-top: 2px;
+        color: var(--ink-400);
+        margin-top: 3px;
         font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .atd-meta-sep { color: var(--border); }
+
+    .atd-section-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+    /* occupancy rate */
+    .atd-occ-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-canvas);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        padding: 6px 14px;
+    }
+    .atd-occ-label { font-size:11px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.5px; }
+    .atd-occ-value { font-size:16px; font-weight:800; color:var(--accent-navy); }
+    .atd-occ-bar-wrap {
+        width: 80px;
+        height: 5px;
+        background: var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .atd-occ-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent-navy) 0%, #2a5ab0 100%);
+        transition: width .6s cubic-bezier(.4,0,.2,1);
     }
 
     .atd-section-stats {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         flex-wrap: wrap;
     }
 
@@ -670,88 +937,82 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        padding: 5px 11px;
+        padding: 4px 10px;
         border-radius: 999px;
         font-size: 12px;
         font-weight: 700;
         border: 1.5px solid;
+        white-space: nowrap;
     }
 
-    .atd-stat.s-active    { background: #E6F4EF; color: var(--success);    border-color: #B8DDD2; }
-    .atd-stat.s-inactive  { background: #FEF3F2; color: var(--danger);     border-color: #F5C0BC; }
+    .atd-stat.s-active    { background: #EDFAF3; color: var(--success);      border-color: #B4DFC7; }
+    .atd-stat.s-inactive  { background: #FEF3F2; color: var(--danger);       border-color: #F5C0BC; }
     .atd-stat.s-maint     { background: var(--accent-gold-soft); color: var(--accent-gold); border-color: #D4B07A; }
     .atd-stat.s-empty     { background: var(--bg-canvas); color: var(--ink-500); border-color: var(--border); }
 
     /* ---- Grid container ---- */
     .atd-grid-wrap {
-        background: var(--bg-surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
+        background: var(--bg-canvas);
         padding: 20px;
-        box-shadow: var(--shadow-sm);
         overflow-x: auto;
     }
 
     .atd-grid {
         display: grid;
-        /* columns & rows set inline per layout */
         width: max-content;
         min-width: 100%;
     }
 
     /* ---- Grid cell ---- */
     .atd-cell {
-        border-radius: 10px;
-        min-width: 130px;
-        min-height: 96px;
+        border-radius: 12px;
+        min-width: 140px;
+        min-height: 108px;
         display: flex;
         flex-direction: column;
         position: relative;
-        transition: transform .2s, box-shadow .2s;
+        transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
         overflow: hidden;
+        background: var(--bg-surface);
     }
 
-    .atd-cell:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
+    .atd-cell:not(.empty):hover {
+        transform: translateY(-3px) scale(1.015);
+        box-shadow: 0 12px 32px rgba(22,33,62,.14);
         z-index: 2;
     }
 
     /* Empty cell */
     .atd-cell.empty {
-        background: var(--bg-canvas);
+        background: transparent;
         border: 2px dashed var(--border);
     }
 
     /* Active machine */
     .atd-cell.active {
+        border: 1.5px solid #B8E0CE;
         background: #fff;
-        border: 1.5px solid #C5E4D8;
-        box-shadow: 0 0 0 0 transparent;
+        box-shadow: 0 1px 3px rgba(46,158,113,.1);
     }
 
     /* Inactive machine */
     .atd-cell.inactive {
-        background: #fff;
         border: 1.5px solid #F5C0BC;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(210,89,79,.1);
     }
 
     /* Maintenance machine */
     .atd-cell.maintenance {
-        background: #fff;
         border: 1.5px solid #D4B07A;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(192,149,78,.1);
     }
 
-    /* ---- Cell content ---- */
-    .atd-cell-pos {
-        position: absolute;
-        top: 6px;
-        right: 8px;
-        font-size: 9px;
-        font-weight: 700;
-        color: var(--ink-300);
-        letter-spacing: .3px;
-    }
+    /* Pulse on active cells */
+    .atd-cell.active .atd-cell-status-dot { animation: atdPulse 2.4s ease-in-out infinite; }
+
+
 
     /* Empty inner */
     .atd-cell.empty .empty-inner {
@@ -760,19 +1021,19 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: 5px;
         color: var(--ink-300);
+        padding: 8px;
     }
-
-    .atd-cell.empty .empty-inner i { font-size: 18px; }
-    .atd-cell.empty .empty-inner span { font-size: 10.5px; font-weight: 600; }
+    .atd-cell.empty .empty-inner i   { font-size: 20px; }
+    .atd-cell.empty .empty-inner span { font-size: 10px; font-weight: 600; letter-spacing:.2px; }
 
     /* Machine inner */
     .atd-cell-inner {
         display: flex;
         flex-direction: column;
-        padding: 10px 12px 9px;
-        gap: 6px;
+        padding: 10px 12px 8px;
+        gap: 5px;
         flex: 1;
     }
 
@@ -784,17 +1045,17 @@
     }
 
     .atd-cell-icon {
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 13px;
+        font-size: 12px;
         flex-shrink: 0;
     }
 
-    .atd-cell.active     .atd-cell-icon { background: #E6F4EF; color: var(--success); }
+    .atd-cell.active     .atd-cell-icon { background: #E6F7EF; color: var(--success); }
     .atd-cell.inactive   .atd-cell-icon { background: #FEF3F2; color: var(--danger); }
     .atd-cell.maintenance .atd-cell-icon { background: var(--accent-gold-soft); color: var(--accent-gold); }
 
@@ -803,10 +1064,9 @@
         height: 8px;
         border-radius: 50%;
         flex-shrink: 0;
-        margin-top: 3px;
+        margin-top: 4px;
     }
-
-    .atd-cell.active     .atd-cell-status-dot { background: var(--success); }
+    .atd-cell.active     .atd-cell-status-dot { background: var(--success); box-shadow: 0 0 0 2px rgba(46,158,113,.2); }
     .atd-cell.inactive   .atd-cell-status-dot { background: var(--danger); }
     .atd-cell.maintenance .atd-cell-status-dot { background: var(--accent-gold); }
 
@@ -815,7 +1075,6 @@
         font-weight: 800;
         color: var(--ink-900);
         line-height: 1.35;
-        margin-bottom: 1px;
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -823,69 +1082,213 @@
     }
 
     .atd-cell-code {
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 700;
-        color: var(--ink-300);
+        color: var(--ink-400);
         font-family: 'Courier New', monospace;
+        letter-spacing: .2px;
     }
 
-    .atd-cell-kw {
-        font-size: 10.5px;
-        color: var(--ink-500);
-        font-weight: 500;
+    /* Production codes mini-chips */
+    .atd-cell-codes {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap;
+        margin-top: 1px;
+    }
+    .atd-code-chip {
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--accent-navy-soft);
+        color: var(--accent-navy);
+        font-family: 'Courier New', monospace;
+        white-space: nowrap;
+        border: 1px solid rgba(31,58,103,.15);
+        max-width: 80px;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    .atd-code-chip.hl {
+        background: rgba(192,149,78,.12);
+        color: var(--accent-gold);
+        border-color: rgba(192,149,78,.3);
+    }
+    /* Chip có sản lượng hôm nay — nổi bật hơn */
+    .atd-code-chip.has-output {
+        background: rgba(46,158,113,.1);
+        color: #1d7a56;
+        border-color: rgba(46,158,113,.28);
+        max-width: none;
+        gap: 4px;
+        display: inline-flex;
+        align-items: center;
+    }
+    .atd-code-chip.has-output.hl {
+        background: rgba(192,149,78,.18);
+        color: var(--accent-gold);
+        border-color: rgba(192,149,78,.4);
+    }
+    /* Badge số sản lượng trong chip */
+    .atd-chip-output {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(46,158,113,.18);
+        color: #1d7a56;
+        font-size: 9px;
+        font-weight: 800;
+        padding: 0px 4px;
+        border-radius: 3px;
+        font-family: 'Manrope', sans-serif;
+        letter-spacing: .2px;
         white-space: nowrap;
+        margin-left: 3px;
+    }
+    .atd-chip-output::before {
+        content: '▲ ';
+        font-size: 7px;
+        opacity: .7;
+    }
+    .atd-code-chip.more {
+        background: var(--bg-canvas);
+        color: var(--ink-400);
+        border-color: var(--border);
     }
 
+    /* ---- Cell footer ---- */
     .atd-cell-footer {
         border-top: 1px solid var(--border-soft);
-        padding: 5px 12px 7px;
+        padding: 5px 12px 6px;
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
 
     .atd-cell-status-label {
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 700;
-        letter-spacing: .3px;
+        letter-spacing: .4px;
         text-transform: uppercase;
     }
-
     .atd-cell.active     .atd-cell-status-label { color: var(--success); }
     .atd-cell.inactive   .atd-cell-status-label { color: var(--danger); }
     .atd-cell.maintenance .atd-cell-status-label { color: var(--accent-gold); }
 
-    /* ---- Tooltip on cell hover ---- */
+    .atd-cell-link-icon { font-size:10px; color: var(--ink-300); transition: color .15s; }
+    .atd-cell:hover .atd-cell-link-icon { color: var(--accent-navy); }
+
+    /* ---- Tooltip on hover ---- */
     .atd-cell[data-tip]:hover::after {
         content: attr(data-tip);
         position: absolute;
-        bottom: calc(100% + 6px);
+        bottom: calc(100% + 8px);
         left: 50%;
         transform: translateX(-50%);
         background: var(--ink-900);
         color: #fff;
         font-size: 11px;
         font-weight: 600;
-        padding: 4px 9px;
-        border-radius: 6px;
+        padding: 5px 10px;
+        border-radius: 7px;
         white-space: nowrap;
         pointer-events: none;
         z-index: 20;
-        box-shadow: 0 4px 12px rgba(0,0,0,.2);
+        box-shadow: 0 6px 18px rgba(0,0,0,.22);
+    }
+    /* tooltip arrow */
+    .atd-cell[data-tip]:hover::before {
+        content: '';
+        position: absolute;
+        bottom: calc(100% + 2px);
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: var(--ink-900);
+        z-index: 20;
+        pointer-events: none;
     }
 
-    /* ---- Status bar at bottom of active cell ---- */
+    /* ---- Status bar at bottom of cell ---- */
     .atd-cell-bar {
         height: 3px;
         width: 100%;
         flex-shrink: 0;
     }
-
     .atd-cell.active     .atd-cell-bar { background: var(--success); }
     .atd-cell.inactive   .atd-cell-bar { background: var(--danger); }
     .atd-cell.maintenance .atd-cell-bar { background: var(--accent-gold); }
+
+    /* Code-search highlight outline */
+    .atd-cell.code-match {
+        outline: 2.5px solid var(--accent-navy);
+        outline-offset: -2px;
+    }
+
+    /* Badge % target hôm nay (thay cho status dot) */
+    .atd-target-pct {
+        font-size: 19px;
+        font-weight: 900;
+        letter-spacing: -.3px;
+      
+        padding: 1px 5px;
+        line-height: 1;
+        white-space: nowrap;
+        background: rgba(255,255,255,.7);
+        flex-shrink: 0;
+    }
+
+    /* ---- Cell info rows (SP / Tổ / Style + sản lượng hôm nay) ---- */
+    .atd-cell-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 3px;
+    }
+
+    .atd-cell-info-row {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        line-height: 1.3;
+        min-width: 0;
+    }
+
+    .atd-cell-info-label {
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        color: var(--ink-300);
+        flex-shrink: 0;
+        width: 16px;
+    }
+
+    .atd-cell-info-value {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--ink-700-solid);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .atd-cell-info-value.sp   { color: var(--accent-navy); }
+    .atd-cell-info-value.line { color: var(--ink-600); font-weight: 600; }
+
+    /* Badge sản lượng hôm nay */
+    .atd-cell-today {
+        font-size: 9px;
+        font-weight: 800;
+        color: #1d7a56;
+        background: rgba(46,158,113,.12);
+        border-radius: 3px;
+        padding: 0 5px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
 
     /* ---- Empty state (no layouts) ---- */
     .atd-no-data {
@@ -893,143 +1296,190 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
+        gap: 16px;
         padding: 80px 24px;
         text-align: center;
         color: var(--ink-300);
     }
 
-    .atd-no-data .nd-icon {
-        width: 72px;
-        height: 72px;
-        border-radius: 18px;
+    .nd-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 22px;
         background: var(--bg-surface);
         border: 2px dashed var(--border);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 30px;
     }
 
-    .atd-no-data h3 { font-size: 16px; font-weight: 700; color: var(--ink-500); margin: 0; }
-    .atd-no-data p { font-size: 13px; max-width: 300px; line-height: 1.6; margin: 0; }
+    .atd-no-data h3 { font-size: 17px; font-weight: 800; color: var(--ink-700-solid); margin: 0; }
+    .atd-no-data p  { font-size: 13px; max-width: 340px; line-height: 1.65; margin: 0; color: var(--ink-400); }
 
     /* ---- Utility buttons ---- */
-    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition: background .18s, opacity .18s, transform .15s; }
-    .btn-primary { background: linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
-    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
-    .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
-    .btn-ghost:hover { background:var(--border-soft); }
-    .btn-sm { padding: 7px 13px; font-size: 12.5px; border-radius: 8px; }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 16px;
+        border-radius: 9px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        font-family: inherit;
+        transition: background .18s, opacity .18s, transform .15s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, var(--accent-navy) 0%, var(--accent-navy-700) 100%);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(31,58,103,.22);
+    }
+    .btn-primary:hover  { opacity:.9; transform:translateY(-1px); }
+    .btn-ghost          { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
+    .btn-ghost:hover    { background:var(--border-soft); }
+    .btn-sm             { padding:7px 13px; font-size:12.5px; border-radius:8px; }
 
     /* ---- Animations ---- */
-    @@keyframes fadeSlide {
-        from { opacity:0; transform: translateY(10px); }
+    @@keyframes atdFadeSlide {
+        from { opacity:0; transform: translateY(14px); }
         to   { opacity:1; transform: translateY(0); }
+    }
+
+    @@keyframes atdPulse {
+        0%, 100% { box-shadow: 0 0 0 2px rgba(46,158,113,.2); }
+        50%       { box-shadow: 0 0 0 5px rgba(46,158,113,.06); }
     }
 
     @@media (max-width: 768px) {
         .atd-topbar, .atd-filter, .atd-body { padding-left: 16px; padding-right: 16px; }
         .atd-grid-wrap { padding: 12px; }
+        .atd-page-title { font-size: 20px; }
     }
 </style>
 
-<div class="atd-page">
 
-    <!-- =====================================================
-         TOP BAR
-         ===================================================== -->
-    <div class="atd-topbar">
-    <div>
-        <div class="atd-topbar-left">
-             <div class="breadcrumb">
+
+<div class="content-area">
+
+    <!-- Tiêu đề trang + breadcrumb (đồng bộ với các trang khác) -->
+    <div class="page-head">
+        <div>
+            <div class="breadcrumb">
                 <a asp-controller="Home" asp-action="Index">Trang chủ</a>
                 <span class="sep">/</span>
-                <span class="current">Thông tin bộ phận</span>
+                <span class="current">Sơ đồ vị trí máy</span>
             </div>
+            <h1 class="page-title">Sơ đồ vị trí máy</h1>
         </div>
-         <h1 class="page-title">Thông tin bộ phận</h1>
-        </div>
-       
-        @* <div class="atd-topbar-right">
-            <button class="btn btn-ghost btn-sm" id="atdRefreshBtn">
+        <div class="page-actions">
+            <div class="atd-clock-chip">
+                <i class="fa-regular fa-clock"></i>
+                <span id="atdLiveClock">--:--:--</span>
+            </div>
+            <button class="btn btn-ghost" id="atdRefreshBtn">
                 <i class="fa-solid fa-rotate-right"></i> Làm mới
             </button>
-           
-           
-        </div> *@
-    </div>
-
-    <!-- =====================================================
-         FILTER BAR
-         ===================================================== -->
-    <div class="atd-filter">
-        <!-- Tìm kiếm máy -->
-        <div class="atd-filter-group">
-            <label class="atd-filter-label">Tên máy</label>
-            <div class="atd-search-wrap">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="atdSearch" placeholder="Tên máy, mã máy...">
-            </div>
-        </div>
-
-        <!-- Tìm theo mã sản xuất -->
-        <div class="atd-filter-group">
-            <label class="atd-filter-label">Mã / Style / Tổ / Màu</label>
-            <div class="atd-search-wrap" style="min-width:200px;">
-                <i class="fa-solid fa-shirt" style="color:var(--accent-navy);"></i>
-                <input type="text" id="atdCodeSearch" placeholder="SP-2026, Tổ 1, Trắng...">
-            </div>
-        </div>
-        <span id="atdCodeSearchResult" style="display:none;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--accent-navy);background:var(--accent-navy-soft);padding:4px 10px;border-radius:999px;white-space:nowrap;"><i class="fa-solid fa-bullseye"></i><span></span></span>
-
-        <!-- Bộ phận -->
-        <div class="atd-filter-group">
-            <label class="atd-filter-label">Bộ phận</label>
-            <select id="atdDeptFilter">
-                <option value="">Tất cả bộ phận</option>
-              
-            </select>
-        </div>
-
-        <!-- Trạng thái máy -->
-        <div class="atd-filter-group">
-            <label class="atd-filter-label">Trạng thái</label>
-            <select id="atdStatusFilter">
-                <option value="">Tất cả</option>
-                <option value="1">Hoạt động</option>
-                <option value="2">Ngừng hoạt động</option>
-                <option value="3">Bảo trì</option>
-            </select>
-        </div>
-
-        <div class="atd-filter-actions">
-            <button class="btn btn-primary btn-sm" id="atdFilterApply">
-                <i class="fa-solid fa-magnifying-glass"></i> Lọc
-            </button>
-            <button class="btn btn-ghost btn-sm" id="atdFilterReset">
-                <i class="fa-solid fa-arrow-rotate-left"></i> Đặt lại
-            </button>
         </div>
     </div>
 
-    <!-- =====================================================
-         BODY: render layout sections
-         ===================================================== -->
-    <div class="atd-body" id="atdBody">
+    <!-- =========================================================
+         ATD CONTENT: filter + grid (dùng atd-page để full-height)
+         ========================================================= -->
+    <div class="atd-page">
 
-        <!-- Legend -->
-        <div class="atd-legend">
-            <span style="font-size:12px;font-weight:700;color:var(--ink-300);text-transform:uppercase;letter-spacing:.6px;">Chú thích:</span>
-            <div class="atd-legend-item"><div class="legend-dot active"></div>Hoạt động</div>
-            <div class="atd-legend-item"><div class="legend-dot inactive"></div>Ngừng hoạt động</div>
-            <div class="atd-legend-item"><div class="legend-dot maintenance"></div>Bảo trì</div>
-            <div class="atd-legend-item"><div class="legend-dot empty"></div>Ô trống</div>
+        <!-- FILTER BAR -->
+        <div class="atd-filter">
+
+            <!-- Bộ phận -->
+            <div class="atd-filter-group">
+                <label class="atd-filter-label"><i class="fa-solid fa-building" style="margin-right:4px;"></i>Bộ phận</label>
+                <div class="atd-select-wrap">
+                    <select id="atdDeptFilter" style="min-width:180px;">
+                        <option value="">— Chọn bộ phận —</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Trạng thái máy -->
+            <div class="atd-filter-group">
+                <label class="atd-filter-label"><i class="fa-solid fa-circle-half-stroke" style="margin-right:4px;"></i>Trạng thái</label>
+                <div class="atd-select-wrap">
+                    <select id="atdStatusFilter">
+                        <option value="">Tất cả</option>
+                        <option value="1">Hoạt động</option>
+                        <option value="0">Ngừng hoạt động</option>
+                        <option value="-1">Bảo trì</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Phân cách -->
+            <div style="width:1px;background:var(--border);align-self:stretch;margin:2px 4px;"></div>
+
+            <!-- Tìm kiếm máy -->
+            <div class="atd-filter-group">
+                <label class="atd-filter-label"><i class="fa-solid fa-magnifying-glass" style="margin-right:4px;"></i>Tên / Mã máy</label>
+                <div class="atd-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="atdSearch" placeholder="Tên máy, mã máy..." style="min-width:180px;">
+                </div>
+            </div>
+
+            <!-- Tìm theo mã sản xuất -->
+            <div class="atd-filter-group">
+                <label class="atd-filter-label"><i class="fa-solid fa-shirt" style="margin-right:4px;color:var(--accent-navy);"></i>Mã / Style / Tổ / Màu</label>
+                <div class="atd-search-wrap">
+                    <i class="fa-solid fa-shirt" style="color:var(--accent-navy);"></i>
+                    <input type="text" id="atdCodeSearch" placeholder="SP-2026, Tổ 1, Trắng..." style="min-width:190px;">
+                </div>
+            </div>
+
+            <!-- Result badge -->
+            <span id="atdCodeSearchResult" style="display:none;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--accent-navy);background:var(--accent-navy-soft);padding:5px 12px;border-radius:999px;white-space:nowrap;align-self:flex-end;border:1.5px solid rgba(31,58,103,.15);"><i class="fa-solid fa-bullseye"></i><span></span></span>
+
+            <!-- Actions -->
+            <div class="atd-filter-actions" style="margin-left:auto;">
+                <button class="btn btn-primary btn-sm" id="atdFilterApply">
+                    <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+                </button>
+                <button class="btn btn-ghost btn-sm" id="atdFilterReset">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Đặt lại
+                </button>
+            </div>
         </div>
 
-        <!-- Layouts rendered by JS -->
-        <div id="atdLayoutContainer"></div>
+        <!-- BODY: render layout sections -->
+        <div class="atd-body" id="atdBody">
 
+            <!-- Legend bar -->
+            <div class="atd-legend-bar">
+                <span class="atd-legend-title">Chú thích:</span>
+                <div class="atd-legend-item"><div class="legend-dot active"></div><i class="fa-solid fa-circle-check" style="font-size:9px;color:var(--success);margin-right:2px;"></i>Hoạt động</div>
+                <div class="atd-legend-item"><div class="legend-dot maintenance"></div><i class="fa-solid fa-wrench" style="font-size:9px;color:var(--accent-gold);margin-right:2px;"></i>Bảo trì</div>
+                <div class="atd-legend-item"><div class="legend-dot inactive"></div><i class="fa-solid fa-circle-xmark" style="font-size:9px;color:var(--danger);margin-right:2px;"></i>Ngừng hoạt động</div>
+                <div class="atd-legend-item"><div class="legend-dot empty"></div>Ô trống</div>
+                <div style="margin-left:auto;font-size:11.5px;color:var(--ink-400);font-weight:600;">Click vào ô máy để xem chi tiết sản xuất</div>
+            </div>
+
+            <!-- Layouts rendered by JS -->
+            <div id="atdLayoutContainer"></div>
+
+        </div>
     </div>
 </div>
 
+<!-- Live clock script -->
+<script>
+(function(){
+    function updateClock() {
+        var el = document.getElementById('atdLiveClock');
+        if (!el) return;
+        var now = new Date();
+        el.textContent = now.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+})();
+</script>

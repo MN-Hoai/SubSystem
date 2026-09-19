@@ -113,6 +113,8 @@ namespace Sub_Services.Execute
         /// </summary>
         public async Task<List<MachineLayout_LayoutDto>> GetAllLayouts(Guid? departmentId = null)
         {
+            var today = DateTime.Today;
+
             var query = _context.ProductionDepartmentLayouts
                 .AsNoTracking()
                 .Where(l => l.Status == 1);
@@ -148,19 +150,20 @@ namespace Sub_Services.Execute
                             Keyword     = i.Keyword,
                             Status      = i.ProductionMachine.Status ?? 1,
                             SortOrder   = i.SortOrder,
-                            // Các mã sản xuất đang chạy trên máy (distinct theo ProductionInfoId)
+                            // Các mã sản xuất đang chạy trên máy, kèm sản lượng hôm nay
                             ProductionCodes = i.ProductionMachine.DailyOutputs
-                                .Where(d => d.Status == 1)
-                                .Select(d => d.ProductionInfo)
-                                .Where(p => p != null && p.Status == 1)
-                                .Select(p => new MachineLayout_ProductionCodeBrief
+                                .Where(d => d.Status == 1 && d.ProductionInfo != null && d.ProductionInfo.Status == 1)
+                                .GroupBy(d => d.ProductionInfoId)
+                                .Select(g => new MachineLayout_ProductionCodeBrief
                                 {
-                                    Spmain = p.Spmain,
-                                    Style  = p.Style,
-                                    Line   = p.Line,
-                                    Color  = p.Color
+                                    Spmain      = g.First().ProductionInfo.Spmain,
+                                    Style       = g.First().ProductionInfo.Style,
+                                    Line        = g.First().ProductionInfo.Line,
+                                    Color       = g.First().ProductionInfo.Color,
+                                    Target      = g.First().ProductionInfo.Target,
+                                    TodayOutput = g.Where(d => d.CreateDate.Date == today)
+                                                   .Sum(d => d.TotalOutputNumber ?? 0)
                                 })
-                                .Distinct()
                                 .ToList()
                         })
                         .OrderBy(i => i.RowIndex).ThenBy(i => i.ColumnIndex)

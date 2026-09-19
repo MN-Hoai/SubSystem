@@ -290,12 +290,12 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
 
         [HttpGet]
         public async Task<IActionResult> GetStyleDetailsForRecording(
-            Guid productionInfoId, Guid machineId, string date = null)
+            Guid productionInfoId, Guid machineId, string date = null, Guid? departmentId = null)
         {
             DateOnly? d = null;
             if (!string.IsNullOrEmpty(date) && DateOnly.TryParse(date, out var parsed))
                 d = parsed;
-            var list = await _service.GetStyleDetailsForRecording(productionInfoId, machineId, d);
+            var list = await _service.GetStyleDetailsForRecording(productionInfoId, machineId, d, departmentId);
             return Ok(list);
         }
 

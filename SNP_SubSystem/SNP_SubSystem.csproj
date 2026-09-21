@@ -9,6 +9,7 @@
   <ItemGroup>
     <Folder Include="Views\ProductionProgress\PartialView\" />
     <Folder Include="Views\ProductionDepartment\PartialView\" />
+    <Folder Include="wwwroot\uploads\settings\" />
   </ItemGroup>
 
   <ItemGroup>

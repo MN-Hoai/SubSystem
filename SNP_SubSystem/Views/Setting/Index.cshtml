@@ -640,3 +640,93 @@
     loadList();
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SECTION: Dọn dẹp dữ liệu
+     ══════════════════════════════════════════════════════════════════════════ -->
+<style>
+    .dc-opt-section { margin-top:24px; }
+    .dc-opt-card {
+        display:flex; align-items:center; justify-content:space-between;
+        gap:20px; flex-wrap:wrap;
+        padding:22px 26px;
+        background:linear-gradient(135deg,rgba(239,68,68,.06),rgba(185,28,28,.04));
+        border:1.5px solid rgba(239,68,68,.25);
+        border-radius:16px;
+    }
+    .dc-opt-left { display:flex; align-items:center; gap:18px; }
+    .dc-opt-icon {
+        width:52px; height:52px; border-radius:14px; flex-shrink:0;
+        background:linear-gradient(135deg,#ef4444,#b91c1c);
+        color:#fff; display:flex; align-items:center; justify-content:center;
+        font-size:22px; box-shadow:0 4px 16px rgba(239,68,68,.35);
+    }
+    .dc-opt-title { font-size:16px; font-weight:800; color:var(--ink-900); margin-bottom:4px; }
+    .dc-opt-desc  { font-size:13px; color:var(--ink-500); line-height:1.5; }
+    .dc-opt-tables { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .dc-opt-chip {
+        display:inline-flex; align-items:center; gap:5px;
+        padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:600;
+        background:rgba(239,68,68,.1); color:#b91c1c;
+        border:1px solid rgba(239,68,68,.2);
+    }
+    .dc-opt-chip .order { opacity:.6; font-size:10px; }
+    .dc-opt-btn {
+        display:inline-flex; align-items:center; gap:8px;
+        padding:12px 24px; border-radius:10px;
+        background:linear-gradient(135deg,#ef4444,#b91c1c);
+        color:#fff; font-size:14px; font-weight:700;
+        text-decoration:none; border:none; cursor:pointer;
+        box-shadow:0 4px 16px rgba(239,68,68,.3);
+        transition:all .2s cubic-bezier(.4,0,.2,1);
+        white-space:nowrap; flex-shrink:0;
+    }
+    .dc-opt-btn:hover {
+        transform:translateY(-2px);
+        box-shadow:0 8px 24px rgba(239,68,68,.4);
+        color:#fff;
+    }
+</style>
+
+<div class="content-area dc-opt-section">
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title">
+                <i class="fa-solid fa-broom" style="color:#ef4444;margin-right:8px;"></i>
+                Dọn dẹp dữ liệu
+            </div>
+        </div>
+        <div class="panel-body" style="padding:20px 24px;">
+            <div class="dc-opt-card">
+                <div class="dc-opt-left">
+                    <div class="dc-opt-icon">
+                        <i class="fa-solid fa-broom"></i>
+                    </div>
+                    <div>
+                        <div class="dc-opt-title">Quản lý dữ liệu đã xóa mềm</div>
+                        <div class="dc-opt-desc">
+                            Xem toàn bộ bản ghi đã bị xóa mềm (Status = -2) trong hệ thống.<br>
+                            Có thể <strong>khôi phục</strong> hoặc <strong>xóa vĩnh viễn</strong> từng bản ghi hoặc toàn bộ bảng.
+                        </div>
+                        <div class="dc-opt-tables">
+                            <span class="dc-opt-chip"><span class="order">①</span>DailyOutputDetail</span>
+                            <span class="dc-opt-chip"><span class="order">②</span>DailyOutput</span>
+                            <span class="dc-opt-chip"><span class="order">③</span>ProductLayoutItem</span>
+                            <span class="dc-opt-chip"><span class="order">④</span>StyleDetail</span>
+                            <span class="dc-opt-chip"><span class="order">⑤</span>StyleInfo</span>
+                            <span class="dc-opt-chip"><span class="order">⑥</span>ProductionInfo</span>
+                            <span class="dc-opt-chip"><span class="order">⑦</span>ProductionMachine</span>
+                            <span class="dc-opt-chip"><span class="order">⑧</span>ProductionDepartment</span>
+                            <span class="dc-opt-chip"><span class="order">⑨</span>Users</span>
+                            <span class="dc-opt-chip"><span class="order">⑩</span>Roles</span>
+                        </div>
+                    </div>
+                </div>
+                <a href="/Settings/DataCleanup" class="dc-opt-btn">
+                    <i class="fa-solid fa-broom"></i>
+                    Mở trang dọn dẹp
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -119,19 +119,19 @@
             <div class="pid-subtitle">
                 @if (!string.IsNullOrEmpty(machineName))
                 {
-                    <span class="pid-chip"><i class="fa-solid fa-gear"></i>@machineName</span>
+                    <span class="pid-chip">Máy: @machineName</span>
                 }
                 @if (!string.IsNullOrEmpty(dept))
                 {
-                    <span class="pid-chip"><i class="fa-solid fa-building"></i>@dept</span>
+                    <span class="pid-chip">Bộ phận: @dept</span>
                 }
                 @if (!string.IsNullOrEmpty(line))
                 {
-                    <span class="pid-chip"><i class="fa-solid fa-users"></i>Tổ @line</span>
+                    <span class="pid-chip">Tổ: @line</span>
                 }
                 @if (!string.IsNullOrEmpty(color))
                 {
-                    <span class="pid-chip"><i class="fa-solid fa-palette"></i>@color</span>
+                    <span class="pid-chip">Màu: @color</span>
                 }
                 @if (!string.IsNullOrEmpty(remark))
                 {

@@ -17,7 +17,8 @@ namespace Sub_Services.Execute
         /// kèm tổng sản lượng. Tùy chọn filter theo keyword / spmain.
         /// </summary>
         public async Task<List<MachineDetail_ProductionInfoDto>> GetProductionInfosByMachine(
-            Guid machineId, string keyword = null)
+            Guid machineId, string keyword = null,
+            DateOnly? from = null, DateOnly? to = null)
         {
             // Bước 1: Tìm danh sách ProductionInfo đang gắn với máy này
             var infoIds = await _context.DailyOutputs
@@ -39,15 +40,22 @@ namespace Sub_Services.Execute
                     (p.Keyword != null && p.Keyword.ToLower().Contains(kw)));
             }
 
-            var today = DateTime.Today;
+            // Xác định khoảng ngày để tính "filtered output"
+            // Nếu không truyền from/to → mặc định là hôm nay
+            var filterFrom = from.HasValue ? from.Value.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
+            var filterTo   = to.HasValue   ? to.Value.ToDateTime(TimeOnly.MaxValue)   : DateTime.Today.AddDays(1).AddTicks(-1);
 
             // Bước 2: Lấy tất cả DailyOutput của máy này (phẳng)
             var allDailyIds = await _context.DailyOutputs
                 .Where(d => d.ProductionMachineId == machineId
                          && d.Status == 1
                          && infoIds.Contains(d.ProductionInfoId))
-                .Select(d => new { d.Id, d.ProductionInfoId, d.TotalOutputNumber,
-                                   IsToday = d.CreateDate.Date == today })
+                .Select(d => new {
+                    d.Id,
+                    d.ProductionInfoId,
+                    d.TotalOutputNumber,
+                    InRange = d.CreateDate >= filterFrom && d.CreateDate <= filterTo
+                })
                 .ToListAsync();
 
             var allDailyIdList = allDailyIds.Select(x => x.Id).ToList();
@@ -70,7 +78,7 @@ namespace Sub_Services.Execute
                            .ToList()
                 );
 
-            // DailyOutput map: Id → (ProductionInfoId, IsToday, TotalOutputNumber fallback)
+            // DailyOutput map: Id → (ProductionInfoId, InRange, TotalOutputNumber fallback)
             var dailyMeta = allDailyIds.ToDictionary(x => x.Id);
 
             // Effective per DailyOutput = min(detail sums) nếu có detail, else TotalOutputNumber
@@ -81,9 +89,9 @@ namespace Sub_Services.Execute
                 return dailyMeta.TryGetValue(dailyId, out var m) ? (m.TotalOutputNumber ?? 0) : 0;
             }
 
-            // Tổng effective toàn kỳ và hôm nay theo ProductionInfoId
-            var totalByInfo = new Dictionary<Guid, int>();
-            var todayByInfo = new Dictionary<Guid, int>();
+            // Tổng effective toàn kỳ và trong khoảng ngày lọc theo ProductionInfoId
+            var totalByInfo    = new Dictionary<Guid, int>();
+            var filteredByInfo = new Dictionary<Guid, int>();
 
             foreach (var d in allDailyIds)
             {
@@ -92,10 +100,10 @@ namespace Sub_Services.Execute
                 if (!totalByInfo.ContainsKey(d.ProductionInfoId)) totalByInfo[d.ProductionInfoId] = 0;
                 totalByInfo[d.ProductionInfoId] += eff;
 
-                if (d.IsToday)
+                if (d.InRange)
                 {
-                    if (!todayByInfo.ContainsKey(d.ProductionInfoId)) todayByInfo[d.ProductionInfoId] = 0;
-                    todayByInfo[d.ProductionInfoId] += eff;
+                    if (!filteredByInfo.ContainsKey(d.ProductionInfoId)) filteredByInfo[d.ProductionInfoId] = 0;
+                    filteredByInfo[d.ProductionInfoId] += eff;
                 }
             }
 
@@ -104,31 +112,41 @@ namespace Sub_Services.Execute
                 .OrderByDescending(p => p.CreateDate)
                 .Select(p => new
                 {
-                    p.Id, p.Style, p.Spmain, p.Line, p.Color,
-                    p.TotalQty, p.FinishQty, p.Target,
-                    p.InlineLine, p.InlineDepartment,
-                    p.Remark, p.Keyword, p.Status, p.CreateDate
+                    p.Id,
+                    p.Style,
+                    p.Spmain,
+                    p.Line,
+                    p.Color,
+                    p.TotalQty,
+                    p.FinishQty,
+                    p.Target,
+                    p.InlineLine,
+                    p.InlineDepartment,
+                    p.Remark,
+                    p.Keyword,
+                    p.Status,
+                    p.CreateDate
                 })
                 .ToListAsync();
 
             return infos.Select(p => new MachineDetail_ProductionInfoDto
             {
-                Id                = p.Id,
-                Style             = p.Style,
-                Spmain            = p.Spmain,
-                Line              = p.Line,
-                Color             = p.Color,
-                TotalQty          = p.TotalQty,
-                FinishQty         = p.FinishQty,
-                Target            = p.Target,
-                InlineLine        = p.InlineLine?.ToString("yyyy-MM-dd"),
-                InlineDepartment  = p.InlineDepartment?.ToString("yyyy-MM-dd"),
-                Remark            = p.Remark,
-                Keyword           = p.Keyword,
-                Status            = p.Status,
-                CreateDate        = p.CreateDate.ToString("yyyy-MM-dd"),
+                Id = p.Id,
+                Style = p.Style,
+                Spmain = p.Spmain,
+                Line = p.Line,
+                Color = p.Color,
+                TotalQty = p.TotalQty,
+                FinishQty = p.FinishQty,
+                Target = p.Target,
+                InlineLine = p.InlineLine?.ToString("yyyy-MM-dd"),
+                InlineDepartment = p.InlineDepartment?.ToString("yyyy-MM-dd"),
+                Remark = p.Remark,
+                Keyword = p.Keyword,
+                Status = p.Status,
+                CreateDate = p.CreateDate.ToString("yyyy-MM-dd"),
                 TotalOutputNumber = totalByInfo.TryGetValue(p.Id, out var tot) ? tot : 0,
-                TodayOutput       = todayByInfo.TryGetValue(p.Id, out var tod) ? tod : 0
+                TodayOutput = filteredByInfo.TryGetValue(p.Id, out var flt) ? flt : 0
             }).ToList();
         }
 
@@ -147,7 +165,7 @@ namespace Sub_Services.Execute
         {
             var query = _context.DailyOutputs
                 .AsNoTracking()
-                .Where(d => d.ProductionInfoId    == productionInfoId
+                .Where(d => d.ProductionInfoId == productionInfoId
                          && d.ProductionMachineId == machineId
                          && d.Status == 1);
 
@@ -160,21 +178,21 @@ namespace Sub_Services.Execute
                 .OrderByDescending(d => d.CreateDate)
                 .Select(d => new MachineDetail_DailyOutputDto
                 {
-                    Id                = d.Id,
-                    StyleCode         = d.StyleInfo != null ? d.StyleInfo.StyleCode : null,
-                    StyleInfoId       = d.StyleInfoId.HasValue ? d.StyleInfoId.Value.ToString() : null,
+                    Id = d.Id,
+                    StyleCode = d.StyleInfo != null ? d.StyleInfo.StyleCode : null,
+                    StyleInfoId = d.StyleInfoId.HasValue ? d.StyleInfoId.Value.ToString() : null,
                     TotalOutputNumber = d.TotalOutputNumber,   // sẽ override bên dưới
-                    CreateDate        = d.CreateDate.ToString("yyyy-MM-dd"),
-                    Details           = d.DailyOutputDetails
+                    CreateDate = d.CreateDate.ToString("yyyy-MM-dd"),
+                    Details = d.DailyOutputDetails
                         .Where(dt => dt.Status == 1)
                         .OrderBy(dt => dt.InputTime)
                         .Select(dt => new MachineDetail_DailyOutputDetailDto
                         {
-                            Id            = dt.Id,
+                            Id = dt.Id,
                             StyleDetailId = dt.StyleDetailId,
-                            DetailName    = dt.StyleDetail.DetailName,
-                            OutputNumber  = dt.OutputNumber,
-                            InputTime     = dt.InputTime.ToString("HH:mm")
+                            DetailName = dt.StyleDetail.DetailName,
+                            OutputNumber = dt.OutputNumber,
+                            InputTime = dt.InputTime.ToString("HH:mm")
                         }).ToList()
                 })
                 .ToListAsync();
@@ -223,9 +241,9 @@ namespace Sub_Services.Execute
                 .OrderByDescending(s => s.CreateDate)
                 .Select(s => new MachineDetail_StylePickerItem
                 {
-                    Id          = s.Id,
-                    StyleCode   = s.StyleCode,
-                    Keyword     = s.Keyword,
+                    Id = s.Id,
+                    StyleCode = s.StyleCode,
+                    Keyword = s.Keyword,
                     DetailCount = s.StyleDetails.Count(sd => sd.Status == 1)
                 })
                 .ToListAsync();
@@ -259,20 +277,20 @@ namespace Sub_Services.Execute
                 .OrderByDescending(p => p.CreateDate)
                 .Select(p => new MachineDetail_ProductionInfoDto
                 {
-                    Id               = p.Id,
-                    Style            = p.Style,
-                    Spmain           = p.Spmain,
-                    Line             = p.Line,
-                    Color            = p.Color,
-                    TotalQty         = p.TotalQty,
-                    FinishQty        = p.FinishQty,
-                    Target           = p.Target,
-                    InlineLine       = p.InlineLine.HasValue ? p.InlineLine.Value.ToString("yyyy-MM-dd") : null,
+                    Id = p.Id,
+                    Style = p.Style,
+                    Spmain = p.Spmain,
+                    Line = p.Line,
+                    Color = p.Color,
+                    TotalQty = p.TotalQty,
+                    FinishQty = p.FinishQty,
+                    Target = p.Target,
+                    InlineLine = p.InlineLine.HasValue ? p.InlineLine.Value.ToString("yyyy-MM-dd") : null,
                     InlineDepartment = p.InlineDepartment.HasValue ? p.InlineDepartment.Value.ToString("yyyy-MM-dd") : null,
-                    Remark           = p.Remark,
-                    Keyword          = p.Keyword,
-                    Status           = p.Status,
-                    CreateDate       = p.CreateDate.ToString("yyyy-MM-dd"),
+                    Remark = p.Remark,
+                    Keyword = p.Keyword,
+                    Status = p.Status,
+                    CreateDate = p.CreateDate.ToString("yyyy-MM-dd"),
                     TotalOutputNumber = 0
                 })
                 .ToListAsync();
@@ -291,7 +309,7 @@ namespace Sub_Services.Execute
         {
             // Kiểm tra đã tồn tại và đang hoạt động
             bool activeExists = await _context.DailyOutputs
-                .AnyAsync(d => d.ProductionInfoId    == productionInfoId
+                .AnyAsync(d => d.ProductionInfoId == productionInfoId
                             && d.ProductionMachineId == machineId
                             && d.Status == 1);
 
@@ -300,14 +318,14 @@ namespace Sub_Services.Execute
 
             // Kiểm tra có bản ghi cũ đã tách khỏi máy (Status == -1) không
             var existing = await _context.DailyOutputs
-                .FirstOrDefaultAsync(d => d.ProductionInfoId    == productionInfoId
+                .FirstOrDefaultAsync(d => d.ProductionInfoId == productionInfoId
                                        && d.ProductionMachineId == machineId
                                        && d.Status == -1);
 
             if (existing != null)
             {
                 // Khôi phục bản ghi cũ
-                existing.Status     = 1;
+                existing.Status = 1;
                 existing.UpdateDate = DateTime.Now;
                 await _context.SaveChangesAsync();
                 return (true, "Đã khôi phục mã sản xuất vào máy thành công.");
@@ -322,13 +340,13 @@ namespace Sub_Services.Execute
             var now = DateTime.Now;
             var daily = new Sub_Entities.Entities.DailyOutput
             {
-                Id                  = Guid.NewGuid(),
-                ProductionInfoId    = productionInfoId,
+                Id = Guid.NewGuid(),
+                ProductionInfoId = productionInfoId,
                 ProductionMachineId = machineId,
-                TotalOutputNumber   = 0,
-                Status              = 1,
-                CreateDate          = now,
-                UpdateDate          = now
+                TotalOutputNumber = 0,
+                Status = 1,
+                CreateDate = now,
+                UpdateDate = now
             };
             _context.DailyOutputs.Add(daily);
             await _context.SaveChangesAsync();
@@ -358,7 +376,7 @@ namespace Sub_Services.Execute
             var now = DateTime.Now;
             foreach (var link in links)
             {
-                link.Status     = -1;
+                link.Status = -1;
                 link.UpdateDate = now;
             }
 
@@ -372,17 +390,17 @@ namespace Sub_Services.Execute
 
         public class CreateProductionInfoRequest
         {
-            public string Spmain         { get; set; }
-            public string Style          { get; set; }
-            public string Line           { get; set; }
-            public string Color          { get; set; }
-            public int?   Target         { get; set; }
-            public int?   TotalQty       { get; set; }
-            public string InlineLine     { get; set; }   // "yyyy-MM-dd" or null
-            public string InlineDept     { get; set; }
-            public string Remark         { get; set; }
-            public Guid   MachineId      { get; set; }
-            public Guid   DeptId         { get; set; }
+            public string Spmain { get; set; }
+            public string Style { get; set; }
+            public string Line { get; set; }
+            public string Color { get; set; }
+            public int? Target { get; set; }
+            public int? TotalQty { get; set; }
+            public string InlineLine { get; set; }   // "yyyy-MM-dd" or null
+            public string InlineDept { get; set; }
+            public string Remark { get; set; }
+            public Guid MachineId { get; set; }
+            public Guid DeptId { get; set; }
         }
 
         /// <summary>
@@ -399,37 +417,37 @@ namespace Sub_Services.Execute
             // Tạo ProductionInfo
             var info = new Sub_Entities.Entities.ProductionInfo
             {
-                Id                    = Guid.NewGuid(),
+                Id = Guid.NewGuid(),
                 ProductionDepartmentId = req.DeptId,
-                Spmain                = req.Spmain.Trim(),
-                Style                 = req.Style.Trim(),
-                Line                  = req.Line?.Trim(),
-                Color                 = req.Color?.Trim(),
-                Target                = req.Target,
-                TotalQty              = req.TotalQty,
-                InlineLine            = string.IsNullOrWhiteSpace(req.InlineLine)
+                Spmain = req.Spmain.Trim(),
+                Style = req.Style.Trim(),
+                Line = req.Line?.Trim(),
+                Color = req.Color?.Trim(),
+                Target = req.Target,
+                TotalQty = req.TotalQty,
+                InlineLine = string.IsNullOrWhiteSpace(req.InlineLine)
                                         ? null
                                         : (DateOnly?)DateOnly.Parse(req.InlineLine),
-                InlineDepartment      = string.IsNullOrWhiteSpace(req.InlineDept)
+                InlineDepartment = string.IsNullOrWhiteSpace(req.InlineDept)
                                         ? null
                                         : (DateOnly?)DateOnly.Parse(req.InlineDept),
-                Remark                = req.Remark?.Trim(),
-                Status                = 1,
-                CreateDate            = now,
-                UpdateDate            = now
+                Remark = req.Remark?.Trim(),
+                Status = 1,
+                CreateDate = now,
+                UpdateDate = now
             };
             _context.ProductionInfos.Add(info);
 
             // Tạo DailyOutput đầu tiên để liên kết với máy
             var daily = new Sub_Entities.Entities.DailyOutput
             {
-                Id                  = Guid.NewGuid(),
-                ProductionInfoId    = info.Id,
+                Id = Guid.NewGuid(),
+                ProductionInfoId = info.Id,
                 ProductionMachineId = req.MachineId,
-                TotalOutputNumber   = 0,
-                Status              = 1,
-                CreateDate          = now,
-                UpdateDate          = now
+                TotalOutputNumber = 0,
+                Status = 1,
+                CreateDate = now,
+                UpdateDate = now
             };
             _context.DailyOutputs.Add(daily);
 
@@ -471,13 +489,13 @@ namespace Sub_Services.Execute
                 .ThenBy(m => m.MachineNumber)
                 .Select(m => new RecordOutput_MachineDto
                 {
-                    Id          = m.Id,
+                    Id = m.Id,
                     MachineName = m.MachineNumber,
                     MachineCode = m.MachineNumber,
-                    Remark      = m.Remark,
-                    Status      = m.Status ?? 1,
-                    DeptName    = m.ProductionDepartment.DepartmentName,
-                    DeptId      = m.ProductionDepartmentId
+                    Remark = m.Remark,
+                    Status = m.Status ?? 1,
+                    DeptName = m.ProductionDepartment.DepartmentName,
+                    DeptId = m.ProductionDepartmentId
                 })
                 .ToListAsync();
         }
@@ -509,9 +527,9 @@ namespace Sub_Services.Execute
                 var kw = keyword.Trim().ToLower();
                 query = query.Where(p =>
                     p.Spmain.ToLower().Contains(kw) ||
-                    p.Style.ToLower().Contains(kw)  ||
+                    p.Style.ToLower().Contains(kw) ||
                     (p.Color != null && p.Color.ToLower().Contains(kw)) ||
-                    (p.Line  != null && p.Line.ToLower().Contains(kw)));
+                    (p.Line != null && p.Line.ToLower().Contains(kw)));
             }
 
             var infos = await query
@@ -559,14 +577,14 @@ namespace Sub_Services.Execute
             return infos.Select(p => new RecordOutput_ProductionCodeDto
             {
                 ProductionInfoId = p.Id,
-                MachineId        = machineId,
-                Style            = p.Style,
-                Spmain           = p.Spmain,
-                Color            = p.Color,
-                Line             = p.Line,
-                Status           = p.Status,
-                Target           = p.Target,
-                TodayOutput      = todayMap.TryGetValue(p.Id, out var v) ? v : 0
+                MachineId = machineId,
+                Style = p.Style,
+                Spmain = p.Spmain,
+                Color = p.Color,
+                Line = p.Line,
+                Status = p.Status,
+                Target = p.Target,
+                TodayOutput = todayMap.TryGetValue(p.Id, out var v) ? v : 0
             }).ToList();
         }
 
@@ -580,7 +598,7 @@ namespace Sub_Services.Execute
             Guid productionInfoId, Guid machineId, DateOnly? date = null, Guid? departmentId = null)
         {
             var targetDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-            var targetDt   = targetDate.ToDateTime(TimeOnly.MinValue);
+            var targetDt = targetDate.ToDateTime(TimeOnly.MinValue);
 
             // Kiểm tra ProductionInfo có Status == 1 không
             var infoOk = await _context.ProductionInfos
@@ -626,9 +644,18 @@ namespace Sub_Services.Execute
             // Tất cả đều phải filter theo effectiveDeptId vì StyleInfo
             // có ProductionDepartmentId riêng cho từng bộ phận.
             // -------------------------------------------------------
+            // Lấy SP của ProductionInfo để kiểm tra ở mọi bước
+            var productionInfo = await _context.ProductionInfos
+                .AsNoTracking()
+                .Select(p => new { p.Id, p.Spmain, p.Style, p.Keyword })
+                .FirstOrDefaultAsync(p => p.Id == productionInfoId);
+
+            var infoSp = (productionInfo?.Spmain ?? "").Trim();
             Guid? styleInfoId = null;
 
             // 1. Qua DailyOutput.StyleInfoId (bộ phận hiện tại, đang active)
+            //    Phải check thêm StyleInfo.Keyword == SP vì cùng StyleCode
+            //    nhưng khác SP sẽ có StyleInfo khác nhau.
             var styleInfoIdFromDaily = await _context.DailyOutputs
                 .Where(d => d.ProductionInfoId == productionInfoId
                          && d.StyleInfoId != null
@@ -639,47 +666,48 @@ namespace Sub_Services.Execute
 
             if (styleInfoIdFromDaily.HasValue)
             {
-                // Kiểm tra StyleInfo này có đúng bộ phận không
-                var siDeptOk = await _context.StyleInfos
+                // Kiểm tra StyleInfo này có đúng bộ phận VÀ đúng SP không
+                var siOk = await _context.StyleInfos
                     .AnyAsync(s => s.Id == styleInfoIdFromDaily.Value
                                && s.ProductionDepartmentId == effectiveDeptId
-                               && s.Status == 1);
-                if (siDeptOk) styleInfoId = styleInfoIdFromDaily;
+                               && s.Status == 1
+                               && (string.IsNullOrEmpty(infoSp) || s.Keyword == infoSp));
+                if (siOk) styleInfoId = styleInfoIdFromDaily;
             }
+
 
             if (styleInfoId == null)
             {
-                // 2. Qua ProductionInfo.Keyword / Style → StyleInfo của đúng bộ phận
-                var info = await _context.ProductionInfos
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.Id == productionInfoId);
-
-                if (info != null)
+                // 2. Tìm StyleInfo theo Style + SP của ProductionInfo.
+                //    StyleInfo.Keyword = mã SP, StyleInfo.StyleCode = mã style.
+                //    Mỗi bộ phận + style + SP → 1 StyleInfo riêng.
+                if (productionInfo != null && !string.IsNullOrEmpty(productionInfo.Style))
                 {
-                    // 2a. Thử Keyword trước
-                    if (!string.IsNullOrEmpty(info.Keyword))
+                    // ── 2a. Ưu tiên: StyleCode + department + Keyword (SP) khớp ──
+                    if (!string.IsNullOrEmpty(infoSp))
                     {
                         var si = await _context.StyleInfos
                             .AsNoTracking()
-                            .FirstOrDefaultAsync(s => s.StyleCode == info.Keyword
+                            .FirstOrDefaultAsync(s => s.StyleCode == productionInfo.Style
+                                                   && s.ProductionDepartmentId == effectiveDeptId
+                                                   && s.Status == 1
+                                                   && s.Keyword == infoSp);
+                        styleInfoId = si?.Id;
+                    }
+
+                    // ── 2b. Fallback: StyleCode + department, không check SP ────
+                    //    (tương thích ngược khi StyleInfo chưa phân theo SP)
+                    if (styleInfoId == null)
+                    {
+                        var si = await _context.StyleInfos
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(s => s.StyleCode == productionInfo.Style
                                                    && s.ProductionDepartmentId == effectiveDeptId
                                                    && s.Status == 1);
                         styleInfoId = si?.Id;
                     }
 
-                    // 2b. Fallback: tìm theo Style name
-                    if (styleInfoId == null && !string.IsNullOrEmpty(info.Style))
-                    {
-                        var si = await _context.StyleInfos
-                            .AsNoTracking()
-                            .FirstOrDefaultAsync(s =>
-                                (s.StyleCode == info.Style || s.Keyword == info.Style)
-                                && s.ProductionDepartmentId == effectiveDeptId
-                                && s.Status == 1);
-                        styleInfoId = si?.Id;
-                    }
-
-                    // 2c. Fallback: qua DailyOutputDetail đã từng lưu (đúng bộ phận)
+                    // ── 2c. Fallback: qua DailyOutputDetail đã từng lưu (đúng bộ phận) ──
                     if (styleInfoId == null)
                     {
                         var existingDetailId = await _context.DailyOutputDetails
@@ -701,6 +729,7 @@ namespace Sub_Services.Execute
                     }
                 }
             }
+
 
             if (styleInfoId == null)
             {
@@ -744,7 +773,7 @@ namespace Sub_Services.Execute
             var todayDetailIds = details.Select(d => d.Id).ToList();
 
             var todayDailyOutputIds = await _context.DailyOutputs
-                .Where(d => d.ProductionInfoId    == productionInfoId
+                .Where(d => d.ProductionInfoId == productionInfoId
                          && d.ProductionMachineId == machineId
                          && d.Status == 1
                          && d.CreateDate.Date == targetDt.Date)
@@ -773,13 +802,15 @@ namespace Sub_Services.Execute
             return details.Select(sd => new RecordOutput_StyleDetailDto
             {
                 StyleDetailId = sd.Id,
-                DetailName    = sd.DetailName,
-                TodayTotal    = totalMap.TryGetValue((Guid?)sd.Id, out var t) ? t : 0
+                DetailName = sd.DetailName,
+                TodayTotal = totalMap.TryGetValue((Guid?)sd.Id, out var t) ? t : 0
             }).ToList();
         }
 
         /// <summary>
-        /// Ghi sản lượng: tạo/cập nhật DailyOutput và cộng dồn DailyOutputDetail theo ngày.
+        /// <summary>
+        /// Ghi sản lượng: tạo/cập nhật DailyOutput và upsert DailyOutputDetail theo ngày + giờ.
+        /// Nếu cùng ngày + cùng giờ (hour) + cùng công đoạn → cập nhật sản lượng, không tạo mới.
         /// </summary>
         public async Task<(bool Success, string Message)> SaveOutputRecord(
             RecordOutput_SaveRequest req)
@@ -794,13 +825,13 @@ namespace Sub_Services.Execute
                 time = TimeOnly.FromDateTime(DateTime.Now);
 
             var targetDt = date.ToDateTime(TimeOnly.MinValue);
-            var now      = DateTime.Now;
+            var now = DateTime.Now;
 
             // Tìm hoặc tạo DailyOutput cho (productionInfoId, machineId, date)
             var daily = await _context.DailyOutputs
                 .Include(d => d.DailyOutputDetails)
                 .FirstOrDefaultAsync(d =>
-                    d.ProductionInfoId    == req.ProductionInfoId
+                    d.ProductionInfoId == req.ProductionInfoId
                     && d.ProductionMachineId == req.MachineId
                     && d.Status == 1
                     && d.CreateDate.Date == targetDt.Date);
@@ -809,37 +840,57 @@ namespace Sub_Services.Execute
             {
                 daily = new Sub_Entities.Entities.DailyOutput
                 {
-                    Id                  = Guid.NewGuid(),
-                    ProductionInfoId    = req.ProductionInfoId,
+                    Id = Guid.NewGuid(),
+                    ProductionInfoId = req.ProductionInfoId,
                     ProductionMachineId = req.MachineId,
-                    TotalOutputNumber   = 0,
-                    Status              = 1,
-                    CreateDate          = targetDt.Date + now.TimeOfDay,
-                    UpdateDate          = now
+                    TotalOutputNumber = 0,
+                    Status = 1,
+                    CreateDate = targetDt.Date + now.TimeOfDay,
+                    UpdateDate = now
                 };
                 _context.DailyOutputs.Add(daily);
                 await _context.SaveChangesAsync(); // cần Id trước khi thêm details
             }
 
-            // Cộng dồn từng chi tiết
+            // Upsert từng chi tiết:
+            // Nếu đã có DailyOutputDetail cùng (DailyOutputId, StyleDetailId, InputTime.Hour) → UPDATE
+            // Ngược lại → INSERT mới
             foreach (var entry in req.Details)
             {
                 if (entry.OutputNumber <= 0) continue;
 
-                // Mỗi lần nhập = 1 DailyOutputDetail mới (accumulate)
-                var detail = new Sub_Entities.Entities.DailyOutputDetail
+                // Tìm record có cùng giờ + công đoạn trong ngày này
+                var existing = daily.DailyOutputDetails
+                    .FirstOrDefault(dt =>
+                        dt.StyleDetailId == entry.StyleDetailId
+                        && dt.Status == 1
+                        && dt.InputTime.Hour == time.Hour);
+
+                if (existing != null)
                 {
-                    Id            = Guid.NewGuid(),
-                    DailyOutputId = daily.Id,
-                    StyleDetailId = entry.StyleDetailId,
-                    OutputNumber  = entry.OutputNumber,
-                    InputTime     = time,
-                    Keyword       = req.Keyword,
-                    Status        = 1,
-                    CreateDate    = now,
-                    UpdateDate    = now
-                };
-                _context.DailyOutputDetails.Add(detail);
+                    // Cùng giờ + công đoạn → cập nhật sản lượng
+                    existing.OutputNumber = entry.OutputNumber;
+                    existing.InputTime    = time;   // cập nhật minute chính xác hơn
+                    existing.Keyword      = req.Keyword;
+                    existing.UpdateDate   = now;
+                }
+                else
+                {
+                    // Chưa có → tạo mới
+                    var detail = new Sub_Entities.Entities.DailyOutputDetail
+                    {
+                        Id            = Guid.NewGuid(),
+                        DailyOutputId = daily.Id,
+                        StyleDetailId = entry.StyleDetailId,
+                        OutputNumber  = entry.OutputNumber,
+                        InputTime     = time,
+                        Keyword       = req.Keyword,
+                        Status        = 1,
+                        CreateDate    = now,
+                        UpdateDate    = now
+                    };
+                    _context.DailyOutputDetails.Add(detail);
+                }
             }
 
             // Cập nhật TotalOutputNumber trên DailyOutput (min của tổng details)
@@ -855,12 +906,13 @@ namespace Sub_Services.Execute
             if (detailTotals.Any())
             {
                 daily.TotalOutputNumber = detailTotals.Min();
-                daily.UpdateDate        = now;
+                daily.UpdateDate = now;
                 await _context.SaveChangesAsync();
             }
 
             return (true, "Đã ghi sản lượng thành công.");
         }
+
 
         // =====================================================================
         //  OUTPUT HISTORY: Lịch sử ghi sản lượng
@@ -868,17 +920,17 @@ namespace Sub_Services.Execute
 
         public class OutputHistoryDto
         {
-            public Guid   Id           { get; set; }
-            public string CreateDate   { get; set; }   // yyyy-MM-dd
-            public string InputTime    { get; set; }   // HH:mm
-            public string MachineName  { get; set; }
-            public string DeptName     { get; set; }
-            public string Line         { get; set; }
-            public string Spmain       { get; set; }
-            public string Style        { get; set; }
-            public string DetailName   { get; set; }
-            public int    OutputNumber { get; set; }
-            public string Source       { get; set; }   // "manual" | "excel"
+            public Guid Id { get; set; }
+            public string CreateDate { get; set; }   // yyyy-MM-dd
+            public string InputTime { get; set; }   // HH:mm
+            public string MachineName { get; set; }
+            public string DeptName { get; set; }
+            public string Line { get; set; }
+            public string Spmain { get; set; }
+            public string Style { get; set; }
+            public string DetailName { get; set; }
+            public int OutputNumber { get; set; }
+            public string Source { get; set; }   // "manual" | "excel"
         }
 
         /// <summary>
@@ -888,7 +940,7 @@ namespace Sub_Services.Execute
             DateOnly? from, DateOnly? to, Guid? deptId)
         {
             var fromDt = from.HasValue ? from.Value.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
-            var toDt   = to.HasValue   ? to.Value.ToDateTime(TimeOnly.MaxValue)   : DateTime.Today.AddDays(1).AddTicks(-1);
+            var toDt = to.HasValue ? to.Value.ToDateTime(TimeOnly.MaxValue) : DateTime.Today.AddDays(1).AddTicks(-1);
 
             // Dùng projection thay vì Include/ThenInclude để tránh N+1 và lock EF tracking
             var query = _context.DailyOutputDetails
@@ -909,19 +961,19 @@ namespace Sub_Services.Execute
                 .Take(3000)          // giới hạn để tránh block khi dữ liệu lớn
                 .Select(d => new OutputHistoryDto
                 {
-                    Id           = d.Id,
-                    CreateDate   = d.DailyOutput.CreateDate.ToString("yyyy-MM-dd"),
-                    InputTime    = d.InputTime.ToString("HH:mm"),
-                    MachineName  = string.IsNullOrEmpty(d.DailyOutput.ProductionMachine.Remark)
+                    Id = d.Id,
+                    CreateDate = d.DailyOutput.CreateDate.ToString("yyyy-MM-dd"),
+                    InputTime = d.InputTime.ToString("HH:mm"),
+                    MachineName = string.IsNullOrEmpty(d.DailyOutput.ProductionMachine.Remark)
                                    ? d.DailyOutput.ProductionMachine.MachineNumber
                                    : d.DailyOutput.ProductionMachine.Remark,
-                    DeptName     = d.DailyOutput.ProductionMachine.ProductionDepartment.DepartmentName,
-                    Line         = d.DailyOutput.ProductionInfo.Line,
-                    Spmain       = d.DailyOutput.ProductionInfo.Spmain,
-                    Style        = d.DailyOutput.ProductionInfo.Style,
-                    DetailName   = d.StyleDetail.DetailName,
+                    DeptName = d.DailyOutput.ProductionMachine.ProductionDepartment.DepartmentName,
+                    Line = d.DailyOutput.ProductionInfo.Line,
+                    Spmain = d.DailyOutput.ProductionInfo.Spmain,
+                    Style = d.DailyOutput.ProductionInfo.Style,
+                    DetailName = d.StyleDetail.DetailName,
                     OutputNumber = d.OutputNumber ?? 0,
-                    Source       = string.IsNullOrEmpty(d.Keyword) ? "manual" : d.Keyword
+                    Source = string.IsNullOrEmpty(d.Keyword) ? "manual" : d.Keyword
                 })
                 .ToListAsync();
 
@@ -931,10 +983,10 @@ namespace Sub_Services.Execute
 
         public class UpdateOutputRecord_Request
         {
-            public Guid   Id           { get; set; }
-            public int    OutputNumber { get; set; }
-            public string Date         { get; set; }
-            public string Time         { get; set; }
+            public Guid Id { get; set; }
+            public int OutputNumber { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
         }
 
         /// <summary>Cập nhật sản lượng, ngày, giờ của một DailyOutputDetail.</summary>
@@ -949,7 +1001,7 @@ namespace Sub_Services.Execute
             if (req.OutputNumber < 0) return (false, "Sản lượng không hợp lệ.");
 
             detail.OutputNumber = req.OutputNumber;
-            detail.UpdateDate   = DateTime.Now;
+            detail.UpdateDate = DateTime.Now;
 
             if (TimeOnly.TryParse(req.Time, out var t))
                 detail.InputTime = t;
@@ -961,7 +1013,7 @@ namespace Sub_Services.Execute
                 {
                     // Đổi ngày → cập nhật CreateDate của DailyOutput (giữ giờ cũ)
                     detail.DailyOutput.CreateDate = d.ToDateTime(TimeOnly.FromDateTime(detail.DailyOutput.CreateDate));
-                    detail.DailyOutput.UpdateDate  = DateTime.Now;
+                    detail.DailyOutput.UpdateDate = DateTime.Now;
                 }
             }
 
@@ -977,7 +1029,7 @@ namespace Sub_Services.Execute
 
             if (detail == null) return (false, "Không tìm thấy bản ghi.");
 
-            detail.Status     = -2;
+            detail.Status = -2;
             detail.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return (true, "Đã xóa.");
@@ -988,21 +1040,21 @@ namespace Sub_Services.Execute
 
         public class DepartmentListItem
         {
-            public Guid   Id             { get; set; }
+            public Guid Id { get; set; }
             public string DepartmentName { get; set; }
-            public string Keyword        { get; set; }
-            public int    Status         { get; set; }
-            public int    ActiveCodes    { get; set; }  // Số mã hàng status == 1
-            public int    TotalCodes     { get; set; }  // Số mã hàng status >= -1
-            public DateTime CreateDate   { get; set; }
-            public DateTime UpdateDate   { get; set; }
+            public string Keyword { get; set; }
+            public int Status { get; set; }
+            public int ActiveCodes { get; set; }  // Số mã hàng status == 1
+            public int TotalCodes { get; set; }  // Số mã hàng status >= -1
+            public DateTime CreateDate { get; set; }
+            public DateTime UpdateDate { get; set; }
         }
 
         public class DepartmentUpsert_Request
         {
-            public Guid?  Id             { get; set; }
+            public Guid? Id { get; set; }
             public string DepartmentName { get; set; }
-            public string Keyword        { get; set; }
+            public string Keyword { get; set; }
         }
 
         /// <summary>Lấy toàn bộ bộ phận (status >= -1 = bao gồm tạm khoá, trừ bị xóa), kèm count mã hàng.</summary>
@@ -1018,23 +1070,23 @@ namespace Sub_Services.Execute
             var stats = await _context.ProductionInfos
                 .Where(p => p.Status >= -1)
                 .GroupBy(p => p.ProductionDepartmentId)
-                .Select(g => new { 
-                    DeptId = g.Key, 
+                .Select(g => new {
+                    DeptId = g.Key,
                     Total = g.Count(p => p.Status >= 0),
-                    Active = g.Count(p => p.Status == 1) 
+                    Active = g.Count(p => p.Status == 1)
                 })
                 .ToDictionaryAsync(x => x.DeptId, x => x);
 
             return depts.Select(d => new DepartmentListItem
             {
-                Id             = d.Id,
+                Id = d.Id,
                 DepartmentName = d.DepartmentName,
-                Keyword        = d.Keyword,
-                Status         = d.Status,
-                ActiveCodes    = stats.TryGetValue(d.Id, out var s) ? s.Active : 0,
-                TotalCodes     = stats.TryGetValue(d.Id, out var st) ? st.Total : 0,
-                CreateDate     = d.CreateDate,
-                UpdateDate     = d.UpdateDate,
+                Keyword = d.Keyword,
+                Status = d.Status,
+                ActiveCodes = stats.TryGetValue(d.Id, out var s) ? s.Active : 0,
+                TotalCodes = stats.TryGetValue(d.Id, out var st) ? st.Total : 0,
+                CreateDate = d.CreateDate,
+                UpdateDate = d.UpdateDate,
             }).ToList();
         }
 
@@ -1048,14 +1100,14 @@ namespace Sub_Services.Execute
             var now = DateTime.Now;
             var dept = new Sub_Entities.Entities.ProductionDepartment
             {
-                Id             = Guid.NewGuid(),
+                Id = Guid.NewGuid(),
                 DepartmentName = req.DepartmentName.Trim(),
-                Keyword        = string.IsNullOrWhiteSpace(req.Keyword)
+                Keyword = string.IsNullOrWhiteSpace(req.Keyword)
                     ? req.DepartmentName.Trim().ToUpperInvariant().Replace(" ", "")
                     : req.Keyword.Trim(),
-                Status         = 1,
-                CreateDate     = now,
-                UpdateDate     = now,
+                Status = 1,
+                CreateDate = now,
+                UpdateDate = now,
             };
             _context.ProductionDepartments.Add(dept);
             await _context.SaveChangesAsync();
@@ -1076,7 +1128,7 @@ namespace Sub_Services.Execute
             if (dept == null) return (false, "Không tìm thấy bộ phận.");
 
             dept.DepartmentName = req.DepartmentName.Trim();
-            dept.Keyword        = string.IsNullOrWhiteSpace(req.Keyword)
+            dept.Keyword = string.IsNullOrWhiteSpace(req.Keyword)
                 ? req.DepartmentName.Trim().ToUpperInvariant().Replace(" ", "")
                 : req.Keyword.Trim();
             dept.UpdateDate = DateTime.Now;
@@ -1090,7 +1142,7 @@ namespace Sub_Services.Execute
             var dept = await _context.ProductionDepartments
                 .FirstOrDefaultAsync(d => d.Id == id && d.Status >= -1);
             if (dept == null) return (false, "Không tìm thấy bộ phận.");
-            dept.Status     = -1;   // -1 = tạm khoá
+            dept.Status = -1;   // -1 = tạm khoá
             dept.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return (true, "Đã tạm khoá bộ phận.");
@@ -1102,7 +1154,7 @@ namespace Sub_Services.Execute
             var dept = await _context.ProductionDepartments
                 .FirstOrDefaultAsync(d => d.Id == id && d.Status == -1);
             if (dept == null) return (false, "Không tìm thấy bộ phận đang tạm khoá.");
-            dept.Status     = 1;    // 1 = hoạt động
+            dept.Status = 1;    // 1 = hoạt động
             dept.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return (true, "Đã mở khoá bộ phận thành công.");
@@ -1114,7 +1166,7 @@ namespace Sub_Services.Execute
             var dept = await _context.ProductionDepartments
                 .FirstOrDefaultAsync(d => d.Id == id && d.Status >= -1);
             if (dept == null) return (false, "Không tìm thấy bộ phận.");
-            dept.Status     = -2;   // -2 = xóa mềm
+            dept.Status = -2;   // -2 = xóa mềm
             dept.UpdateDate = DateTime.Now;
             await _context.SaveChangesAsync();
             return (true, "Đã xoá bộ phận thành công.");

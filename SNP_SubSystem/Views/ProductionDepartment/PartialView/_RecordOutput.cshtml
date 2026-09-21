@@ -578,8 +578,8 @@
                     statusBadge(c.status) +
                 '</div>' +
                 '<div class="ro-code-meta">' +
-                    (c.line  ? '<span class="ro-code-meta-chip"><i class="fa-solid fa-users fa-xs"></i>' + esc(c.line)  + '</span>' : '') +
-                    (c.color ? '<span class="ro-code-meta-chip"><i class="fa-solid fa-palette fa-xs"></i>' + esc(c.color) + '</span>' : '') +
+                    (c.line  ? '<span class="ro-code-meta-chip">Tổ: ' + esc(c.line)  + '</span>' : '') +
+                    (c.color ? '<span class="ro-code-meta-chip">Màu: ' + esc(c.color) + '</span>' : '') +
                 '</div>' +
                 '<div>' +
                     '<div class="ro-code-progress-bar-wrap">' +
@@ -607,9 +607,9 @@
         document.getElementById('roModalSub').textContent = (code.spmain||'') + (code.style ? ' — '+code.style : '');
         var chips = document.getElementById('roModalChips');
         chips.innerHTML =
-            (code.line  ? '<span class="ro-chip"><i class="fa-solid fa-users fa-xs"></i>' + esc(code.line)  + '</span>' : '') +
-            (code.color ? '<span class="ro-chip"><i class="fa-solid fa-palette fa-xs"></i>' + esc(code.color) + '</span>' : '') +
-            (selectedMachine ? '<span class="ro-chip navy"><i class="fa-solid fa-gear fa-xs"></i>' + esc(selectedMachine.machineName) + '</span>' : '');
+            (code.line  ? '<span class="ro-chip">Tổ: ' + esc(code.line)  + '</span>' : '') +
+            (code.color ? '<span class="ro-chip">Màu: ' + esc(code.color) + '</span>' : '') +
+            (selectedMachine ? '<span class="ro-chip navy">Máy: ' + esc(selectedMachine.machineName) + '</span>' : '');
         document.getElementById('roInputDate').value = todayStr();
         document.getElementById('roInputTime').value = nowTimeStr();
         loadStyleDetails();

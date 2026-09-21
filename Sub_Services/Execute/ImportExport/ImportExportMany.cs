@@ -83,7 +83,7 @@ namespace Sub_Services.Execute
                 (today, "08:00", "AT-05", "02", "VN2025", "26090784SP", "BLK", "Thân trước", 120),
             };
 
-            int dataStartRow = 3;
+            int dataStartRow = 2;
             for (int r = 0; r < sampleData.Length; r++)
             {
                 var rowEl = ws.Row(dataStartRow + r);
@@ -210,40 +210,17 @@ namespace Sub_Services.Execute
             var rows = new List<ImportOutput_Row>();
             int lastRow = ws.LastRowUsed()?.RowNumber() ?? 2;
 
-            // Phát hiện format cũ (6 cột) hay mới (9 cột) dựa trên header dòng 2
-            var col4Header = ws.Cell(2, 4).GetString().Trim().ToUpperInvariant();
-            bool isNewFormat = col4Header.Contains("LINE"); // cột 4 là "Line (*)" trong format mới
-
             for (int r = 3; r <= lastRow; r++)
             {
-                string dateCell, timeCell, machineVal, lineVal, styleVal, spVal, colorVal, detailVal, qtyCell;
-
-                if (isNewFormat)
-                {
-                    // Format mới: 9 cột
-                    dateCell   = ws.Cell(r, 1).GetString().Trim();
-                    timeCell   = ws.Cell(r, 2).GetString().Trim();
-                    machineVal = ws.Cell(r, 3).GetString().Trim();
-                    lineVal    = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
-                    styleVal   = ws.Cell(r, 5).GetString().Trim().ToUpperInvariant();
-                    spVal      = ws.Cell(r, 6).GetString().Trim().ToUpperInvariant();
-                    colorVal   = ws.Cell(r, 7).GetString().Trim().ToUpperInvariant();
-                    detailVal  = ws.Cell(r, 8).GetString().Trim();
-                    qtyCell    = ws.Cell(r, 9).GetString().Trim();
-                }
-                else
-                {
-                    // Format cũ: 6 cột — giữ tương thích ngược
-                    dateCell   = ws.Cell(r, 1).GetString().Trim();
-                    timeCell   = ws.Cell(r, 2).GetString().Trim();
-                    machineVal = ws.Cell(r, 3).GetString().Trim();
-                    lineVal    = null;
-                    styleVal   = null;
-                    spVal      = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
-                    colorVal   = null;
-                    detailVal  = ws.Cell(r, 5).GetString().Trim();
-                    qtyCell    = ws.Cell(r, 6).GetString().Trim();
-                }
+                var dateCell   = ws.Cell(r, 1).GetString().Trim();
+                var timeCell   = ws.Cell(r, 2).GetString().Trim();
+                var machineVal = ws.Cell(r, 3).GetString().Trim();
+                var lineVal    = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
+                var styleVal   = ws.Cell(r, 5).GetString().Trim().ToUpperInvariant();
+                var spVal      = ws.Cell(r, 6).GetString().Trim().ToUpperInvariant();
+                var colorVal   = ws.Cell(r, 7).GetString().Trim().ToUpperInvariant();
+                var detailVal  = ws.Cell(r, 8).GetString().Trim();
+                var qtyCell    = ws.Cell(r, 9).GetString().Trim();
 
                 // Skip dòng không có dữ liệu thực tế:
                 // — dòng hoàn toàn trống
@@ -327,7 +304,7 @@ namespace Sub_Services.Execute
 
             var allProdInfoCache = await _context.ProductionInfos
                 .AsNoTracking()
-                .Where(p => p.Status == 1 && p.ProductionDepartmentId == deptId)
+                .Where(p => p.Status >= 0 && p.ProductionDepartmentId == deptId)
                 .ToListAsync();
 
             // Cache StyleInfo: StyleCode (upper) → StyleInfoId
@@ -579,9 +556,8 @@ namespace Sub_Services.Execute
             var ws = wb.AddWorksheet("NhapMaHang");
             ws.SheetView.FreezeRows(1);
 
-            // Header row (row 1)
+            // Header row (row 1) — bỏ cột dept, bắt đầu từ Line
             string[] headers = {
-                "Tên bộ phận (bỏ qua)",
                 "Line (*)",
                 "Style (*)",
                 "SP (*)",
@@ -603,61 +579,55 @@ namespace Sub_Services.Execute
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             }
 
-            // Tô màu vàng cột A để nhắc người dùng bỏ qua
-            ws.Cell(1, 1).Style.Fill.BackgroundColor = XLColor.FromArgb(0xFF, 0xC0, 0x00);
-            ws.Cell(1, 1).Style.Font.FontColor = XLColor.Black;
 
             // Sample data rows (từ dòng 2)
-            var samples = new (string dept, string line, string style, string sp, int qty, string color, int target, string inlineLine, string inlineDept)[]
+            var samples = new (string line, string style, string sp, int qty, string color, int target, string inlineLine, string inlineDept)[]
             {
-                ("EMB", "8/25", "S123", "SP-001", 5000, "BLACK", 800, DateTime.Today.ToString("dd/MM/yyyy"), DateTime.Today.AddDays(5).ToString("dd/MM/yyyy")),
-                ("EMB", "8/25", "S124", "SP-002", 3000, "WHITE",  600, "", ""),
+                ("8", "S123", "SP-001", 5000, "010", 800, DateTime.Today.ToString("dd/MM/yyyy"), DateTime.Today.AddDays(5).ToString("dd/MM/yyyy")),
             };
 
             int dataStart = 2;
             for (int r = 0; r < samples.Length; r++)
             {
                 var s = samples[r];
-                ws.Cell(dataStart + r, 1).Value = s.dept;
-                ws.Cell(dataStart + r, 2).Value = s.line;
-                ws.Cell(dataStart + r, 3).Value = s.style;
-                ws.Cell(dataStart + r, 4).Value = s.sp;
-                ws.Cell(dataStart + r, 5).Value = s.qty;
-                ws.Cell(dataStart + r, 6).Value = s.color;
-                ws.Cell(dataStart + r, 7).Value = s.target;
-                ws.Cell(dataStart + r, 8).Value = s.inlineLine;
-                ws.Cell(dataStart + r, 9).Value = s.inlineDept;
+                ws.Cell(dataStart + r, 1).Value = s.line;
+                ws.Cell(dataStart + r, 2).Value = s.style;
+                ws.Cell(dataStart + r, 3).Value = s.sp;
+                ws.Cell(dataStart + r, 4).Value = s.qty;
+                ws.Cell(dataStart + r, 5).Value = s.color;
+                ws.Cell(dataStart + r, 6).Value = s.target;
+                ws.Cell(dataStart + r, 7).Value = s.inlineLine;
+                ws.Cell(dataStart + r, 8).Value = s.inlineDept;
 
                 if (r % 2 == 0)
-                    ws.Range(dataStart + r, 1, dataStart + r, 9).Style.Fill.BackgroundColor = XLColor.FromArgb(0xF7, 0xF8, 0xFC);
+                    ws.Range(dataStart + r, 1, dataStart + r, 8).Style.Fill.BackgroundColor = XLColor.FromArgb(0xF7, 0xF8, 0xFC);
 
-                for (int c = 1; c <= 9; c++)
+                for (int c = 1; c <= 8; c++)
                     ws.Cell(dataStart + r, c).Style.Border.OutsideBorder = XLBorderStyleValues.Hair;
             }
 
             // 50 dòng trống để nhập
             int blankStart = dataStart + samples.Length;
             for (int r = 0; r < 50; r++)
-                for (int c = 1; c <= 9; c++)
+                for (int c = 1; c <= 8; c++)
                     ws.Cell(blankStart + r, c).Style.Border.OutsideBorder = XLBorderStyleValues.Hair;
 
             // Column widths
-            ws.Column(1).Width = 24; // Tên bộ phận
-            ws.Column(2).Width = 12; // Line
-            ws.Column(3).Width = 18; // Style
-            ws.Column(4).Width = 18; // SP
-            ws.Column(5).Width = 12; // TotalQty
-            ws.Column(6).Width = 14; // Color
-            ws.Column(7).Width = 12; // Target
-            ws.Column(8).Width = 22; // InlineLine
-            ws.Column(9).Width = 22; // InlineDepartment
+            ws.Column(1).Width = 12; // Line
+            ws.Column(2).Width = 18; // Style
+            ws.Column(3).Width = 18; // SP
+            ws.Column(4).Width = 12; // TotalQty
+            ws.Column(5).Width = 14; // Color
+            ws.Column(6).Width = 12; // Target
+            ws.Column(7).Width = 22; // InlineLine
+            ws.Column(8).Width = 22; // InlineDepartment
 
             // Ghi chú
             int noteRow = blankStart + 50 + 1;
-            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Cột A (Tên bộ phận) bị BỎ QUA — bộ phận được chọn khi nhập trên web. Keyword tự động = Line+Style+SP+Color.";
+            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Bộ phận được chọn khi nhập trên web. Keyword tự động = Line+Style+SP+Color.";
             ws.Cell(noteRow, 1).Style.Font.Italic = true;
             ws.Cell(noteRow, 1).Style.Font.FontColor = XLColor.FromArgb(0x64, 0x69, 0x7F);
-            ws.Range(noteRow, 1, noteRow, 9).Merge();
+            ws.Range(noteRow, 1, noteRow, 8).Merge();
 
             using var ms = new MemoryStream();
             wb.SaveAs(ms);
@@ -666,8 +636,8 @@ namespace Sub_Services.Execute
 
         /// <summary>
         /// Import mã hàng (ProductionInfo) từ file Excel.
-        /// - Bỏ qua dòng 1 (header) và cột A (tên bộ phận).
-        /// - Đọc từ dòng 2: B=Line, C=Style, D=SP, E=TotalQty, F=Color, G=Target, H=InlineLine, I=InlineDept.
+        /// - Bỏ qua dòng 1 (header). Không có cột dept.
+        /// - Đọc từ dòng 2: A=Line, B=Style, C=SP, D=TotalQty, E=Color, F=Target, G=InlineLine, H=InlineDept.
         /// - Keyword = Line + Style + SP + Color (upper, không khoảng trắng).
         /// - Status mặc định = 0 (chờ sản xuất).
         /// - Nếu trùng Line+Style+SP+Color trong cùng bộ phận → UPDATE, không tạo mới.
@@ -702,14 +672,15 @@ namespace Sub_Services.Execute
 
             for (int r = 2; r <= lastRow; r++)
             {
-                var lineVal  = ws.Cell(r, 2).GetString().Trim();
-                var styleVal = ws.Cell(r, 3).GetString().Trim();
-                var spVal    = ws.Cell(r, 4).GetString().Trim();
-                var qtyCell  = ws.Cell(r, 5).GetString().Trim();
-                var colorVal = ws.Cell(r, 6).GetString().Trim();
-                var targetCell  = ws.Cell(r, 7).GetString().Trim();
-                var inlineLineVal = ws.Cell(r, 8).GetString().Trim();
-                var inlineDeptVal = ws.Cell(r, 9).GetString().Trim();
+                // Đọc từ cột 1: A=Line, B=Style, C=SP, D=TotalQty, E=Color, F=Target, G=InlineLine, H=InlineDept
+                var lineVal       = ws.Cell(r, 1).GetString().Trim();
+                var styleVal      = ws.Cell(r, 2).GetString().Trim();
+                var spVal         = ws.Cell(r, 3).GetString().Trim();
+                var qtyCell       = ws.Cell(r, 4).GetString().Trim();
+                var colorVal      = ws.Cell(r, 5).GetString().Trim();
+                var targetCell    = ws.Cell(r, 6).GetString().Trim();
+                var inlineLineVal = ws.Cell(r, 7).GetString().Trim();
+                var inlineDeptVal = ws.Cell(r, 8).GetString().Trim();
 
                 // Bỏ qua dòng hoàn toàn rỗng
                 if (string.IsNullOrEmpty(lineVal) && string.IsNullOrEmpty(styleVal) &&

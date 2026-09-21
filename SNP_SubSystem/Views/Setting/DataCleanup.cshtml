@@ -1,0 +1,767 @@
+@model List<Sub_Services.Execute.CleanupTableSummary>
+
+@{
+    ViewData["Title"] = "Dọn dẹp dữ liệu";
+}
+
+<div class="dc-page">
+
+    <!-- ── TOP BAR ─────────────────────────────────────────────────── -->
+    <div class="dc-topbar">
+        <div class="dc-topbar-left">
+            <a href="/Settings/Index" class="dc-back-btn">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại cài đặt
+            </a>
+            <div class="dc-page-icon"><i class="fa-solid fa-broom"></i></div>
+            <div>
+                <div class="dc-page-title">Dọn dẹp dữ liệu</div>
+                <div class="dc-page-sub">Xem, khôi phục hoặc xóa vĩnh viễn các bản ghi đã xóa mềm</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dc-layout">
+
+        <!-- ── LEFT: Danh sách bảng ────────────────────────────────── -->
+        <div class="dc-sidebar">
+            <div class="dc-sidebar-head">
+                <i class="fa-solid fa-database"></i> Danh sách bảng
+                <span class="dc-sidebar-count">@Model.Count bảng</span>
+            </div>
+            <div class="dc-table-list" id="dcTableList">
+                @foreach (var t in Model)
+                {
+                    <div class="dc-table-item @(t.DeletedCount > 0 ? "has-data" : "no-data")"
+                         data-table="@t.TableName"
+                         data-display="@t.DisplayName"
+                         onclick="selectTable(this)">
+                        <div class="dc-table-item-left">
+                            <div class="dc-table-order">@t.Order</div>
+                            <div>
+                                <div class="dc-table-name">
+                                    <i class="fa-solid @t.Icon dc-table-icon"></i>
+                                    @t.DisplayName
+                                </div>
+                                <div class="dc-table-raw">@t.TableName</div>
+                            </div>
+                        </div>
+                        <div class="dc-table-item-right">
+                            <span class="dc-deleted-badge @(t.DeletedCount > 0 ? "danger" : "zero")">
+                                @t.DeletedCount
+                            </span>
+                            @if (t.DeletedCount > 0)
+                            {
+                                <button class="dc-purge-btn"
+                                        data-table="@t.TableName"
+                                        data-display="@t.DisplayName"
+                                        onclick="confirmPurge(event, this)"
+                                        title="Xóa tất cả bản ghi đã xóa mềm của bảng này">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ── RIGHT: Dữ liệu bảng đang chọn ─────────────────────── -->
+        <div class="dc-main">
+            <!-- Placeholder khi chưa chọn -->
+            <div class="dc-placeholder" id="dcPlaceholder">
+                <i class="fa-solid fa-hand-pointer" style="font-size:48px;color:var(--ink-300);"></i>
+                <div style="margin-top:14px;font-size:15px;font-weight:600;color:var(--ink-400);">Chọn một bảng để xem dữ liệu</div>
+                <div style="font-size:13px;color:var(--ink-300);margin-top:6px;">Danh sách bên trái hiển thị số bản ghi đã xóa mềm</div>
+            </div>
+
+            <!-- Panel dữ liệu -->
+            <div class="dc-data-panel" id="dcDataPanel" style="display:none;">
+                <div class="dc-data-head">
+                    <div>
+                        <div class="dc-data-title" id="dcDataTitle"></div>
+                        <div class="dc-data-sub" id="dcDataSub"></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label style="font-size:12px;color:var(--ink-500);font-weight:600;">Hiển thị:</label>
+                            <select id="dcPageSize" class="dc-select-ctrl" onchange="loadTableData(1)">
+                                <option value="10">10</option>
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <button class="dc-refresh-btn" onclick="loadTableData()">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="dcLoading" style="display:none;padding:44px;text-align:center;color:var(--ink-400);">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;"></i>
+                    <div style="margin-top:10px;">Đang tải dữ liệu...</div>
+                </div>
+
+                <!-- Empty -->
+                <div id="dcEmpty" style="display:none;padding:48px;text-align:center;color:var(--ink-400);">
+                    <i class="fa-solid fa-circle-check" style="font-size:40px;color:var(--success);display:block;margin-bottom:12px;"></i>
+                    <div style="font-weight:600;font-size:15px;">Không có dữ liệu đã xóa</div>
+                    <div style="font-size:13px;margin-top:6px;">Bảng này sạch!</div>
+                </div>
+
+                <!-- Table scroll -->
+                <div id="dcTableWrap" class="dc-table-wrap" style="display:none;">
+                    <div class="dc-table-scroll">
+                        <table class="dc-tbl" id="dcTbl">
+                            <thead id="dcThead"></thead>
+                            <tbody id="dcTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div id="dcPagination" class="dc-pagination" style="display:none;">
+                    <div id="dcPagInfo" class="dc-pag-info"></div>
+                    <div id="dcPagControls" class="dc-pag-controls"></div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- end layout -->
+
+</div><!-- end page -->
+
+<!-- ── Floating action bar khi chọn hàng ───────────────────────────── -->
+<div id="dcActionBar" class="dc-action-bar">
+    <span id="dcActionLabel" class="dc-action-label"></span>
+    <button class="dc-action-btn restore" id="dcBtnRestore" onclick="doRestore()">
+        <i class="fa-solid fa-rotate-left"></i> Khôi phục
+    </button>
+    <button class="dc-action-btn hard-delete" id="dcBtnHardDelete" onclick="doHardDelete()">
+        <i class="fa-solid fa-skull-crossbones"></i> Xóa vĩnh viễn
+    </button>
+    <button class="dc-action-btn clear" onclick="clearSel()">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+
+<!-- ── Confirm modal ────────────────────────────────────────────────── -->
+<div id="dcConfirmModal" class="dc-modal-backdrop">
+    <div class="dc-modal-box">
+        <div class="dc-modal-head">
+            <span id="dcConfirmIcon" style="font-size:24px;"></span>
+            <div>
+                <div class="dc-modal-title" id="dcConfirmTitle"></div>
+                <div class="dc-modal-sub"  id="dcConfirmSub"></div>
+            </div>
+        </div>
+        <div class="dc-modal-warn" id="dcConfirmWarn"></div>
+        <div class="dc-modal-footer">
+            <button class="dc-modal-btn ghost" onclick="closeConfirm()">Hủy</button>
+            <button class="dc-modal-btn danger" id="dcConfirmOk">Xác nhận</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+.dc-page { display:flex; flex-direction:column; min-height:calc(100vh - 60px); }
+
+.dc-topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px 16px;
+    border-bottom:1px solid var(--border);
+    background:var(--bg-surface);
+}
+.dc-topbar-left { display:flex; align-items:center; gap:14px; }
+.dc-back-btn {
+    display:inline-flex; align-items:center; gap:7px; padding:7px 14px;
+    border:1.5px solid var(--border); border-radius:8px; font-size:13px;
+    font-weight:600; color:var(--ink-700-solid); text-decoration:none;
+    background:var(--bg-canvas); transition:all .15s;
+}
+.dc-back-btn:hover { border-color:var(--primary); color:var(--primary); }
+.dc-page-icon {
+    width:44px; height:44px; border-radius:12px;
+    background:linear-gradient(135deg,#ef4444,#b91c1c);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex-shrink:0;
+}
+.dc-page-title { font-size:18px; font-weight:800; color:var(--ink-900); }
+.dc-page-sub   { font-size:12px; color:var(--ink-500); margin-top:2px; }
+
+.dc-layout { display:flex; flex:1; overflow:hidden; }
+
+/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
+.dc-sidebar {
+    width:300px; flex-shrink:0;
+    border-right:1px solid var(--border);
+    background:var(--bg-canvas);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+}
+.dc-sidebar-head {
+    padding:14px 18px; font-size:12px; font-weight:700;
+    color:var(--ink-500); text-transform:uppercase; letter-spacing:.5px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:8px;
+}
+.dc-sidebar-count {
+    margin-left:auto; background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:999px; padding:2px 9px; font-size:11px;
+    color:var(--ink-600); font-weight:700;
+}
+.dc-table-list { overflow-y:auto; flex:1; padding:6px 0; }
+
+.dc-table-item {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px; cursor:pointer; transition:background .12s;
+    border-left:3px solid transparent;
+}
+.dc-table-item:hover { background:rgba(59,130,246,.05); }
+.dc-table-item.active {
+    background:rgba(59,130,246,.09);
+    border-left-color:var(--primary);
+}
+.dc-table-item-left { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.dc-table-item-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.dc-table-order {
+    width:22px; height:22px; border-radius:50%; background:var(--bg-surface);
+    border:1px solid var(--border); font-size:10px; font-weight:800;
+    color:var(--ink-500); display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+}
+.dc-table-name { font-size:13px; font-weight:600; color:var(--ink-900); display:flex; align-items:center; gap:6px; }
+.dc-table-icon { font-size:12px; color:var(--ink-400); }
+.dc-table-raw  { font-size:11px; color:var(--ink-400); font-family:monospace; }
+.dc-deleted-badge {
+    padding:2px 9px; border-radius:999px; font-size:11px; font-weight:800;
+}
+.dc-deleted-badge.danger { background:#FEF2F2; color:#dc2626; border:1px solid #FECACA; }
+.dc-deleted-badge.zero   { background:var(--bg-canvas); color:var(--ink-400); border:1px solid var(--border); }
+
+.dc-purge-btn {
+    width:26px; height:26px; border-radius:6px; border:1px solid #FECACA;
+    background:#FEF2F2; color:#dc2626; font-size:11px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition:all .15s;
+}
+.dc-purge-btn:hover { background:#dc2626; color:#fff; }
+
+/* ─── Main panel ──────────────────────────────────────────────────────────── */
+.dc-main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.dc-placeholder {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+}
+.dc-data-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.dc-data-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 22px 12px; border-bottom:1px solid var(--border);
+    flex-shrink:0;
+}
+.dc-data-title { font-size:16px; font-weight:700; color:var(--ink-900); }
+.dc-data-sub   { font-size:12px; color:var(--ink-500); margin-top:3px; }
+.dc-refresh-btn {
+    width:34px; height:34px; border-radius:8px;
+    border:1.5px solid var(--border); background:var(--bg-canvas);
+    color:var(--ink-600); font-size:14px; cursor:pointer; transition:all .15s;
+}
+.dc-refresh-btn:hover { border-color:var(--primary); color:var(--primary); }
+.dc-select-ctrl {
+    border:1.5px solid var(--border); border-radius:7px; padding:5px 10px;
+    font-size:12px; font-family:inherit; background:var(--bg-surface);
+    color:var(--ink-900); outline:none;
+}
+
+/* ─── Table ───────────────────────────────────────────────────────────────── */
+.dc-table-wrap  { flex:1; overflow:hidden; position:relative; }
+.dc-table-scroll { overflow:auto; height:100%; }
+.dc-tbl { width:100%; border-collapse:collapse; white-space:nowrap; }
+.dc-tbl th {
+    padding:9px 14px; font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--ink-500); background:var(--bg-canvas);
+    border-bottom:1px solid var(--border); text-align:left; position:sticky; top:0;
+    white-space:nowrap;
+}
+.dc-tbl td {
+    padding:9px 14px; font-size:12.5px; border-bottom:1px solid var(--border-soft);
+    vertical-align:middle; max-width:200px; overflow:hidden; text-overflow:ellipsis;
+}
+.dc-tbl tbody tr:hover td { background:rgba(59,130,246,.04); }
+.dc-tbl tbody tr.dc-sel td { background:rgba(59,130,246,.1) !important; }
+.dc-tbl tbody tr { cursor:pointer; user-select:none; }
+
+.dc-td-del-time {
+    font-size:11.5px; font-weight:600; color:#dc2626;
+    background:#FEF2F2; padding:2px 8px; border-radius:4px;
+    display:inline-flex; align-items:center; gap:4px;
+}
+
+/* ─── Pagination ──────────────────────────────────────────────────────────── */
+.dc-pagination {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 22px; border-top:1px solid var(--border);
+    flex-shrink:0; flex-wrap:wrap; gap:8px;
+}
+.dc-pag-info { font-size:13px; color:var(--ink-500); }
+.dc-pag-controls { display:flex; gap:5px; }
+.dc-pag-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:32px; height:32px; padding:0 8px; border-radius:6px;
+    border:1.5px solid var(--border); background:var(--bg-surface);
+    color:var(--ink-700-solid); cursor:pointer; font-size:12px; font-weight:600;
+    transition:all .15s;
+}
+.dc-pag-btn:hover:not(:disabled):not(.active) { border-color:var(--primary); color:var(--primary); }
+.dc-pag-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.dc-pag-btn:disabled { opacity:.4; cursor:default; }
+
+/* ─── Action bar ──────────────────────────────────────────────────────────── */
+.dc-action-bar {
+    position:fixed; bottom:24px; left:50%;
+    transform:translateX(-50%);
+    z-index:8900;
+    display:none; align-items:center; gap:12px;
+    background:#1e3a5f; color:#fff;
+    padding:12px 20px; border-radius:14px;
+    box-shadow:0 8px 32px rgba(10,14,26,.35);
+    animation:dcBarIn .18s cubic-bezier(.4,0,.2,1);
+}
+.dc-action-bar.show { display:flex; }
+@@keyframes dcBarIn {
+    from { opacity:0; transform:translateX(-50%) translateY(16px) scale(.96); }
+    to   { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+}
+.dc-action-label { font-size:13.5px; font-weight:700; padding-right:8px; border-right:1px solid rgba(255,255,255,.2); }
+.dc-action-btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:8px; font-size:13px;
+    font-weight:700; cursor:pointer; border:none; font-family:inherit;
+    transition:all .15s;
+}
+.dc-action-btn.restore { background:rgba(24,193,110,.2); color:#16a34a; }
+.dc-action-btn.restore:hover { background:#16a34a; color:#fff; }
+.dc-action-btn.hard-delete { background:rgba(220,38,38,.2); color:#dc2626; }
+.dc-action-btn.hard-delete:hover { background:#dc2626; color:#fff; }
+.dc-action-btn.clear { background:rgba(255,255,255,.1); color:rgba(255,255,255,.7); padding:7px 10px; }
+.dc-action-btn.clear:hover { background:rgba(255,255,255,.2); color:#fff; }
+
+/* ─── Confirm modal ───────────────────────────────────────────────────────── */
+.dc-modal-backdrop {
+    display:none; position:fixed; inset:0; z-index:9500;
+    background:rgba(10,14,26,.5); backdrop-filter:blur(3px);
+    align-items:center; justify-content:center;
+}
+.dc-modal-backdrop.open { display:flex !important; }
+.dc-modal-box {
+    background:var(--bg-surface); border-radius:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25); width:420px; max-width:95vw;
+    padding:24px; animation:dcMbIn .2s cubic-bezier(.4,0,.2,1);
+}
+@@keyframes dcMbIn {
+    from { opacity:0; transform:translateY(-12px) scale(.97); }
+    to   { opacity:1; transform:none; }
+}
+.dc-modal-head  { display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; }
+.dc-modal-title { font-size:16px; font-weight:700; color:var(--ink-900); }
+.dc-modal-sub   { font-size:13px; color:var(--ink-500); margin-top:4px; }
+.dc-modal-warn  {
+    background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;
+    padding:10px 14px; font-size:13px; font-weight:600; color:#991b1b;
+    margin-bottom:18px;
+}
+.dc-modal-footer { display:flex; justify-content:flex-end; gap:10px; }
+.dc-modal-btn {
+    padding:9px 20px; border-radius:8px; font-size:13.5px; font-weight:700;
+    cursor:pointer; font-family:inherit; border:2px solid transparent;
+    transition:all .15s;
+}
+.dc-modal-btn.ghost { background:transparent; border-color:var(--border); color:var(--ink-700-solid); }
+.dc-modal-btn.ghost:hover { background:var(--bg-canvas); }
+.dc-modal-btn.danger { background:#dc2626; color:#fff; border-color:#dc2626; }
+.dc-modal-btn.danger:hover { filter:brightness(1.1); }
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    // ─── State ────────────────────────────────────────────────────────────────
+    let currentTable  = null;
+    let currentPage   = 1;
+    let totalPages    = 1;
+    let selRows       = [];   // HTMLElement[]
+    let dragging      = false;
+    let dragStartIdx  = -1;
+    let confirmAction = null; // function to call on confirm
+
+    // ─── DOM refs ─────────────────────────────────────────────────────────────
+    const placeholder  = document.getElementById('dcPlaceholder');
+    const dataPanel    = document.getElementById('dcDataPanel');
+    const loading      = document.getElementById('dcLoading');
+    const emptyEl      = document.getElementById('dcEmpty');
+    const tableWrap    = document.getElementById('dcTableWrap');
+    const thead        = document.getElementById('dcThead');
+    const tbody        = document.getElementById('dcTbody');
+    const pagination   = document.getElementById('dcPagination');
+    const pagInfo      = document.getElementById('dcPagInfo');
+    const pagControls  = document.getElementById('dcPagControls');
+    const dataTitle    = document.getElementById('dcDataTitle');
+    const dataSub      = document.getElementById('dcDataSub');
+    const actionBar    = document.getElementById('dcActionBar');
+    const actionLabel  = document.getElementById('dcActionLabel');
+    const confirmModal = document.getElementById('dcConfirmModal');
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function fmtVal(v) {
+        if (v === null || v === undefined) return '<span style="color:var(--ink-300);font-style:italic;">null</span>';
+        if (typeof v === 'boolean') return v ? '<span style="color:var(--success);">true</span>' : '<span style="color:var(--danger);">false</span>';
+        const s = String(v);
+        // Phát hiện datetime
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+            try {
+                const d = new Date(s);
+                return d.toLocaleString('vi-VN');
+            } catch { return esc(s); }
+        }
+        return esc(s);
+    }
+
+    // ─── Select table ─────────────────────────────────────────────────────────
+    window.selectTable = function (el) {
+        document.querySelectorAll('.dc-table-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentTable = el.dataset.table;
+        const displayName = el.dataset.display;
+
+        placeholder.style.display = 'none';
+        dataPanel.style.display   = 'flex';
+        dataTitle.textContent     = displayName;
+        dataSub.textContent       = el.querySelector('.dc-table-raw').textContent;
+
+        loadTableData(1);
+    };
+
+    // ─── Load data ────────────────────────────────────────────────────────────
+    window.loadTableData = function (page) {
+        if (!currentTable) return;
+        page = page || currentPage;
+        const pageSize = document.getElementById('dcPageSize').value;
+
+        loading.style.display   = 'block';
+        emptyEl.style.display   = 'none';
+        tableWrap.style.display = 'none';
+        pagination.style.display = 'none';
+        clearSel();
+
+        fetch('/Settings/GetDeletedData?table=' + encodeURIComponent(currentTable) + '&page=' + page + '&pageSize=' + pageSize)
+            .then(r => r.json())
+            .then(data => {
+                loading.style.display = 'none';
+                currentPage = data.page;
+                totalPages  = data.totalPages;
+
+                if (!data.rows || !data.rows.length) {
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+                renderTable(data);
+                renderPagination(data);
+            })
+            .catch(e => {
+                loading.style.display = 'none';
+                emptyEl.style.display = 'block';
+                console.error(e);
+            });
+    };
+
+    // ─── Render table ────────────────────────────────────────────────────────
+    function renderTable(data) {
+        // Header — lọc bỏ Status và ID ẩn, đặt UpdateDate cuối
+        const displayCols = data.columns.filter(c =>
+            !['__rn','Status'].includes(c)
+        );
+        // Tách UpdateDate ra cuối
+        const updateDateCol = displayCols.includes('UpdateDate') ? 'UpdateDate' : null;
+        const otherCols = displayCols.filter(c => c !== 'UpdateDate');
+        const orderedCols = updateDateCol ? [...otherCols, updateDateCol] : otherCols;
+
+        // Cột ID để lấy giá trị select
+        const idCol = data.columns.find(c => c === 'ID' || c === 'Id' || c === 'id') || data.columns[0];
+
+        // Thead
+        thead.innerHTML = '<tr>'
+            + orderedCols.map(c => {
+                const isDelTime = c === 'UpdateDate';
+                return `<th${isDelTime ? ' style="color:#dc2626;"' : ''}>${isDelTime ? '<i class="fa-regular fa-clock" style="margin-right:4px;"></i>Thời gian xóa' : esc(c)}</th>`;
+            }).join('')
+            + '</tr>';
+
+        // Tbody
+        tbody.innerHTML = '';
+        data.rows.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            tr.dataset.id = String(row[idCol] ?? i);
+            orderedCols.forEach(col => {
+                const td = document.createElement('td');
+                const isDelTime = col === 'UpdateDate';
+                if (isDelTime) {
+                    td.innerHTML = `<span class="dc-td-del-time"><i class="fa-regular fa-clock"></i>${fmtVal(row[col])}</span>`;
+                } else {
+                    td.innerHTML = fmtVal(row[col]);
+                    td.title = String(row[col] ?? '');
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        tableWrap.style.display  = 'block';
+        pagination.style.display = 'flex';
+
+        initDragSelect();
+    }
+
+    // ─── Pagination ───────────────────────────────────────────────────────────
+    function renderPagination(data) {
+        pagInfo.textContent = `Hiển thị ${(data.page-1)*data.pageSize+1}–${Math.min(data.page*data.pageSize, data.total)} / ${data.total} bản ghi`;
+        pagControls.innerHTML = '';
+        const mk = (label, p, disabled, active) => {
+            const b = document.createElement('button');
+            b.className = 'dc-pag-btn' + (active ? ' active' : '');
+            b.innerHTML = label;
+            b.disabled  = disabled || active;
+            b.onclick   = () => loadTableData(p);
+            pagControls.appendChild(b);
+        };
+        mk('<i class="fa-solid fa-chevron-left"></i>', data.page-1, data.page<=1, false);
+        let s = Math.max(1, data.page-2), e = Math.min(data.totalPages, s+4);
+        if (e-s < 4) s = Math.max(1, e-4);
+        for (let p = s; p <= e; p++) mk(p, p, false, p===data.page);
+        mk('<i class="fa-solid fa-chevron-right"></i>', data.page+1, data.page>=data.totalPages, false);
+    }
+
+    // ─── Drag-select rows ─────────────────────────────────────────────────────
+    function initDragSelect() {
+        // Re-gắn event sau mỗi lần render
+        tbody.onmousedown = null;
+        tbody.onmouseover = null;
+
+        tbody.addEventListener('mousedown', onTbodyMouseDown);
+        tbody.addEventListener('mouseover', onTbodyMouseOver);
+    }
+
+    function onTbodyMouseDown(e) {
+        if (e.button !== 0) return;
+        const tr = e.target.closest('tr');
+        if (!tr) { clearSel(); return; }
+        const rows = allRows();
+        const idx  = rows.indexOf(tr);
+
+        if (e.shiftKey && dragStartIdx > -1) {
+            e.preventDefault();
+            clearSel();
+            selectRange(dragStartIdx, idx, rows);
+        } else if (e.ctrlKey) {
+            toggleSel(tr);
+            dragStartIdx = idx;
+        } else {
+            clearSel();
+            addSel(tr);
+            dragStartIdx = idx;
+            dragging = true;
+        }
+        updateActionBar();
+    }
+
+    function onTbodyMouseOver(e) {
+        if (!dragging) return;
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const rows = allRows();
+        const idx  = rows.indexOf(tr);
+        clearSel();
+        selectRange(dragStartIdx, idx, rows);
+        updateActionBar();
+    }
+
+    document.addEventListener('mouseup', () => { dragging = false; });
+    document.addEventListener('mousedown', e => {
+        if (!tbody.contains(e.target) && !actionBar.contains(e.target)) clearSel();
+    });
+    tbody.addEventListener('selectstart', e => { if (dragging || e.shiftKey) e.preventDefault(); });
+
+    function allRows() { return Array.from(tbody.querySelectorAll('tr')); }
+    function addSel(tr) { tr.classList.add('dc-sel'); if (!selRows.includes(tr)) selRows.push(tr); }
+    function toggleSel(tr) {
+        if (tr.classList.contains('dc-sel')) { tr.classList.remove('dc-sel'); selRows = selRows.filter(r => r !== tr); }
+        else addSel(tr);
+    }
+    function selectRange(a, b, rows) {
+        const lo = Math.min(a,b), hi = Math.max(a,b);
+        selRows = [];
+        for (let i = lo; i <= hi; i++) if (rows[i]) addSel(rows[i]);
+    }
+
+    window.clearSel = function () {
+        selRows.forEach(r => r.classList.remove('dc-sel'));
+        selRows = [];
+        updateActionBar();
+    };
+
+    function updateActionBar() {
+        if (selRows.length > 0) {
+            actionLabel.textContent = 'Đã chọn ' + selRows.length + ' bản ghi';
+            actionBar.classList.add('show');
+        } else {
+            actionBar.classList.remove('show');
+        }
+    }
+
+    function getSelIds() { return selRows.map(r => r.dataset.id).filter(Boolean); }
+
+    // ─── Actions ──────────────────────────────────────────────────────────────
+    window.doRestore = function () {
+        const ids = getSelIds();
+        if (!ids.length) return;
+        openConfirm({
+            icon: '🔄',
+            title: `Khôi phục ${ids.length} bản ghi`,
+            sub:  `Bảng: ${currentTable}`,
+            warn: `Các bản ghi sẽ được khôi phục (Status = 1) và hiển thị lại trong hệ thống.`,
+            okText: 'Khôi phục',
+            okClass: 'dc-modal-btn restore-ok',
+            action: async () => {
+                const r = await fetch('/Settings/RestoreRows', {
+                    method: 'POST', headers: { 'Content-Type':'application/json' },
+                    body: JSON.stringify({ table: currentTable, ids })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    showToast(d.message, 'success');
+                    refreshSidebarCount(currentTable, -ids.length);
+                    loadTableData(currentPage);
+                } else showToast(d.message || 'Lỗi', 'error');
+            }
+        });
+    };
+
+    window.doHardDelete = function () {
+        const ids = getSelIds();
+        if (!ids.length) return;
+        openConfirm({
+            icon: '💀',
+            title: `Xóa vĩnh viễn ${ids.length} bản ghi`,
+            sub:  `Bảng: ${currentTable}`,
+            warn: `⚠️ Hành động này KHÔNG THỂ hoàn tác! Dữ liệu sẽ bị xóa khỏi cơ sở dữ liệu vĩnh viễn.`,
+            okText: 'Xóa vĩnh viễn',
+            action: async () => {
+                const r = await fetch('/Settings/HardDeleteRows', {
+                    method: 'POST', headers: { 'Content-Type':'application/json' },
+                    body: JSON.stringify({ table: currentTable, ids })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    showToast(d.message, 'success');
+                    refreshSidebarCount(currentTable, -ids.length);
+                    loadTableData(currentPage);
+                } else showToast(d.message || 'Lỗi', 'error');
+            }
+        });
+    };
+
+    window.confirmPurge = function (event, btn) {
+        event.stopPropagation();
+        const table = btn.dataset.table;
+        const display = btn.dataset.display;
+        openConfirm({
+            icon: '🗑️',
+            title: `Xóa toàn bộ: ${display}`,
+            sub:   `Bảng: ${table}`,
+            warn:  `⚠️ Sẽ xóa vĩnh viễn TẤT CẢ bản ghi đã xóa mềm của bảng [${table}]. KHÔNG THỂ hoàn tác!`,
+            okText: 'Xóa tất cả',
+            action: async () => {
+                const r = await fetch('/Settings/PurgeTable', {
+                    method: 'POST', headers: { 'Content-Type':'application/json' },
+                    body: JSON.stringify({ table })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    showToast(d.message, 'success');
+                    // Cập nhật badge về 0
+                    const item = document.querySelector(`.dc-table-item[data-table="${table}"]`);
+                    if (item) {
+                        const badge = item.querySelector('.dc-deleted-badge');
+                        if (badge) { badge.textContent = '0'; badge.className = 'dc-deleted-badge zero'; }
+                        const purgeBtn = item.querySelector('.dc-purge-btn');
+                        if (purgeBtn) purgeBtn.remove();
+                        item.classList.remove('has-data');
+                        item.classList.add('no-data');
+                    }
+                    if (currentTable === table) {
+                        emptyEl.style.display = 'block';
+                        tableWrap.style.display = 'none';
+                        pagination.style.display = 'none';
+                    }
+                } else showToast(d.message || 'Lỗi', 'error');
+            }
+        });
+    };
+
+    // ─── Confirm modal ────────────────────────────────────────────────────────
+    function openConfirm({ icon, title, sub, warn, okText, action }) {
+        document.getElementById('dcConfirmIcon').textContent  = icon;
+        document.getElementById('dcConfirmTitle').textContent = title;
+        document.getElementById('dcConfirmSub').textContent   = sub;
+        document.getElementById('dcConfirmWarn').textContent  = warn;
+        const okBtn = document.getElementById('dcConfirmOk');
+        okBtn.textContent = okText;
+        confirmAction = action;
+        confirmModal.classList.add('open');
+    }
+
+    window.closeConfirm = function () { confirmModal.classList.remove('open'); };
+
+    document.getElementById('dcConfirmOk').addEventListener('click', async () => {
+        if (!confirmAction) return;
+        closeConfirm();
+        clearSel();
+        try { await confirmAction(); } catch(e) { showToast('Lỗi: ' + e.message, 'error'); }
+        confirmAction = null;
+    });
+
+    confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeConfirm(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeConfirm(); });
+
+    // ─── Toast (dùng toastr nếu có, fallback nội bộ) ─────────────────────────
+    function showToast(msg, type) {
+        if (window.toastr) {
+            type === 'success' ? toastr.success(msg) : toastr.error(msg);
+        } else {
+            alert(msg);
+        }
+    }
+
+    // ─── Cập nhật badge sidebar ───────────────────────────────────────────────
+    function refreshSidebarCount(table, delta) {
+        const item = document.querySelector(`.dc-table-item[data-table="${table}"]`);
+        if (!item) return;
+        const badge = item.querySelector('.dc-deleted-badge');
+        if (!badge) return;
+        const newCount = Math.max(0, parseInt(badge.textContent || '0') + delta);
+        badge.textContent = newCount;
+        if (newCount === 0) {
+            badge.className = 'dc-deleted-badge zero';
+            const pb = item.querySelector('.dc-purge-btn');
+            if (pb) pb.remove();
+        }
+    }
+
+}());
+</script>

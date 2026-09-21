@@ -32,6 +32,23 @@
                     <label style="font-size:13px;font-weight:600;color:var(--ink-600);white-space:nowrap;">Tìm kiếm: </label>
                     <input type="text" id="filterKw" class="si-filter-ctrl" placeholder="StyleCode, Keyword..." style="flex:1;">
                 </div>
+                <!-- Lọc theo ngày tạo -->
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <label style="font-size:13px;font-weight:600;color:var(--ink-600);white-space:nowrap;"><i class="fa-regular fa-calendar"></i> Ngày tạo:</label>
+                    <input type="date" id="filterFromDate" class="si-filter-ctrl" style="padding:6px 10px;" title="Từ ngày">
+                    <span style="color:var(--ink-400);font-size:12px;">—</span>
+                    <input type="date" id="filterToDate" class="si-filter-ctrl" style="padding:6px 10px;" title="Đến ngày">
+                </div>
+                <!-- Số lượng hiển thị -->
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <label style="font-size:13px;font-weight:600;color:var(--ink-600);white-space:nowrap;">Hiển thị:</label>
+                    <select id="filterPageSize" class="si-filter-ctrl" style="min-width:70px;">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
                 <button id="btnSearch" class="btn btn-primary" style="padding:7px 18px;"><i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm</button>
                 <button id="btnReset" class="btn btn-ghost" style="padding:7px 14px;"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
@@ -112,25 +129,7 @@
     </div>
 </div>
 
-<!-- =====================================================================
-     MODAL: Xác nhận Xoá
-     ===================================================================== -->
-<div id="modalSiDelete" class="si-modal-backdrop">
-    <div class="si-modal-box" style="max-width:420px;">
-        <div class="si-modal-header" style="border-top:4px solid var(--danger);">
-            <h2 class="si-modal-title" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Xác nhận xoá</h2>
-            <button class="si-modal-close" id="btnCloseSiDelete">&times;</button>
-        </div>
-        <div class="si-modal-body">
-            <p style="font-size:14px;color:var(--ink-700-solid);line-height:1.6;">Hành động này sẽ xoá mềm StyleInfo và tất cả công đoạn liên quan. Dữ liệu sẽ không còn hiển thị.</p>
-            <div id="siDeleteInfoBox" class="si-confirm-box"></div>
-        </div>
-        <div class="si-modal-footer">
-            <button class="si-btn si-btn-ghost" id="btnCancelSiDelete">Huỷ</button>
-            <button class="si-btn si-btn-danger" id="btnConfirmSiDelete"><i class="fa-solid fa-trash"></i> Xoá</button>
-        </div>
-    </div>
-</div>
+<!-- modalSiDelete đã được thay bằng SweetAlert2 -->
 
 <!-- =====================================================================
      MODAL: Nhập Excel
@@ -288,16 +287,16 @@
     function onBkd(id) {
         document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
     }
-    ['modalSiForm','modalSiDelete','modalSiExcel','modalSiDetail'].forEach(id => {
+    ['modalSiForm','modalSiExcel','modalSiDetail'].forEach(id => {
         onBkd(id);
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') ['modalSiForm','modalSiDelete','modalSiExcel','modalSiDetail'].forEach(closeModal);
+        if (e.key === 'Escape') ['modalSiForm','modalSiExcel','modalSiDetail'].forEach(closeModal);
     });
 
     /* ===== STATE ============================================================= */
     let currentPage = 1;
-    const pageSize  = 20;
+    let pageSize    = 20;
     let activeRow   = null;
     let editingId   = null;
     let deptLoaded  = false;
@@ -331,8 +330,11 @@
     /* ===== TABLE ============================================================= */
     async function loadTable(page) {
         page = page || currentPage;
-        const dept = document.getElementById('filterDept').value;
-        const kw   = document.getElementById('filterKw').value.trim();
+        pageSize = parseInt(document.getElementById('filterPageSize').value) || 20;
+        const dept     = document.getElementById('filterDept').value;
+        const kw       = document.getElementById('filterKw').value.trim();
+        const fromDate = document.getElementById('filterFromDate').value;
+        const toDate   = document.getElementById('filterToDate').value;
 
         document.getElementById('siLoading').style.display = 'block';
         document.getElementById('siTable').style.display   = 'none';
@@ -340,8 +342,10 @@
 
         try {
             const qs  = new URLSearchParams({ page, pageSize });
-            if (dept) qs.set('deptId', dept);
-            if (kw)   qs.set('kw', kw);
+            if (dept)     qs.set('deptId', dept);
+            if (kw)       qs.set('kw', kw);
+            if (fromDate) qs.set('fromDate', fromDate);
+            if (toDate)   qs.set('toDate', toDate);
             const res  = await fetch('/StyleInfo/GetList?' + qs);
             if (!res.ok) { toast('error','Không tải được dữ liệu.'); return; }
             const data = await res.json();
@@ -374,7 +378,7 @@
                 + '<td><strong style="font-family:monospace;">' + esc(item.styleCode) + '</strong></td>'
                 + '<td><span style="font-size:12px;background:var(--bg-canvas);padding:2px 8px;border-radius:4px;">' + esc(item.departmentName) + '</span></td>'
                 + '<td><code style="font-size:11.5px;color:var(--ink-500);">' + esc(item.keyword||'') + '</code></td>'
-                + '<td style="text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--primary);">' + item.detailCount + '</span></td>'
+                + '<td style="text-align:center;" data-col="detail" data-val="' + item.detailCount + '"><span style="font-size:16px;font-weight:800;color:var(--primary);">' + item.detailCount + '</span></td>'
                 + '<td>' + badge + '</td>'
                 + '<td style="font-size:12px;color:var(--ink-500);">' + upd + '</td>'
                 + '</tr>');
@@ -407,12 +411,27 @@
     /* ===== SEARCH / FILTER =================================================== */
     document.getElementById('btnSearch').addEventListener('click', () => loadTable(1));
     document.getElementById('btnReset').addEventListener('click', () => {
-        document.getElementById('filterDept').value = '';
-        document.getElementById('filterKw').value   = '';
+        document.getElementById('filterDept').value     = '';
+        document.getElementById('filterKw').value       = '';
+        document.getElementById('filterFromDate').value = '';
+        document.getElementById('filterToDate').value   = '';
+        document.getElementById('filterPageSize').value = '20';
         loadTable(1);
     });
     document.getElementById('filterKw').addEventListener('keydown', e => {
         if (e.key === 'Enter') loadTable(1);
+    });
+    document.getElementById('filterPageSize').addEventListener('change', () => loadTable(1));
+    // Giới hạn toDate >= fromDate
+    document.getElementById('filterFromDate').addEventListener('change', () => {
+        const f = document.getElementById('filterFromDate').value;
+        const t = document.getElementById('filterToDate').value;
+        if (t && t < f) document.getElementById('filterToDate').value = f;
+    });
+    document.getElementById('filterToDate').addEventListener('change', () => {
+        const f = document.getElementById('filterFromDate').value;
+        const t = document.getElementById('filterToDate').value;
+        if (f && t < f) document.getElementById('filterFromDate').value = t;
     });
 
     /* ===== DOUBLE-CLICK: Xem chi tiết công đoạn ============================== */
@@ -552,8 +571,21 @@
     bulkDelete.addEventListener('click', () => {
         const ids = ms_selected().map(r => r.dataset.id);
         if (!ids.length) return;
-        if (!confirm('Xoá ' + ids.length + ' mã hàng đã chọn? Hành động này không thể phục hồi.')) return;
-        doBulkDelete(ids);
+        Swal.fire({
+            title: 'Xoá ' + ids.length + ' mã hàng?',
+            html:  '<span style="font-size:13.5px;color:#6b7280;">Hành động này sẽ xoá mềm <strong>' + ids.length + '</strong> mã hàng đã chọn và toàn bộ công đoạn liên quan.</span>',
+            icon:  'warning',
+            iconColor: '#ef4444',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-trash"></i> Xoá tất cả',
+            cancelButtonText:  'Huỷ',
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor:  '#6b7280',
+            reverseButtons: true,
+            focusCancel: true,
+        }).then(result => {
+            if (result.isConfirmed) doBulkDelete(ids);
+        });
     });
 
     /* ===== CONTEXT MENU ====================================================== */
@@ -599,16 +631,59 @@
         openSiForm(activeRow.dataset.id);
     });
     document.getElementById('ctxDeleteStyle').addEventListener('click', () => {
-        if (!activeRow) return; hideCtx();
-        document.getElementById('siDeleteInfoBox').textContent = activeRow.dataset.code;
-        openModal('modalSiDelete');
+        if (!activeRow) return;
+        const rowRef  = activeRow;
+        const code    = rowRef.dataset.code;
+        hideCtx();
+        Swal.fire({
+            title: 'Xoá mã hàng?',
+            html:  '<span style="font-size:13.5px;color:#6b7280;">Sẽ xoá mềm StyleInfo</span><br>' +
+                   '<code style="font-size:14px;font-weight:800;color:#ef4444;background:#FEF2F2;padding:3px 10px;border-radius:6px;">' + esc(code) + '</code><br>' +
+                   '<span style="font-size:12.5px;color:#9ca3af;margin-top:6px;display:block;">và tất cả công đoạn liên quan. Dữ liệu sẽ không còn hiển thị.</span>',
+            icon:  'warning',
+            iconColor: '#ef4444',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-trash"></i> Xoá',
+            cancelButtonText:  'Huỷ',
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor:  '#6b7280',
+            reverseButtons: true,
+            focusCancel: true,
+        }).then(async result => {
+            if (!result.isConfirmed) return;
+            try {
+                const res  = await fetch('/StyleInfo/SoftDelete', {
+                    method: 'POST', headers: { 'Content-Type':'application/json' },
+                    body: JSON.stringify({ id: rowRef.dataset.id })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    toast('success', data.message);
+                    activeRow = null;
+                    loadTable(currentPage);
+                } else { toast('error', data.message || 'Lỗi.'); }
+            } catch(e) { toast('error', e.message); }
+        });
     });
     document.getElementById('ctxBulkDelete').addEventListener('click', () => {
         hideCtx();
         const ids = ms_selected().map(r => r.dataset.id);
         if (!ids.length) return;
-        if (!confirm('Xoá ' + ids.length + ' mã hàng đã chọn? Hành động này không thể phục hồi.')) return;
-        doBulkDelete(ids);
+        Swal.fire({
+            title: 'Xoá ' + ids.length + ' mã hàng?',
+            html:  '<span style="font-size:13.5px;color:#6b7280;">Hành động này sẽ xoá mềm <strong>' + ids.length + '</strong> mã hàng đã chọn và toàn bộ công đoạn liên quan.</span>',
+            icon:  'warning',
+            iconColor: '#ef4444',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Xoá ' + ids.length + ' mã',
+            cancelButtonText:  'Huỷ',
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor:  '#6b7280',
+            reverseButtons: true,
+            focusCancel: true,
+        }).then(result => {
+            if (result.isConfirmed) doBulkDelete(ids);
+        });
     });
 
     /* ===== FORM: Create / Update ============================================= */
@@ -702,28 +777,7 @@
     document.getElementById('btnCloseSiForm').addEventListener('click', () => closeModal('modalSiForm'));
     document.getElementById('btnCancelSiForm').addEventListener('click', () => closeModal('modalSiForm'));
 
-    /* ===== DELETE ============================================================= */
-    document.getElementById('btnCloseSiDelete').addEventListener('click', () => closeModal('modalSiDelete'));
-    document.getElementById('btnCancelSiDelete').addEventListener('click', () => closeModal('modalSiDelete'));
-    document.getElementById('btnConfirmSiDelete').addEventListener('click', async () => {
-        if (!activeRow) return;
-        const btn = document.getElementById('btnConfirmSiDelete');
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xoá...';
-        try {
-            const res  = await fetch('/StyleInfo/SoftDelete', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ id: activeRow.dataset.id })
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                toast('error', data.message);
-                closeModal('modalSiDelete');
-                activeRow = null;
-                loadTable(currentPage);
-            } else { toast('error', data.message || 'Lỗi.'); }
-        } catch(e) { toast('error', e.message); }
-        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Xoá'; }
-    });
+    /* ===== DELETE — đã chuyển sang SweetAlert2 =============================== */
 
     /* ===== EXCEL IMPORT ======================================================= */
     let excelFile = null;
@@ -792,7 +846,125 @@
     /* ===== HELPER ============================================================= */
     function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+    /* ===== DRAG-SELECT COLUMN STATS ========================================== */
+    // Drag chọn các ô trong cột data-col → hiện floating stat card
+    (function initColSelect() {
+        const tbl       = document.getElementById('siTbody');
+        const statCard  = document.getElementById('siColStatCard');
+        const statBody  = document.getElementById('siColStatBody');
+        let dragging = false, startCol = null, selCells = [];
+
+        function clearSel() {
+            selCells.forEach(c => c.classList.remove('si-col-sel'));
+            selCells = [];
+            statCard.classList.remove('show');
+        }
+
+        function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('vi-VN'); }
+
+        function updateStat() {
+            if (!selCells.length) { statCard.classList.remove('show'); return; }
+            const vals = selCells.map(td => parseFloat(td.dataset.val) || 0);
+            const cnt  = vals.length;
+            const sum  = vals.reduce((a,b) => a+b, 0);
+            const avg  = cnt ? (sum/cnt) : 0;
+            statBody.innerHTML =
+                '<div class="si-stat-row"><span class="si-stat-lbl">Số lượng cột chọn</span><span class="si-stat-val">' + cnt + '</span></div>' +
+                '<div class="si-stat-row"><span class="si-stat-lbl">Tổng công đoạn</span><span class="si-stat-val si-stat-hl">' + fmt(sum) + '</span></div>' +
+                '<div class="si-stat-row"><span class="si-stat-lbl">Trung bình</span><span class="si-stat-val">' + avg.toFixed(1) + '</span></div>';
+            statCard.classList.add('show');
+        }
+
+        tbl.addEventListener('mousedown', e => {
+            const td = e.target.closest('td[data-col]');
+            if (!td) { clearSel(); return; }
+            e.preventDefault();
+            dragging  = true;
+            startCol  = td.dataset.col;
+            clearSel();
+            td.classList.add('si-col-sel'); selCells = [td];
+            updateStat();
+        });
+
+        tbl.addEventListener('mouseover', e => {
+            if (!dragging) return;
+            const td = e.target.closest('td[data-col]');
+            if (!td || td.dataset.col !== startCol) return;
+            const allInCol = Array.from(tbl.querySelectorAll('td[data-col="' + startCol + '"]'));
+            const si = allInCol.indexOf(selCells[0]), ei = allInCol.indexOf(td);
+            if (si < 0 || ei < 0) return;
+            const lo = Math.min(si,ei), hi = Math.max(si,ei);
+            selCells.forEach(c => c.classList.remove('si-col-sel')); selCells = [];
+            for (let i = lo; i <= hi; i++) { allInCol[i].classList.add('si-col-sel'); selCells.push(allInCol[i]); }
+            updateStat();
+        });
+
+        document.addEventListener('mouseup', () => { dragging = false; });
+        tbl.addEventListener('selectstart', e => { if (dragging) e.preventDefault(); });
+        document.addEventListener('mousedown', e => {
+            if (!tbl.contains(e.target)) clearSel();
+        });
+    }());
+
     /* ===== INIT =============================================================== */
     loadDepts().then(() => loadTable(1));
 })();
 </script>
+
+<!-- Floating stat card cho drag-select cột -->
+<div id="siColStatCard" class="si-col-stat-card">
+    <div class="si-col-stat-head"><i class="fa-solid fa-table-cells-large"></i> Thống kê vùng chọn</div>
+    <div id="siColStatBody"></div>
+</div>
+
+<style>
+    /* ── Date filter ─────────────────────────────────────────────────────── */
+    #filterFromDate, #filterToDate { cursor:pointer; }
+
+    /* ── Drag-select cell highlight ──────────────────────────────────────── */
+    #siTbody td[data-col] { cursor:cell; }
+    #siTbody td.si-col-sel {
+        background: rgba(59,130,246,.13) !important;
+        outline: 1.5px solid rgba(59,130,246,.45);
+        outline-offset: -1px;
+    }
+
+    /* ── Floating stat card ──────────────────────────────────────────────── */
+    .si-col-stat-card {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 8800;
+        display: none;
+        flex-direction: column;
+        gap: 0;
+        min-width: 200px;
+        background: var(--bg-surface, #fff);
+        border: 1.5px solid var(--border, #d1d5e0);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(10,14,26,.18), 0 2px 8px rgba(10,14,26,.08);
+        padding: 10px 16px 12px;
+        font-size: 12px;
+        animation: siStatIn .18s cubic-bezier(.4,0,.2,1);
+    }
+    .si-col-stat-card.show { display: flex; }
+    @@keyframes siStatIn {
+        from { opacity:0; transform:translateY(12px) scale(.96); }
+        to   { opacity:1; transform:none; }
+    }
+    .si-col-stat-head {
+        font-size: 10.5px; font-weight: 700; color: var(--ink-400);
+        padding-bottom: 7px; margin-bottom: 6px;
+        border-bottom: 1px solid var(--border-soft, #e5e8f0);
+        display: flex; align-items: center; gap: 6px;
+    }
+    .si-stat-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; padding: 4px 0;
+        border-bottom: 1px solid var(--border-soft, #e5e8f0);
+    }
+    .si-stat-row:last-child { border-bottom: none; }
+    .si-stat-lbl { color: var(--ink-400); font-size: 11px; white-space: nowrap; }
+    .si-stat-val { color: var(--ink-900); font-weight: 800; font-size: 13px; }
+    .si-stat-hl  { color: var(--primary); }
+</style>

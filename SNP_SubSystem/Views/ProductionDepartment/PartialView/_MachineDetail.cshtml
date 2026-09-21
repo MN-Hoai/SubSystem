@@ -236,6 +236,17 @@
                 <option value="-1">Tạm khóa</option>
             </select>
         </div>
+        <!-- Phân cách -->
+        <div style="width:1px;background:var(--border);align-self:stretch;margin:2px 4px;"></div>
+        <!-- Bộ lọc ngày -->
+        <div class="md-filter-group">
+            <label class="md-filter-label"><i class="fa-solid fa-calendar-days" style="margin-right:3px;color:var(--accent-gold);"></i>Từ ngày</label>
+            <input type="date" id="mdDateFrom">
+        </div>
+        <div class="md-filter-group">
+            <label class="md-filter-label"><i class="fa-solid fa-calendar-days" style="margin-right:3px;color:var(--accent-gold);"></i>Đến ngày</label>
+            <input type="date" id="mdDateTo">
+        </div>
         <div class="md-filter-group" style="align-self:flex-end;">
             <button class="btn btn-primary btn-sm" id="mdFilterApply">
                 <i class="fa-solid fa-magnifying-glass"></i> Lọc
@@ -290,10 +301,9 @@
                         <th>Mã SP</th>
                         <th>Màu</th>
                         <th>Output / Qty</th>
-                        <th>Hôm nay / Target</th>
+                        <th id="mdTodayHeader">Hôm nay / Target</th>
                         <th>Trạng thái</th>
-                        <th style="text-align:center;">Chi tiết</th>
-                        <th style="text-align:center;">Thao tác</th>
+                       
                     </tr>
                 </thead>
                 <tbody id="mdTableBody">
@@ -501,6 +511,8 @@
     var allInfos       = [];
     var currentSearch  = '';
     var currentStatus  = '1';
+    var currentDateFrom = '';
+    var currentDateTo   = '';
     var addActiveTab   = 'pick';
     var addPickerItems = [];
     var pickedInfo     = null;
@@ -710,10 +722,23 @@
             return;
         }
         var url = '/ProductionDepartment/GetProductionInfos?machineId=' + encodeURIComponent(MACHINE_ID);
-        if (currentSearch) url += '&keyword=' + encodeURIComponent(currentSearch);
+        if (currentSearch)    url += '&keyword=' + encodeURIComponent(currentSearch);
+        if (currentDateFrom)  url += '&from='    + encodeURIComponent(currentDateFrom);
+        if (currentDateTo)    url += '&to='      + encodeURIComponent(currentDateTo);
 
         document.getElementById('mdTableBody').innerHTML =
             '<tr><td colspan="9" class="md-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Đang tải...</p></td></tr>';
+
+        // Cập nhật tiêu đề cột
+        var hdr = document.getElementById('mdTodayHeader');
+        if (hdr) {
+            if (currentDateFrom || currentDateTo) {
+                var label = (currentDateFrom || '?') + (currentDateTo && currentDateTo !== currentDateFrom ? ' – ' + currentDateTo : '');
+                hdr.textContent = label + ' / Target';
+            } else {
+                hdr.textContent = 'Hôm nay / Target';
+            }
+        }
 
         fetch(url)
             .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -738,12 +763,26 @@
 
     function renderSummary(list) {
         var totalOutput = list.reduce(function (s, p) { return s + (p.totalOutputNumber || 0); }, 0);
+        var filteredOutput = list.reduce(function (s, p) { return s + (p.todayOutput || 0); }, 0);
         var totalTarget = list.reduce(function (s, p) { return s + (p.target || 0); }, 0);
         var active = list.filter(function (p) { return p.status === 1; }).length;
         document.getElementById('sumTotal').textContent  = fmt(list.length);
-        document.getElementById('sumOutput').textContent = fmt(totalOutput);
+        document.getElementById('sumOutput').textContent = fmt(filteredOutput);
         document.getElementById('sumTarget').textContent = fmt(totalTarget);
         document.getElementById('sumActive').textContent = fmt(active);
+
+        // Cập nhật sub-text của card sản lượng
+        var subEl = document.querySelector('#mdSummaryRow .md-sum-card.accent-green .md-sum-sub');
+        if (subEl) {
+            if (currentDateFrom || currentDateTo) {
+                var rangeLabel = (currentDateFrom || '?');
+                if (currentDateTo && currentDateTo !== currentDateFrom) rangeLabel += ' – ' + currentDateTo;
+                subEl.textContent = 'trong khoảng: ' + rangeLabel;
+            } else {
+                subEl.textContent = 'hôm nay';
+            }
+        }
+
         document.getElementById('mdRecordCount').textContent = list.length + ' bản ghi';
     }
 
@@ -766,7 +805,11 @@
             var colorTarget = progressColor(pctTarget);
 
             var tr = document.createElement('tr');
-            tr.dataset.id = p.id;
+            tr.dataset.id    = p.id;
+            tr.dataset.line  = p.line  || '';
+            tr.dataset.style = p.style || '';
+            tr.dataset.sp    = p.spmain || '';
+            tr.dataset.color = p.color || '';
             tr.innerHTML =
                 '<td><div style="font-size:13px;font-weight:600;">' + esc(p.line || '—') + '</div></td>' +
                 '<td><div class="td-style-name">' + esc(p.style || '—') + '</div>' +
@@ -783,19 +826,8 @@
                     '<div class="td-progress-bar-bg"><div class="td-progress-bar-fill" style="width:' + pctTarget + '%;background:' + colorTarget + ';"></div></div>' +
                     '<div class="td-pct">' + pctTarget + '%</div>' +
                 '</div></td>' +
-                '<td>' + statusBadge(p.status) + '</td>' +
-                '<td style="text-align:center;"><button class="td-view-btn" data-id="' + p.id + '"><i class="fa-solid fa-eye"></i> Xem</button></td>' +
-                '<td style="text-align:center;"><button class="md-stop-btn" data-id="' + p.id + '" title="Tách khỏi máy"><i class="fa-solid fa-circle-stop"></i> Ngừng</button></td>';
+                '<td>' + statusBadge(p.status) + '</td>';
 
-            tr.querySelector('.td-view-btn').addEventListener('click', function (e) {
-                e.stopPropagation();
-                navigateToDetail(p);
-            });
-            tr.querySelector('.md-stop-btn').addEventListener('click', function(e) {
-                e.stopPropagation();
-                doRemoveFromMachine([p.id]);
-            });
-            // Click hàng: chỉ chọn (multi-select), không mở modal
             tbody.appendChild(tr);
         });
     }
@@ -1165,16 +1197,23 @@
        FILTER EVENTS
        ===================================================== */
     document.getElementById('mdFilterApply').addEventListener('click', function () {
-        currentSearch = document.getElementById('mdSearch').value.trim().toLowerCase();
-        currentStatus = document.getElementById('mdStatusFilter').value;
+        currentSearch   = document.getElementById('mdSearch').value.trim().toLowerCase();
+        currentStatus   = document.getElementById('mdStatusFilter').value;
+        currentDateFrom = document.getElementById('mdDateFrom').value;
+        currentDateTo   = document.getElementById('mdDateTo').value;
         loadProductionInfos();
     });
 
     document.getElementById('mdFilterReset').addEventListener('click', function () {
-        document.getElementById('mdSearch').value = '';
+        var today = new Date().toISOString().slice(0, 10);
+        document.getElementById('mdSearch').value       = '';
         document.getElementById('mdStatusFilter').value = '1';
-        currentSearch = '';
-        currentStatus = '1';
+        document.getElementById('mdDateFrom').value     = today;
+        document.getElementById('mdDateTo').value       = today;
+        currentSearch   = '';
+        currentStatus   = '1';
+        currentDateFrom = today;
+        currentDateTo   = today;
         loadProductionInfos();
     });
 
@@ -1194,7 +1233,118 @@
        INIT — Gọi trực tiếp vì partial view inject sau DOM ready
        (DOMContentLoaded đã fired trước khi partial được load)
        ===================================================== */
+    // Mặc định ngày hôm nay
+    (function () {
+        var today = new Date().toISOString().slice(0, 10);
+        var fi = document.getElementById('mdDateFrom');
+        var ti = document.getElementById('mdDateTo');
+        if (fi && !fi.value) { fi.value = today; currentDateFrom = today; }
+        if (ti && !ti.value) { ti.value = today; currentDateTo   = today; }
+    })();
+
     loadProductionInfos();
 
+}());
+</script>
+
+<style>
+    /* ---- Copy toast cho MachineDetail ---- */
+    #mdCopyToast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 99999;
+        background: #1a2744;
+        color: #e2e8f0;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: Manrope, sans-serif;
+        padding: 6px 14px;
+        border-radius: 8px;
+        box-shadow: 0 4px 18px rgba(0,0,0,.28);
+        pointer-events: none;
+        white-space: nowrap;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        animation: mdCopyToastIn .14s cubic-bezier(.4,0,.2,1);
+    }
+    @@keyframes mdCopyToastIn {
+        from { opacity:0; transform:translateY(8px) scale(.95); }
+        to   { opacity:1; transform:none; }
+    }
+    #mdTableBody td.md-td-copied {
+        background: rgba(59,130,246,.13) !important;
+        outline: 2px solid rgba(59,130,246,.45);
+        border-radius: 3px;
+        transition: background .25s, outline .25s;
+    }
+</style>
+
+<div id="mdCopyToast" style="display:none;">
+    <i class="fa-solid fa-copy" style="opacity:.75;"></i>
+    <span id="mdCopyToastText"></span>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var mdToast     = document.getElementById('mdCopyToast');
+    var mdToastText = document.getElementById('mdCopyToastText');
+    var mdToastTmr  = null;
+
+    function showMdCopyToast(val) {
+        mdToastText.textContent = val.length > 40 ? val.slice(0, 40) + '\u2026' : val;
+        mdToast.style.display = 'flex';
+        clearTimeout(mdToastTmr);
+        mdToastTmr = setTimeout(function () { mdToast.style.display = 'none'; }, 1600);
+    }
+
+    // Map col index -> data attribute trên <tr>
+    var COL_DATA_MAP = { 0:'line', 1:'style', 2:'sp', 3:'color' };
+
+    function getMdCellText(td) {
+        var colIdx = td.cellIndex;
+        var tr     = td.closest('tr');
+        if (COL_DATA_MAP[colIdx] !== undefined && tr) {
+            var v = tr.dataset[COL_DATA_MAP[colIdx]];
+            if (v) return v;
+        }
+        return (td.innerText || td.textContent || '').trim();
+    }
+
+    function fallbackCopy(text) {
+        var el = document.createElement('textarea');
+        el.value = text;
+        el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(el);
+        el.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(el);
+    }
+
+    var tbody = document.getElementById('mdTableBody');
+    if (tbody) {
+        tbody.addEventListener('dblclick', function (e) {
+            var td = e.target.closest('td');
+            if (!td) return;
+
+            var text = getMdCellText(td);
+            if (!text || text === '\u2014') return;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).catch(function () { fallbackCopy(text); });
+            } else {
+                fallbackCopy(text);
+            }
+
+            td.classList.add('md-td-copied');
+            setTimeout(function () { td.classList.remove('md-td-copied'); }, 500);
+
+            showMdCopyToast(text);
+            e.preventDefault();
+        });
+    }
 }());
 </script>

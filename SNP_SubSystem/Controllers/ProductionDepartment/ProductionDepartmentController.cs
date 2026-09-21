@@ -48,13 +48,15 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
 
         // ---------------------------------------------------------------
         // GET: Danh sách mã sản xuất theo máy
-        // GET /ProductionDepartment/GetProductionInfos?machineId={guid}&keyword=
+        // GET /ProductionDepartment/GetProductionInfos?machineId={guid}&keyword=&from=yyyy-MM-dd&to=yyyy-MM-dd
         // ---------------------------------------------------------------
 
         [HttpGet]
-        public async Task<IActionResult> GetProductionInfos(Guid machineId, string keyword = null)
+        public async Task<IActionResult> GetProductionInfos(
+            Guid machineId, string keyword = null,
+            DateOnly? from = null, DateOnly? to = null)
         {
-            var list = await _service.GetProductionInfosByMachine(machineId, keyword);
+            var list = await _service.GetProductionInfosByMachine(machineId, keyword, from, to);
             return Ok(list);
         }
 

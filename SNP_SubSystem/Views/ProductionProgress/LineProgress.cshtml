@@ -121,18 +121,47 @@
 .lp-tbl { user-select:none; }
 .lp-tbl td[data-col] { cursor:cell; }
 .lp-tbl td.lp-sel { background:rgba(59,130,246,.13) !important; outline:1.5px solid rgba(59,130,246,.45); outline-offset:-1px; }
-.lp-stat-bar { display:none; align-items:center; gap:0; flex-wrap:wrap;
-    background:var(--bg-canvas); border:1.5px solid var(--border); border-top:none;
-    border-radius:0 0 10px 10px; padding:5px 12px; font-size:12px; }
-.lp-stat-bar.show { display:flex; }
-.lp-stat-hd { font-size:10.5px; font-weight:700; color:var(--ink-400); padding-right:10px; white-space:nowrap; }
-.lp-stat-group { display:flex; align-items:center; gap:4px; padding:3px 10px;
-    border-right:1px solid var(--border-soft); white-space:nowrap; }
-.lp-stat-group:last-child { border-right:none; }
-.lp-stat-col { font-size:11px; font-weight:800; color:var(--primary); padding-right:3px; }
-.lp-stat-lbl { color:var(--ink-400); font-size:11px; }
-.lp-stat-val { color:var(--ink-900); font-weight:800; font-size:12px; margin-left:2px; }
-.lp-stat-sep { color:var(--border); margin:0 3px; font-size:13px; }
+/* ── Floating stat card (góc dưới phải) ─────────────────── */
+.lp-stat-bar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 8800;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    min-width: 180px;
+    max-width: 420px;
+    background: var(--bg-surface, #fff);
+    border: 1.5px solid var(--border, #d1d5e0);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(10,14,26,.18), 0 2px 8px rgba(10,14,26,.08);
+    padding: 10px 14px 10px 14px;
+    font-size: 12px;
+    animation: lpStatIn .18s cubic-bezier(.4,0,.2,1);
+    backdrop-filter: blur(6px);
+}
+.lp-stat-bar.show { display: flex; }
+@@keyframes lpStatIn {
+    from { opacity:0; transform:translateY(12px) scale(.96); }
+    to   { opacity:1; transform:none; }
+}
+.lp-stat-hd {
+    font-size: 10.5px; font-weight: 700; color: var(--ink-400);
+    padding-bottom: 6px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-soft, #e5e8f0);
+    white-space: nowrap; display: flex; align-items: center; gap: 5px;
+}
+.lp-stat-groups-wrap { display: flex; flex-direction: column; gap: 2px; }
+.lp-stat-group {
+    display: flex; align-items: center; gap: 4px; padding: 3px 0;
+    border-bottom: 1px solid var(--border-soft, #e5e8f0); white-space: nowrap;
+}
+.lp-stat-group:last-child { border-bottom: none; }
+.lp-stat-col { font-size: 11px; font-weight: 800; color: var(--primary); min-width: 72px; }
+.lp-stat-lbl { color: var(--ink-400); font-size: 11px; }
+.lp-stat-val { color: var(--ink-900); font-weight: 800; font-size: 12px; margin-left: 2px; }
+.lp-stat-sep { color: var(--border); margin: 0 4px; font-size: 13px; }
 </style>
 
 <div class="lp-page">
@@ -543,7 +572,7 @@
         html += '<div class="lp-card-head">';
         html += '<div class="lp-card-title"><i class="fa-solid fa-circle-half-stroke" style="color:var(--accent-navy);"></i> Phân bổ sản lượng tích lũy</div>';
         html += '<div style="font-size:11px;color:var(--ink-400);font-weight:600;">';
-        html += fmt(dept.totalTotalOutput) + '/' + fmt(dept.totalQtyFixed) + ' <span class="' + pctC(compPct) + '">(' + compPct + '%)</span>';
+        html += 'Tổng SL bộ phận: '+' ' + fmt(dept.totalTotalOutput) + '/' + fmt(dept.totalQtyFixed) + ' <span class="' + pctC(compPct) + '">(' + compPct + '%)</span>';
         html += '</div></div>';
         html += '<div class="lp-card-body">';
         html += '<div class="lp-chart-area-sm"><canvas id="detailDoughnutCanvas"></canvas></div>';
@@ -572,7 +601,7 @@
             html += '</tr>';
         });
         html += '</tbody></table>';
-        html += '<div class="lp-stat-bar" id="lpStatBar"></div>';
+        // lpStatBar là floating card ngoài DOM – không inject trong card
         html += '</div></div>'; // card-body + card
 
         detailGrid.innerHTML = html;
@@ -787,7 +816,8 @@
                 if (!byCol[c]) byCol[c] = [];
                 byCol[c].push(parseFloat(td.dataset.val) || 0);
             });
-            var h = '<span class="lp-stat-hd"><i class="fa-solid fa-table-cells-large" style="margin-right:5px;"></i>Chọn:</span>';
+            var h = '<span class="lp-stat-hd"><i class="fa-solid fa-table-cells-large"></i>Thống kê vùng chọn</span>';
+            h += '<div class="lp-stat-groups-wrap">';
             Object.keys(byCol).sort().forEach(function(col) {
                 var vals  = byCol[col];
                 var cnt   = vals.length;
@@ -803,6 +833,7 @@
                 h += '<span class="lp-stat-lbl">TB</span><span class="lp-stat-val">' + fmtStat(avg,isPct) + '</span>';
                 h += '</div>';
             });
+            h += '</div>';
             bar.innerHTML = h;
             bar.className = 'lp-stat-bar show';
         }
@@ -869,3 +900,6 @@
 
 }());
 </script>
+
+<!-- Floating stat card – hiển thị cố định góc dưới phải khi có vùng chọn -->
+<div class="lp-stat-bar" id="lpStatBar"></div>

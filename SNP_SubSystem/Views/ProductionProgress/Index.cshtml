@@ -1257,4 +1257,137 @@
     .modal-footer { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
     @@keyframes mbIn { from { opacity:0; transform:translateY(-16px) scale(.97); } to { opacity:1; transform:none; } }
     @@keyframes msSumIn { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
+    /* ---- Copy tooltip khi double-click ô ---- */
+    #copyToast {
+        position: fixed;
+        z-index: 99999;
+        background: #1a2744;
+        color: #e2e8f0;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: Manrope, sans-serif;
+        padding: 5px 12px;
+        border-radius: 7px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.28);
+        pointer-events: none;
+        white-space: nowrap;
+        display: none;
+        animation: copyToastIn .14s cubic-bezier(.4,0,.2,1);
+    }
+    @@keyframes copyToastIn {
+        from { opacity: 0; transform: translateY(6px) scale(.95); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    /* Hiệu ứng flash ô khi copy */
+    #progressTableBody td.td-copied {
+        background: rgba(59, 130, 246, 0.15) !important;
+        outline: 2px solid rgba(59, 130, 246, 0.5);
+        border-radius: 3px;
+        transition: background .25s, outline .25s;
+    }
 </style>
+
+<!-- Toast hiển thị khi copy ô -->
+<div id="copyToast"><i class="fa-solid fa-copy" style="margin-right:5px;opacity:.75;"></i><span id="copyToastText"></span></div>
+
+<script>
+(function () {
+    'use strict';
+
+    const toast     = document.getElementById('copyToast');
+    const toastText = document.getElementById('copyToastText');
+    let toastTimer  = null;
+
+    /**
+     * Hiển thị toast tại vị trí chuột
+     */
+    function showCopyToast(value, x, y) {
+        toastText.textContent = value.length > 40 ? value.slice(0, 40) + '…' : value;
+        toast.style.display = 'block';
+
+        // Định vị: xuất hiện bên phải / bên dưới con trỏ, cách 12px
+        const tw = toast.offsetWidth  || 160;
+        const th = toast.offsetHeight || 30;
+        let left = x + 14;
+        let top  = y + 14;
+
+        // Tránh bị cắt bởi màn hình
+        if (left + tw > window.innerWidth  - 8) left = x - tw - 8;
+        if (top  + th > window.innerHeight - 8) top  = y - th - 8;
+
+        toast.style.left = left + 'px';
+        toast.style.top  = top  + 'px';
+
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 1600);
+    }
+
+    /**
+     * Lấy text thuần từ một ô td (bỏ qua HTML badge/progress bar)
+     * Ưu tiên data-* trên <tr> nếu có, fallback về innerText của td
+     */
+    function getCellText(td) {
+        // Lấy index cột
+        const colIdx = td.cellIndex;
+        const tr     = td.closest('tr');
+
+        // Map cột → data attribute trên <tr>
+        const colDataMap = {
+            1: 'line',
+            2: 'style',
+            3: 'sp',
+        };
+
+        if (colDataMap[colIdx] !== undefined && tr) {
+            const v = tr.dataset[colDataMap[colIdx]];
+            if (v !== undefined && v !== '') return v;
+        }
+
+        // Fallback: text thuần của td (loại bỏ nội dung progress bar nếu cần)
+        return (td.innerText || td.textContent || '').trim();
+    }
+
+    /**
+     * Gắn event delegation lên tbody
+     */
+    const tbody = document.getElementById('progressTableBody');
+    if (tbody) {
+        tbody.addEventListener('dblclick', function (e) {
+            const td = e.target.closest('td');
+            if (!td) return;
+
+            const text = getCellText(td);
+            if (!text || text === '—') return;
+
+            // Copy vào clipboard
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+
+            // Hiệu ứng flash ô
+            td.classList.add('td-copied');
+            setTimeout(() => td.classList.remove('td-copied'), 500);
+
+            // Hiển thị toast
+            showCopyToast(text, e.clientX, e.clientY);
+
+            // Ngăn chọn text khi double-click
+            e.preventDefault();
+        });
+    }
+
+    function fallbackCopy(text) {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(el);
+        el.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(el);
+    }
+})();
+</script>

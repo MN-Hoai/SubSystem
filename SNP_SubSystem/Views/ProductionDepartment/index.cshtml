@@ -1454,12 +1454,13 @@
                 <button class="btn btn-primary btn-sm" id="atdFilterApply">
                     <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
                 </button>
+                  <button class="btn btn-primary btn-sm" id="atdOutputHistoryBtn" >
+                    <i class="fa-solid fa-chart-bar"></i> Xem sản lượng
+                </button>
                 <button class="btn btn-ghost btn-sm" id="atdFilterReset">
                     <i class="fa-solid fa-arrow-rotate-left"></i> Đặt lại
                 </button>
-                <button class="btn btn-sm" id="atdOutputHistoryBtn" style="background:linear-gradient(135deg,var(--accent-gold) 0%,#a87b3a 100%);color:#fff;box-shadow:0 4px 12px rgba(192,149,78,.3);">
-                    <i class="fa-solid fa-chart-bar"></i> Xem sản lượng
-                </button>
+              
             </div>
         </div>
 
@@ -1483,71 +1484,10 @@
     </div>
 </div>
 
-<!-- ===== OUTPUT HISTORY PANEL ===== -->
-<div id="atdOutputPanel" style="
-    display:none;
-    position:fixed;top:0;right:0;bottom:0;
-    width:min(92vw,900px);
-    background:var(--bg-surface);
-    box-shadow:-4px 0 32px rgba(22,33,62,.18);
-    z-index:1100;
-    display:flex;
-    flex-direction:column;
-    transform:translateX(100%);
-    transition:transform .32s cubic-bezier(.4,0,.2,1);
-    border-left:1px solid var(--border);
-">
-    <!-- Panel header -->
-    <div style="flex-shrink:0;padding:18px 24px 14px;background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%);display:flex;align-items:center;gap:14px;">
-        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;">
-            <i class="fa-solid fa-chart-bar"></i>
-        </div>
-        <div style="flex:1;min-width:0;">
-            <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.2px;">Sản lượng từng máy</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px;" id="atdPanelSubtitle">Chọn ngày và bộ phận để xem</div>
-        </div>
-        <button onclick="closeOutputPanel()" style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;border-radius:9px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
-            <i class="fa-solid fa-xmark"></i> Đóng
-        </button>
-    </div>
+@* Panel san luong tung may — tach ra partial view de gon code *@
+@await Html.PartialAsync("~/Views/ProductionDepartment/PartialView/_OutputHistoryPanel.cshtml")
 
-    <!-- Panel filter -->
-    <div style="flex-shrink:0;padding:12px 24px;background:var(--bg-canvas);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
-        <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Từ ngày</label>
-            <input type="date" id="panelDateFrom" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Đến ngày</label>
-            <input type="date" id="panelDateTo" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Bộ phận</label>
-            <select id="panelDeptFilter" style="padding:7px 28px 7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;appearance:none;">
-                <option value="">— Tất cả bộ phận —</option>
-            </select>
-        </div>
-        <button id="panelLoadBtn" onclick="loadOutputHistory()" style="padding:8px 16px;background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%);color:#fff;border:none;border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(31,58,103,.22);">
-            <i class="fa-solid fa-magnifying-glass"></i> Tra cứu
-        </button>
-        <button onclick="exportOutputCsv()" style="padding:8px 14px;background:var(--bg-surface);color:var(--ink-700-solid);border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;">
-            <i class="fa-solid fa-file-csv" style="color:var(--success);"></i> Xuất CSV
-        </button>
-    </div>
 
-    <!-- Summary badges -->
-    <div id="atdPanelSummary" style="flex-shrink:0;padding:10px 24px;background:var(--bg-canvas);border-bottom:1px solid var(--border);display:none;gap:16px;flex-wrap:wrap;align-items:center;"></div>
-
-    <!-- Table body -->
-    <div style="flex:1;overflow-y:auto;padding:16px 24px 24px;" id="atdPanelBody">
-        <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:64px;color:var(--ink-300);font-size:14px;">
-            <i class="fa-solid fa-chart-bar fa-2x" style="opacity:.3;"></i>
-            <span>Chọn khoảng ngày và nhấn <strong>Tra cứu</strong></span>
-        </div>
-    </div>
-</div>
-<!-- Backdrop -->
-<div id="atdOutputBackdrop" onclick="closeOutputPanel()" style="display:none;position:fixed;inset:0;background:rgba(22,33,62,.35);z-index:1099;backdrop-filter:blur(2px);"></div>
 
 <script>
 (function(){
@@ -1756,22 +1696,20 @@
         link.click();
     };
 
-    /* ---- Wire up button ---- */
+    /* ---- Wire up button (chỉ set ngày mặc định, panel tự xử lý open) ---- */
     document.addEventListener('DOMContentLoaded', function() {
         var btn = document.getElementById('atdOutputHistoryBtn');
         if (btn) btn.addEventListener('click', function() {
-            // Set default dates nếu chưa có
+            // Set default dates nếu chưa có — panel handler sẽ lo phần còn lại
             var pFrom = document.getElementById('panelDateFrom');
             var pTo   = document.getElementById('panelDateTo');
             var mainFrom = document.getElementById('atdDateFrom');
             var mainTo   = document.getElementById('atdDateTo');
-            if (!pFrom.value) {
+            if (pFrom && !pFrom.value) {
                 var today = new Date().toISOString().slice(0,10);
                 pFrom.value = mainFrom && mainFrom.value ? mainFrom.value : today;
                 pTo.value   = mainTo   && mainTo.value   ? mainTo.value   : today;
             }
-            syncPanelDepts();
-            openOutputPanel();
         });
 
         // Set default cho filter bar date inputs

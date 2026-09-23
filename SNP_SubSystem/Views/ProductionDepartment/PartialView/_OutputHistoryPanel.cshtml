@@ -1,0 +1,322 @@
+@*
+    ===================================================================
+    _OutputHistoryPanel.cshtml
+    Panel san luong tung may — slide-in tu phai man hinh.
+
+    Su dung trong index.cshtml:
+        @@await Html.PartialAsync("~/Views/ProductionDepartment/PartialView/_OutputHistoryPanel.cshtml")
+
+    API:
+        GET /ProductionDepartment/GetOutputHistory?from=&to=&deptId=
+
+    JS cong khai (window.*):
+        openOutputPanel()    — mo panel, dong bo ngay + dept tu filter bar
+        closeOutputPanel()   — dong panel
+        loadOutputHistory()  — goi API va render bang
+        exportOutputCsv()    — xuat CSV tu du lieu da tai
+    ===================================================================
+*@
+
+<!-- ===== OUTPUT HISTORY PANEL ===== -->
+<div id="atdOutputPanel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:min(92vw,1920px);background:var(--bg-surface);box-shadow:-4px 0 32px rgba(22,33,62,.18);z-index:1100;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);border-left:1px solid var(--border);">
+
+    <!-- Panel header -->
+    <div style="flex-shrink:0;padding:18px 24px 14px;background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%);display:flex;align-items:center;gap:14px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;">
+            <i class="fa-solid fa-chart-bar"></i>
+        </div>
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.2px;">Sản lượng máy</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px;" id="atdPanelSubtitle">Chọn ngày và bộ phận để xem</div>
+        </div>
+        <button onclick="closeOutputPanel()" style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;border-radius:9px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-xmark"></i> Đóng
+        </button>
+    </div>
+
+    <!-- Panel filter -->
+    <div style="flex-shrink:0;padding:12px 24px;background:var(--bg-canvas);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Từ ngày</label>
+            <input type="date" id="panelDateFrom" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Đến ngày</label>
+            <input type="date" id="panelDateTo" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:10.5px;font-weight:700;color:var(--ink-500);text-transform:uppercase;letter-spacing:.6px;">Bộ phận</label>
+            <select id="panelDeptFilter" style="padding:7px 28px 7px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-900);background:var(--bg-surface);outline:none;appearance:none;">
+                <option value="">— Tat ca bo phan —</option>
+            </select>
+        </div>
+        <button id="panelLoadBtn" onclick="loadOutputHistory()" style="padding:8px 16px;background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%);color:#fff;border:none;border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(31,58,103,.22);">
+            <i class="fa-solid fa-magnifying-glass"></i> Tra cứu
+        </button>
+        <button onclick="exportOutputCsv()" style="padding:8px 14px;background:var(--bg-surface);color:var(--ink-700-solid);border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;">
+            <i class="fa-solid fa-file-csv" style="color:var(--success);"></i> Xuất CSV
+        </button>
+    </div>
+
+    <!-- Summary badges -->
+    <div id="atdPanelSummary" style="flex-shrink:0;padding:10px 24px;background:var(--bg-canvas);border-bottom:1px solid var(--border);display:none;gap:16px;flex-wrap:wrap;align-items:center;"></div>
+
+    <!-- Table body -->
+    <div style="flex:1;overflow-y:auto;padding:16px 24px 24px;" id="atdPanelBody">
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:64px;color:var(--ink-300);font-size:14px;">
+            <i class="fa-solid fa-chart-bar fa-2x" style="opacity:.3;"></i>
+            <span>Chọn khoảng ngày và nhấn <strong>Tra cứu</strong></span>
+        </div>
+    </div>
+</div>
+
+<!-- Backdrop -->
+<div id="atdOutputBackdrop" onclick="closeOutputPanel()" style="display:none;position:fixed;inset:0;background:rgba(22,33,62,.35);z-index:1099;backdrop-filter:blur(2px);"></div>
+
+<script>
+(function () {
+
+    /* ---- Mo / dong panel ---- */
+    window.openOutputPanel = function () {
+        var panel    = document.getElementById('atdOutputPanel');
+        var backdrop = document.getElementById('atdOutputBackdrop');
+        panel.style.display    = 'flex';
+        backdrop.style.display = 'block';
+        setTimeout(function () { panel.style.transform = 'translateX(0)'; }, 10);
+
+        // Dong bo ngay tu filter bar neu co
+        var mainFrom = document.getElementById('atdDateFrom');
+        var mainTo   = document.getElementById('atdDateTo');
+        var pFrom    = document.getElementById('panelDateFrom');
+        var pTo      = document.getElementById('panelDateTo');
+        if (mainFrom && mainFrom.value) pFrom.value = mainFrom.value;
+        if (mainTo   && mainTo.value)   pTo.value   = mainTo.value;
+
+        // Dong bo dept
+        var deptSel   = document.getElementById('atdDeptFilter');
+        var panelDept = document.getElementById('panelDeptFilter');
+        if (deptSel && deptSel.value && panelDept) panelDept.value = deptSel.value;
+    };
+
+    window.closeOutputPanel = function () {
+        var panel    = document.getElementById('atdOutputPanel');
+        var backdrop = document.getElementById('atdOutputBackdrop');
+        panel.style.transform  = 'translateX(100%)';
+        backdrop.style.display = 'none';
+        setTimeout(function () { panel.style.display = 'none'; }, 340);
+    };
+
+    /* ---- Load bộ phận vào panel — chỉ chạy MỘT lần duy nhất ---- */
+    var _deptsLoaded = false;
+    function syncPanelDepts() {
+        if (_deptsLoaded) return;
+        var panelSel = document.getElementById('panelDeptFilter');
+        if (!panelSel) return;
+
+        // Ưu tiên copy từ dropdown chính nếu đã sẵn có
+        var mainSel = document.getElementById('atdDeptFilter');
+        if (mainSel && mainSel.options.length > 1) {
+            Array.from(mainSel.options).forEach(function (opt, i) {
+                if (i === 0) return;
+                var o = document.createElement('option');
+                o.value       = opt.value;
+                o.textContent = opt.textContent;
+                panelSel.appendChild(o);
+            });
+            _deptsLoaded = true;
+            return;
+        }
+
+        // Fallback: gọi API nếu dropdown chính chưa có dữ liệu
+        fetch('/ProductionDepartment/GetDepartments')
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                list.forEach(function (d) {
+                    var o = document.createElement('option');
+                    o.value       = d.id;
+                    o.textContent = d.departmentName;
+                    panelSel.appendChild(o);
+                });
+                _deptsLoaded = true;
+            })
+            .catch(function () {});
+    }
+
+    /* ---- Cache de xuat CSV ---- */
+    var _lastRawData = [];
+
+    /* ---- Goi API va hien thi bang ---- */
+    window.loadOutputHistory = function () {
+        var from   = document.getElementById('panelDateFrom').value;
+        var to     = document.getElementById('panelDateTo').value;
+        var deptId = document.getElementById('panelDeptFilter').value;
+        var body   = document.getElementById('atdPanelBody');
+        var sumEl  = document.getElementById('atdPanelSummary');
+        var sub    = document.getElementById('atdPanelSubtitle');
+        var btn    = document.getElementById('panelLoadBtn');
+
+        body.innerHTML      = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:64px;color:var(--ink-300);font-size:14px;"><i class="fa-solid fa-circle-notch fa-spin fa-lg"></i> Dang tai...</div>';
+        sumEl.style.display = 'none';
+        btn.disabled        = true;
+        btn.innerHTML       = '<i class="fa-solid fa-circle-notch fa-spin"></i> Dang tai...';
+
+        var url = '/ProductionDepartment/GetOutputHistory?';
+        if (from)   url += 'from='   + encodeURIComponent(from)   + '&';
+        if (to)     url += 'to='     + encodeURIComponent(to)     + '&';
+        if (deptId) url += 'deptId=' + encodeURIComponent(deptId) + '&';
+
+        fetch(url)
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (data) {
+                _lastRawData = data;
+                if (sub) sub.textContent = (from || '?') + ' \u2192 ' + (to || '?') + (deptId ? '' : ' \u2014 Chọn bộ phận');
+                renderOutputTable(data, body, sumEl);
+            })
+            .catch(function (e) {
+                body.innerHTML = '<div style="padding:48px;text-align:center;color:var(--danger);"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top:12px;">Loi: ' + e.message + '</p></div>';
+            })
+            .finally(function () {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Tra cuu';
+            });
+    };
+
+    /* ---- Render bang gop theo may ---- */
+    function renderOutputTable(rows, body, sumEl) {
+        if (!rows || rows.length === 0) {
+            body.innerHTML      = '<div style="padding:64px;text-align:center;color:var(--ink-300);"><i class="fa-solid fa-inbox fa-2x" style="opacity:.3;"></i><p style="margin-top:12px;">Khong co du lieu trong khoang ngay nay.</p></div>';
+            sumEl.style.display = 'none';
+            return;
+        }
+
+        // Group theo may
+        var machineMap   = {};
+        var machineOrder = [];
+        rows.forEach(function (r) {
+            var key = r.machineName || '\u2014';
+            if (!machineMap[key]) {
+                machineMap[key] = { machineName: key, deptName: r.deptName, total: 0, details: [] };
+                machineOrder.push(key);
+            }
+            machineMap[key].total += r.outputNumber || 0;
+            machineMap[key].details.push(r);
+        });
+
+        // Sort theo total giam dan
+        machineOrder.sort(function (a, b) { return machineMap[b].total - machineMap[a].total; });
+
+        var grandTotal   = rows.reduce(function (s, r) { return s + (r.outputNumber || 0); }, 0);
+        var machineCount = machineOrder.length;
+
+        sumEl.style.display = 'flex';
+        sumEl.innerHTML =
+            badge('fa-hashtag',  'Tong ban ghi',  rows.length,                         '#5b6a8a') +
+            badge('fa-industry', 'So may',          machineCount,                       'var(--accent-navy)') +
+            badge('fa-cubes',    'Tong san luong',  grandTotal.toLocaleString('vi-VN'), 'var(--success)');
+
+        var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+        html += '<thead><tr style="background:var(--bg-canvas);position:sticky;top:0;z-index:2;">';
+        html += th('May') + th('Bo phan') + th('Ngay') + th('Gio') + th('Line') + th('Style') + th('SP') + th('Cong doan') + th('SL', 'right');
+        html += '</tr></thead><tbody>';
+
+        machineOrder.forEach(function (mk, mi) {
+            var m     = machineMap[mk];
+            var rowBg = mi % 2 === 0 ? 'var(--bg-canvas)' : 'var(--bg-surface)';
+            m.details.sort(function (a, b) {
+                return b.createDate.localeCompare(a.createDate) || b.inputTime.localeCompare(a.inputTime);
+            });
+
+            m.details.forEach(function (d, di) {
+                html += '<tr style="background:' + rowBg + ';border-bottom:1px solid var(--border);transition:background .15s;" onmouseover="this.style.background=\'rgba(31,58,103,.06)\'" onmouseout="this.style.background=\'' + rowBg + '\'">';
+                if (di === 0) {
+                    html += '<td rowspan="' + m.details.length + '" style="font-weight:800;color:var(--accent-navy);padding:8px 12px;vertical-align:middle;white-space:nowrap;border-right:2px solid var(--border);background:' + rowBg + ';">';
+                    html +=   '<div style="display:flex;flex-direction:column;gap:2px;">';
+                    html +=     '<span>' + esc(m.machineName) + '</span>';
+                    html +=     '<span style="font-size:10px;font-weight:700;color:var(--ink-300);background:var(--bg-surface);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">\u25b2\u00a0' + m.total.toLocaleString('vi-VN') + '</span>';
+                    html +=   '</div></td>';
+                    html += '<td rowspan="' + m.details.length + '" style="font-size:11.5px;color:var(--ink-500);padding:8px 10px;vertical-align:middle;white-space:nowrap;border-right:1px solid var(--border);background:' + rowBg + ';">' + esc(m.deptName || '\u2014') + '</td>';
+                }
+                html += '<td style="padding:7px 10px;white-space:nowrap;color:var(--ink-600);font-size:12.5px;">'                                  + esc(d.createDate  || '\u2014') + '</td>';
+                html += '<td style="padding:7px 10px;white-space:nowrap;color:var(--ink-400);font-size:12px;">'                                    + esc(d.inputTime   || '\u2014') + '</td>';
+                html += '<td style="padding:7px 10px;white-space:nowrap;font-size:12px;">'                                                         + esc(d.line        || '\u2014') + '</td>';
+                html += '<td style="padding:7px 10px;white-space:nowrap;font-size:12px;">'                                                         + esc(d.style       || '\u2014') + '</td>';
+                html += '<td style="padding:7px 10px;white-space:nowrap;font-weight:700;color:var(--accent-navy);font-size:12px;">'                + esc(d.spmain      || '\u2014') + '</td>';
+                html += '<td style="padding:7px 10px;font-size:12px;">'                                                                            + esc(d.detailName  || '\u2014') + '</td>';
+                html += '<td style="padding:7px 12px;text-align:right;font-weight:800;font-size:13px;color:var(--success);white-space:nowrap;">'  + (d.outputNumber || 0).toLocaleString('vi-VN') + '</td>';
+                html += '</tr>';
+            });
+
+            // Dong tong cua may
+            html += '<tr style="background:rgba(31,58,103,.06);border-bottom:2px solid var(--border);">';
+            html += '<td colspan="8" style="padding:6px 12px;text-align:right;font-size:12px;font-weight:700;color:var(--ink-600);">Tong may <strong style="color:var(--accent-navy);">' + esc(m.machineName) + '</strong></td>';
+            html += '<td style="padding:6px 12px;text-align:right;font-size:13px;font-weight:900;color:var(--accent-navy);">' + m.total.toLocaleString('vi-VN') + '</td>';
+            html += '</tr>';
+        });
+
+        // Dong tong tat ca
+        html += '<tr style="background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%);">';
+        html += '<td colspan="8" style="padding:10px 12px;text-align:right;font-size:13px;font-weight:800;color:rgba(255,255,255,.8);">TONG CONG</td>';
+        html += '<td style="padding:10px 12px;text-align:right;font-size:16px;font-weight:900;color:#fff;">' + grandTotal.toLocaleString('vi-VN') + '</td>';
+        html += '</tr>';
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    }
+
+    function th(label, align) {
+        return '<th style="padding:9px 12px;text-align:' + (align || 'left') + ';font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-500);border-bottom:2px solid var(--border);white-space:nowrap;">' + label + '</th>';
+    }
+    function esc(v) {
+        return String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function badge(icon, label, value, color) {
+        return '<div style="display:flex;align-items:center;gap:7px;padding:6px 14px;background:var(--bg-surface);border:1.5px solid var(--border);border-radius:999px;">' +
+            '<i class="fa-solid ' + icon + '" style="color:' + color + ';font-size:11px;"></i>' +
+            '<span style="font-size:11.5px;font-weight:600;color:var(--ink-500);">' + label + ':</span>' +
+            '<span style="font-size:13px;font-weight:800;color:' + color + ';">' + value + '</span>' +
+            '</div>';
+    }
+
+    /* ---- Xuat CSV ---- */
+    window.exportOutputCsv = function () {
+        if (!_lastRawData || _lastRawData.length === 0) {
+            alert('Chua co du lieu de xuat. Vui long tra cuu truoc.');
+            return;
+        }
+        var headers = ['May', 'Bo phan', 'Ngay', 'Gio', 'Line', 'Style', 'SP', 'Cong doan', 'So luong'];
+        var csvRows = _lastRawData.map(function (r) {
+            return [
+                r.machineName || '', r.deptName || '', r.createDate || '', r.inputTime || '',
+                r.line || '', r.style || '', r.spmain || '', r.detailName || '', r.outputNumber || 0
+            ].map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+        });
+        var csv  = '\uFEFF' + headers.join(',') + '\n' + csvRows.join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var a    = document.createElement('a');
+        a.href   = URL.createObjectURL(blob);
+        a.download = 'SanLuong_' + (document.getElementById('panelDateFrom').value || 'all') +
+                     '_'         + (document.getElementById('panelDateTo').value   || 'all') + '.csv';
+        a.click();
+    };
+
+    /* ---- Gan su kien cho nut "Xem san luong" ---- */
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('atdOutputHistoryBtn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var pFrom    = document.getElementById('panelDateFrom');
+            var pTo      = document.getElementById('panelDateTo');
+            var mainFrom = document.getElementById('atdDateFrom');
+            var mainTo   = document.getElementById('atdDateTo');
+            if (!pFrom.value) {
+                var today = new Date().toISOString().slice(0, 10);
+                pFrom.value = (mainFrom && mainFrom.value) ? mainFrom.value : today;
+                pTo.value   = (mainTo   && mainTo.value)   ? mainTo.value   : today;
+            }
+            syncPanelDepts();
+            openOutputPanel();
+        });
+    });
+
+})();
+</script>
+

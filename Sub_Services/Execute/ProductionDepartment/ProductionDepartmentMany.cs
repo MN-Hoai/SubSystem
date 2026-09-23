@@ -67,44 +67,72 @@ namespace Sub_Services.Execute
                 .Select(dt => new { dt.DailyOutputId, dt.StyleDetailId, dt.OutputNumber })
                 .ToListAsync();
 
-            // Bước 4: tính effective (min logic) per DailyOutput record — client-side
-            // Nhóm details theo DailyOutputId → sum mỗi StyleDetail → lấy min
-            var detailsByDaily = allDetails
-                .GroupBy(dt => dt.DailyOutputId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.GroupBy(dt => dt.StyleDetailId)
-                           .Select(sg => sg.Sum(x => x.OutputNumber ?? 0))
-                           .ToList()
-                );
+            // Map DailyOutputId → ProductionInfoId
+            var dailyInfoMap = allDailyIds.ToDictionary(x => x.Id, x => x.ProductionInfoId);
 
-            // DailyOutput map: Id → (ProductionInfoId, InRange, TotalOutputNumber fallback)
-            var dailyMeta = allDailyIds.ToDictionary(x => x.Id);
+            // Bước 4: Tính effective theo đúng logic:
+            //   - Cộng tổng OutputNumber của TẤT CẢ DailyOutputDetail theo từng StyleDetailId
+            //     (tổng hợp cả kỳ, không tính min trên từng DailyOutput record)
+            //   - Sau đó lấy min của các tổng StyleDetail → sản lượng effective
+            //
+            // Toàn kỳ: group theo (ProductionInfoId, StyleDetailId) → sum → min per ProductionInfo
+            // Trong khoảng: chỉ lấy DailyOutput có InRange == true
 
-            // Effective per DailyOutput = min(detail sums) nếu có detail, else TotalOutputNumber
-            int EffectiveOf(Guid dailyId)
-            {
-                if (detailsByDaily.TryGetValue((Guid?)dailyId, out var sums) && sums.Count > 0)
-                    return sums.Min();
-                return dailyMeta.TryGetValue(dailyId, out var m) ? (m.TotalOutputNumber ?? 0) : 0;
-            }
-
-            // Tổng effective toàn kỳ và trong khoảng ngày lọc theo ProductionInfoId
+            // Nhóm allDetails theo ProductionInfoId trước
+            // (detail → dailyOutput → productionInfo)
             var totalByInfo    = new Dictionary<Guid, int>();
             var filteredByInfo = new Dictionary<Guid, int>();
 
-            foreach (var d in allDailyIds)
+            // --- Toàn kỳ ---
+            // Cộng tổng theo (ProductionInfoId, StyleDetailId)
+            var totalPerInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            foreach (var dt in allDetails)
             {
-                var eff = EffectiveOf(d.Id);
+                if (!dt.DailyOutputId.HasValue) continue;
+                if (!dailyInfoMap.TryGetValue(dt.DailyOutputId.Value, out var infoId)) continue;
+                if (!totalPerInfoPerDetail.TryGetValue(infoId, out var detMap))
+                    totalPerInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
+                detMap[dt.StyleDetailId] = (detMap.TryGetValue(dt.StyleDetailId, out var v) ? v : 0) + (dt.OutputNumber ?? 0);
+            }
 
+            // Lấy min của các tổng StyleDetail → effective toàn kỳ
+            foreach (var (infoId, detMap) in totalPerInfoPerDetail)
+            {
+                var sums = detMap.Values.ToList();
+                totalByInfo[infoId] = sums.Count > 0 ? sums.Min() : 0;
+            }
+
+            // Fallback: DailyOutput không có detail → dùng TotalOutputNumber cộng dồn
+            var infoIdsWithDetails = totalPerInfoPerDetail.Keys.ToHashSet();
+            foreach (var d in allDailyIds.Where(d => !infoIdsWithDetails.Contains(d.ProductionInfoId)))
+            {
                 if (!totalByInfo.ContainsKey(d.ProductionInfoId)) totalByInfo[d.ProductionInfoId] = 0;
-                totalByInfo[d.ProductionInfoId] += eff;
+                totalByInfo[d.ProductionInfoId] += d.TotalOutputNumber ?? 0;
+            }
 
-                if (d.InRange)
-                {
-                    if (!filteredByInfo.ContainsKey(d.ProductionInfoId)) filteredByInfo[d.ProductionInfoId] = 0;
-                    filteredByInfo[d.ProductionInfoId] += eff;
-                }
+            // --- Trong khoảng lọc ---
+            var inRangeDailyIdSet = allDailyIds.Where(d => d.InRange).Select(d => d.Id).ToHashSet();
+            var filteredPerInfoPerDetail = new Dictionary<Guid, Dictionary<Guid?, int>>();
+            foreach (var dt in allDetails.Where(dt => dt.DailyOutputId.HasValue && inRangeDailyIdSet.Contains(dt.DailyOutputId!.Value)))
+            {
+                if (!dailyInfoMap.TryGetValue(dt.DailyOutputId!.Value, out var infoId)) continue;
+                if (!filteredPerInfoPerDetail.TryGetValue(infoId, out var detMap))
+                    filteredPerInfoPerDetail[infoId] = detMap = new Dictionary<Guid?, int>();
+                detMap[dt.StyleDetailId] = (detMap.TryGetValue(dt.StyleDetailId, out var v) ? v : 0) + (dt.OutputNumber ?? 0);
+            }
+
+            foreach (var (infoId, detMap) in filteredPerInfoPerDetail)
+            {
+                var sums = detMap.Values.ToList();
+                filteredByInfo[infoId] = sums.Count > 0 ? sums.Min() : 0;
+            }
+
+            // Fallback trong khoảng: DailyOutput không có detail
+            var filteredInfoIdsWithDetails = filteredPerInfoPerDetail.Keys.ToHashSet();
+            foreach (var d in allDailyIds.Where(d => d.InRange && !filteredInfoIdsWithDetails.Contains(d.ProductionInfoId)))
+            {
+                if (!filteredByInfo.ContainsKey(d.ProductionInfoId)) filteredByInfo[d.ProductionInfoId] = 0;
+                filteredByInfo[d.ProductionInfoId] += d.TotalOutputNumber ?? 0;
             }
 
             // Bước 5: lấy thông tin ProductionInfo và ghép
@@ -852,31 +880,37 @@ namespace Sub_Services.Execute
                 await _context.SaveChangesAsync(); // cần Id trước khi thêm details
             }
 
-            // Upsert từng chi tiết:
-            // Nếu đã có DailyOutputDetail cùng (DailyOutputId, StyleDetailId, InputTime.Hour) → UPDATE
-            // Ngược lại → INSERT mới
+            // Upsert/Insert từng chi tiết:
+            // - source == "manual" → luôn INSERT mới (cho phép ghi thêm cùng ngày giờ)
+            // - source khác (excel, null…) → upsert theo giờ + công đoạn để tránh trùng lặp
+            var isManual = string.Equals(req.Source, "manual", StringComparison.OrdinalIgnoreCase);
+
             foreach (var entry in req.Details)
             {
                 if (entry.OutputNumber <= 0) continue;
 
-                // Tìm record có cùng giờ + công đoạn trong ngày này
-                var existing = daily.DailyOutputDetails
-                    .FirstOrDefault(dt =>
-                        dt.StyleDetailId == entry.StyleDetailId
-                        && dt.Status == 1
-                        && dt.InputTime.Hour == time.Hour);
+                Sub_Entities.Entities.DailyOutputDetail existing = null;
+                if (!isManual)
+                {
+                    // Tìm record có cùng giờ + công đoạn trong ngày này (chỉ áp dụng cho Excel/upsert)
+                    existing = daily.DailyOutputDetails
+                        .FirstOrDefault(dt =>
+                            dt.StyleDetailId == entry.StyleDetailId
+                            && dt.Status == 1
+                            && dt.InputTime.Hour == time.Hour);
+                }
 
                 if (existing != null)
                 {
-                    // Cùng giờ + công đoạn → cập nhật sản lượng
+                    // Cùng giờ + công đoạn (excel mode) → cập nhật sản lượng
                     existing.OutputNumber = entry.OutputNumber;
-                    existing.InputTime    = time;   // cập nhật minute chính xác hơn
+                    existing.InputTime    = time;
                     existing.Keyword      = req.Keyword;
                     existing.UpdateDate   = now;
                 }
                 else
                 {
-                    // Chưa có → tạo mới
+                    // Manual: luôn tạo mới | Excel: chưa có record giờ này → tạo mới
                     var detail = new Sub_Entities.Entities.DailyOutputDetail
                     {
                         Id            = Guid.NewGuid(),
@@ -892,6 +926,7 @@ namespace Sub_Services.Execute
                     _context.DailyOutputDetails.Add(detail);
                 }
             }
+
 
             // Cập nhật TotalOutputNumber trên DailyOutput (min của tổng details)
             await _context.SaveChangesAsync();

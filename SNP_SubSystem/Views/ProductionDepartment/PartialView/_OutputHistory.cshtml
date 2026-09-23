@@ -1,172 +1,169 @@
-@{
+﻿@{
     ViewData["Title"] = "Lịch sử ghi sản lượng";
+    Layout = "~/Views/Shared/_Layout.cshtml";
 }
+
 <style>
-    :root {
-        --accent-navy:      #1f3a67;
-        --accent-navy-700:  #16305a;
-        --accent-navy-soft: #e8edf5;
-        --accent-gold:      #c9972a;
-        --accent-gold-soft: #fef3d0;
-        --success:          #1a9e65;
-        --danger:           #d64040;
-        --border:           #e2e6ef;
-        --border-soft:      #f0f2f8;
-        --bg-canvas:        #ffffff;
-        --bg-surface:       #f7f8fc;
-        --ink-900:          #1a1d29;
-        --ink-700-solid:    #2e3349;
-        --ink-500:          #64697f;
-        --ink-400:          #8e93a8;
-        --ink-300:          #b4b9cc;
-    }
+    .oh-page { display:flex; flex-direction:column; height:calc(100vh - var(--header-h, 68px)); overflow:hidden; background:var(--bg-canvas); }
 
-    /* PAGE */
-    .oh-page { display:flex; flex-direction:column; height:calc(100vh - var(--header-h,60px)); overflow:hidden; font-family:'Inter','Segoe UI',system-ui,sans-serif; background:var(--bg-surface); }
+    /* Thanh tiêu đề */
+    .oh-topbar { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:16px 28px 14px; background:var(--bg-surface); border-bottom:1px solid var(--border); gap:14px; flex-wrap:wrap; }
+    .oh-topbar-left  { display:flex; align-items:center; gap:14px; }
+    .oh-topbar-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .oh-page-icon { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; box-shadow:0 6px 18px rgba(31,58,103,.28); }
+    .oh-page-title { font-size:20px; font-weight:800; background:linear-gradient(135deg,var(--accent-navy) 0%,#3a5fa8 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-.3px; }
+    .oh-page-sub { font-size:12.5px; color:var(--ink-400); margin-top:2px; }
+    .oh-live-chip { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--ink-400); background:var(--bg-canvas); border:1px solid var(--border); padding:5px 12px; border-radius:999px; }
+    .oh-live-dot { width:7px; height:7px; border-radius:50%; background:var(--success); animation:pulse 2s infinite; }
+    @@keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.5;transform:scale(.75);} }
 
-    /* TOP BAR */
-    .oh-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 24px 12px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; gap:14px; flex-wrap:wrap; }
-    .oh-topbar-left { display:flex; align-items:center; gap:14px; }
-    .oh-icon { width:42px; height:42px; border-radius:11px; background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; box-shadow:0 4px 14px rgba(31,58,103,.28); }
-    .oh-page-title { font-size:20px; font-weight:800; background:linear-gradient(135deg,var(--accent-navy) 0%,#3a5fa8 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-    .oh-page-sub { font-size:12.5px; color:var(--ink-400); margin-top:1px; }
-    .oh-date-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--ink-400); background:var(--bg-surface); border:1px solid var(--border); padding:4px 10px; border-radius:999px; }
-    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s,transform .15s; text-decoration:none; }
+    /* Nút */
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:9px 18px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; border:none; font-family:inherit; transition:background .18s,opacity .18s,transform .14s; text-decoration:none; }
+    .btn-sm { padding:7px 14px; font-size:12.5px; border-radius:8px; }
     .btn-ghost { background:var(--bg-canvas); color:var(--ink-700-solid); border:1.5px solid var(--border); }
-    .btn-ghost:hover { background:var(--border-soft); }
-    .btn-primary { background:linear-gradient(135deg,var(--accent-navy) 0%,var(--accent-navy-700) 100%); color:#fff; box-shadow:0 4px 12px rgba(31,58,103,.22); }
+    .btn-ghost:hover { background:var(--accent-navy-soft); border-color:var(--accent-navy); color:var(--accent-navy); }
+    .btn-primary { background:linear-gradient(135deg,var(--accent-navy) 0%,#142b55 100%); color:#fff; box-shadow:0 4px 14px rgba(31,58,103,.25); }
     .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
-    .btn-sm { padding:7px 13px; font-size:12.5px; border-radius:8px; }
+    .btn-success { background:var(--success); color:#fff; box-shadow:0 4px 14px rgba(46,158,113,.25); }
+    .btn-success:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-danger { background:var(--danger); color:#fff; box-shadow:0 4px 14px rgba(210,89,79,.22); }
+    .btn-danger:hover { opacity:.88; transform:translateY(-1px); }
 
-    /* FILTER BAR */
-    .oh-filter { display:flex; align-items:flex-end; gap:10px; padding:12px 24px 13px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
-    .oh-filter-grp { display:flex; flex-direction:column; gap:3px; }
-    .oh-filter-lbl { font-size:10.5px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.4px; }
-    .oh-inp { padding:7px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; transition:border-color .18s,box-shadow .18s; }
+    /* Thanh lọc */
+    .oh-filter { flex-shrink:0; display:flex; align-items:flex-end; gap:10px; padding:12px 28px 13px; background:var(--bg-canvas); border-bottom:2px solid var(--border); flex-wrap:wrap; }
+    .oh-filter-grp { display:flex; flex-direction:column; gap:4px; }
+    .oh-filter-lbl { font-size:10.5px; font-weight:700; color:var(--ink-500); text-transform:uppercase; letter-spacing:.5px; }
+    .oh-inp { padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; color:var(--ink-900); background:var(--bg-surface); outline:none; transition:border-color .18s,box-shadow .18s; }
     .oh-inp:focus { border-color:var(--accent-navy); box-shadow:0 0 0 3px var(--accent-navy-soft); }
     .oh-search-wrap { position:relative; }
-    .oh-search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ink-300); font-size:12px; }
-    .oh-search-wrap .oh-inp { padding-left:30px; min-width:200px; }
+    .oh-search-wrap > i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ink-300); font-size:12px; pointer-events:none; }
+    .oh-search-wrap .oh-inp { padding-left:32px; min-width:220px; }
 
-    /* SUMMARY CHIPS */
-    .oh-summary { display:flex; gap:10px; padding:10px 24px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
-    .oh-sum-chip { display:flex; flex-direction:column; align-items:center; gap:1px; background:var(--bg-surface); border:1.5px solid var(--border); border-radius:10px; padding:8px 18px; min-width:80px; }
-    .oh-sum-chip .s-num { font-size:18px; font-weight:800; color:var(--ink-900); line-height:1.1; }
-    .oh-sum-chip .s-lbl { font-size:10px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.5px; }
-    .oh-sum-chip.accent-purple { border-color:var(--accent-navy); }
-    .oh-sum-chip.accent-purple .s-num { color:var(--accent-navy); }
-    .oh-sum-chip.accent-green .s-num { color:var(--success); }
+    /* Thẻ thống kê */
+    .oh-summary { flex-shrink:0; display:flex; gap:12px; padding:12px 28px; background:var(--bg-canvas); border-bottom:1px solid var(--border); flex-wrap:wrap; align-items:center; }
+    .oh-sum-card { display:flex; align-items:center; gap:12px; background:var(--bg-surface); border:1.5px solid var(--border); border-radius:12px; padding:10px 18px; min-width:130px; transition:box-shadow .18s,transform .15s; }
+    .oh-sum-card:hover { box-shadow:var(--shadow-md); transform:translateY(-1px); }
+    .oh-sum-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+    .oh-sum-card .s-num { font-size:20px; font-weight:900; line-height:1.1; color:var(--ink-900); }
+    .oh-sum-card .s-lbl { font-size:10.5px; font-weight:700; color:var(--ink-400); text-transform:uppercase; letter-spacing:.4px; margin-top:1px; }
+    .card-navy  .oh-sum-icon { background:var(--accent-navy-soft); color:var(--accent-navy); }
+    .card-navy  .s-num        { color:var(--accent-navy); }
+    .card-green .oh-sum-icon { background:rgba(46,158,113,.12); color:var(--success); }
+    .card-green .s-num        { color:var(--success); }
+    .card-gold  .oh-sum-icon { background:var(--accent-gold-soft); color:var(--accent-gold); }
+    .card-gold  .s-num        { color:var(--accent-gold); }
+    .card-gray  .oh-sum-icon { background:var(--bg-canvas); color:var(--ink-500); }
 
-    /* BODY: TABLE */
+    /* Bảng dữ liệu */
     .oh-body { flex:1; overflow-y:auto; min-height:0; }
     .oh-table-wrap { overflow-x:auto; }
     .oh-table { width:100%; border-collapse:collapse; font-size:13px; user-select:none; }
     .oh-table thead tr { background:var(--bg-surface); position:sticky; top:0; z-index:2; }
-    .oh-table thead th { padding:9px 14px; text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-400); white-space:nowrap; border-bottom:2px solid var(--border); }
+    .oh-table thead th { padding:10px 14px; text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-500); white-space:nowrap; border-bottom:2px solid var(--border); }
     .oh-table thead th.sortable { cursor:pointer; transition:color .15s; }
     .oh-table thead th.sortable:hover { color:var(--accent-navy); }
     .oh-table thead th.sort-active { color:var(--accent-navy); }
     .oh-table tbody tr { border-bottom:1px solid var(--border-soft); transition:background .12s; }
     .oh-table tbody tr:hover { background:var(--accent-navy-soft); }
     .oh-table tbody td { padding:9px 14px; vertical-align:middle; }
-    .oh-num-cell { font-size:14px; font-weight:800; color:var(--accent-navy); cursor:cell; border-radius:5px; padding:2px 6px; display:inline-block; transition:background .1s; }
-    .oh-num-cell.selecting { background:var(--sel-cell-bg, rgba(31,58,103,.14)); color:var(--accent-navy); outline:2px solid rgba(31,58,103,.35); outline-offset:-1px; }
-    .oh-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; }
+    .oh-num-cell { font-size:14px; font-weight:800; color:var(--accent-navy); cursor:cell; border-radius:6px; padding:3px 8px; display:inline-block; transition:background .1s; }
+    .oh-num-cell.selecting { background:var(--sel-cell-bg,rgba(31,58,103,.14)); outline:2px solid rgba(31,58,103,.35); outline-offset:-1px; }
+    .oh-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:6px; font-size:11px; font-weight:700; }
     .oh-badge.manual { background:var(--accent-navy-soft); color:var(--accent-navy); }
-    .oh-badge.excel  { background:#e0f7ef; color:var(--success); }
-    .oh-empty { text-align:center; padding:60px; color:var(--ink-300); }
-    .oh-empty i { font-size:40px; display:block; margin-bottom:12px; }
+    .oh-badge.excel  { background:rgba(46,158,113,.12); color:var(--success); }
+    .oh-sp-badge { font-family:'Courier New',monospace; font-size:11.5px; font-weight:700; color:var(--accent-navy); background:var(--accent-navy-soft); padding:2px 9px; border-radius:5px; white-space:nowrap; }
+    .oh-empty { text-align:center; padding:64px 20px; color:var(--ink-300); }
+    .oh-empty i { font-size:44px; display:block; margin-bottom:14px; opacity:.35; }
     .oh-empty p { font-size:14px; font-weight:600; color:var(--ink-400); }
 
-    /* FOOTER: PAGINATION */
-    .oh-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 24px; border-top:1px solid var(--border); background:var(--bg-canvas); flex-shrink:0; flex-wrap:wrap; }
+    /* Phân trang */
+    .oh-foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 28px; border-top:1px solid var(--border); background:var(--bg-surface); flex-wrap:wrap; }
     .oh-page-info { font-size:12px; color:var(--ink-400); font-weight:600; }
     .oh-paging { display:flex; align-items:center; gap:5px; }
-    .oh-paging-btn { padding:5px 11px; border-radius:7px; border:1.5px solid var(--border); background:var(--bg-canvas); font-size:12.5px; font-weight:700; color:var(--ink-700-solid); cursor:pointer; transition:background .14s,border-color .14s; }
+    .oh-paging-btn { padding:6px 12px; border-radius:7px; border:1.5px solid var(--border); background:var(--bg-canvas); font-size:12.5px; font-weight:700; color:var(--ink-700-solid); cursor:pointer; transition:background .14s,border-color .14s,color .14s; }
     .oh-paging-btn:hover:not([disabled]) { background:var(--accent-navy-soft); border-color:var(--accent-navy); color:var(--accent-navy); }
     .oh-paging-btn[disabled] { opacity:.35; pointer-events:none; }
     .oh-paging-btn.active { background:var(--accent-navy); color:#fff; border-color:var(--accent-navy); }
-    .oh-page-size { padding:5px 10px; border:1.5px solid var(--border); border-radius:7px; font-family:inherit; font-size:12.5px; color:var(--ink-700-solid); background:var(--bg-canvas); outline:none; cursor:pointer; }
+    .oh-page-size { padding:6px 10px; border:1.5px solid var(--border); border-radius:7px; font-family:inherit; font-size:12.5px; color:var(--ink-700-solid); background:var(--bg-canvas); outline:none; cursor:pointer; }
 
-    /* DRAG-SELECT STATUS BAR */
-    .oh-sel-bar { position:fixed; bottom:20px; right:28px; z-index:500; background:#1e1e2e; color:#fff; border-radius:12px; padding:10px 20px; display:none; align-items:center; gap:18px; box-shadow:0 8px 28px rgba(0,0,0,.35); font-size:12.5px; animation:ohIn .18s ease; }
+    /* Thanh kéo chọn */
+    .oh-sel-bar { position:fixed; bottom:22px; right:28px; z-index:500; background:var(--accent-navy); color:#fff; border-radius:14px; padding:10px 22px; display:none; align-items:center; gap:20px; box-shadow:0 10px 32px rgba(31,58,103,.40); font-size:12.5px; animation:ohSlideUp .2s ease; }
     .oh-sel-bar.visible { display:flex; }
     .oh-sel-stat { display:flex; flex-direction:column; align-items:center; gap:1px; }
-    .oh-sel-stat .s-lbl { font-size:10px; font-weight:700; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.5px; }
-    .oh-sel-stat .s-val { font-size:15px; font-weight:800; color:#93c5fd; }
-    .oh-sel-divider { width:1px; height:32px; background:rgba(255,255,255,.15); }
-    .oh-sel-close { background:none; border:none; color:rgba(255,255,255,.4); cursor:pointer; font-size:14px; margin-left:4px; padding:2px; transition:color .15s; }
-    .oh-sel-close:hover { color:#fff; }
+    .oh-sel-stat .s-lbl { font-size:10px; font-weight:700; color:rgba(255,255,255,.5); text-transform:uppercase; letter-spacing:.5px; }
+    .oh-sel-stat .s-val { font-size:16px; font-weight:800; color:#bfdbfe; }
+    .oh-sel-divider { width:1px; height:34px; background:rgba(255,255,255,.2); }
+    .oh-sel-close { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:rgba(255,255,255,.8); cursor:pointer; font-size:12.5px; margin-left:4px; padding:5px 11px; border-radius:7px; transition:background .15s; }
+    .oh-sel-close:hover { background:rgba(255,255,255,.25); color:#fff; }
 
-    /* CONTEXT MENU */
-    .oh-ctx { position:fixed; background:var(--bg-canvas); border:1.5px solid var(--border); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.18); z-index:600; padding:5px; min-width:160px; display:none; animation:ohIn .12s ease; }
+    /* Context menu */
+    .oh-ctx { position:fixed; background:var(--bg-surface); border:1.5px solid var(--border); border-radius:11px; box-shadow:0 10px 32px rgba(22,33,62,.18); z-index:600; padding:5px; min-width:175px; display:none; animation:ohIn .12s ease; }
     .oh-ctx.visible { display:block; }
-    .oh-ctx-item { display:flex; align-items:center; gap:9px; padding:9px 13px; border-radius:7px; font-size:13px; font-weight:600; color:var(--ink-700-solid); cursor:pointer; transition:background .12s; }
-    .oh-ctx-item:hover { background:var(--bg-surface); }
+    .oh-ctx-item { display:flex; align-items:center; gap:9px; padding:9px 14px; border-radius:7px; font-size:13px; font-weight:600; color:var(--ink-700-solid); cursor:pointer; transition:background .12s; }
+    .oh-ctx-item:hover { background:var(--bg-canvas); }
     .oh-ctx-item.danger { color:var(--danger); }
-    .oh-ctx-item.danger:hover { background:#fdecea; }
+    .oh-ctx-item.danger:hover { background:rgba(210,89,79,.08); }
     .oh-ctx-sep { height:1px; background:var(--border-soft); margin:4px 5px; }
 
-    /* EDIT MODAL — pattern chuẩn hệ thống */
-    .oh-edit-bd { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:70px; }
-    .oh-edit-bd.open { display:flex !important; }
-    .oh-edit-modal { background:var(--bg-canvas); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:480px; max-width:95vw; max-height:calc(100vh - 120px); overflow-y:auto; animation:ohIn .22s cubic-bezier(.4,0,.2,1); }
-    .oh-edit-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); }
-    .oh-edit-title { font-size:16px; font-weight:700; color:var(--ink-900); display:flex; align-items:center; gap:8px; margin:0; }
-    .oh-edit-body { padding:20px 22px; display:flex; flex-direction:column; gap:16px; }
-    .oh-edit-lbl { display:block; font-size:13px; font-weight:600; color:var(--ink-700-solid); margin-bottom:5px; }
-    .oh-edit-val { font-size:13px; color:var(--ink-500); background:var(--bg-surface); border-radius:8px; padding:8px 12px; border:1px solid var(--border); }
-    .oh-edit-foot { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
-    .oh-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:2px 7px; border-radius:6px; transition:background .15s; }
-    .oh-modal-close:hover { background:var(--bg-surface); color:var(--danger); }
+    /* Modal */
+    .oh-modal-bd { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,14,26,.48); backdrop-filter:blur(4px); align-items:flex-start; justify-content:center; padding-top:72px; }
+    .oh-modal-bd.open { display:flex !important; }
+    .oh-modal-box { background:var(--bg-surface); border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,.22); width:500px; max-width:95vw; max-height:calc(100vh - 120px); overflow-y:auto; animation:ohIn .22s cubic-bezier(.4,0,.2,1); border:1px solid var(--border); }
+    .oh-modal-head { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 16px; border-bottom:1px solid var(--border); background:linear-gradient(135deg,var(--accent-navy-soft) 0%,var(--bg-surface) 100%); border-radius:16px 16px 0 0; }
+    .oh-modal-title { font-size:16px; font-weight:800; color:var(--ink-900); display:flex; align-items:center; gap:9px; margin:0; }
+    .oh-modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--ink-400); line-height:1; padding:3px 8px; border-radius:7px; transition:background .15s; }
+    .oh-modal-close:hover { background:var(--bg-canvas); color:var(--danger); }
+    .oh-modal-body { padding:22px 24px; display:flex; flex-direction:column; gap:18px; }
+    .oh-modal-foot { padding:14px 24px 20px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+    .oh-field-lbl { display:block; font-size:12.5px; font-weight:700; color:var(--ink-700-solid); margin-bottom:6px; }
+    .oh-field-info { font-size:13px; color:var(--ink-500); background:var(--bg-canvas); border-radius:8px; padding:9px 12px; border:1px solid var(--border); }
 
-    /* ROW MULTI-SELECT */
-    .oh-table tbody tr[data-id].oh-row-sel td { background:var(--sel-row-bg, rgba(31,58,103,.10)) !important; }
-    .oh-table tbody tr[data-id].oh-row-ctx td { background:var(--sel-ctx-bg, rgba(31,58,103,.18)) !important; }
+    /* Modal xác nhận */
+    .oh-cfm-bd { display:none; position:fixed; inset:0; z-index:9100; background:rgba(10,14,26,.48); backdrop-filter:blur(4px); align-items:flex-start; justify-content:center; padding-top:72px; }
+    .oh-cfm-bd.open { display:flex !important; }
+    .oh-cfm-box { background:var(--bg-surface); border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,.22); width:420px; max-width:95vw; overflow:hidden; animation:ohIn .22s cubic-bezier(.4,0,.2,1); border:1px solid var(--border); border-top:4px solid var(--danger); }
+    .oh-cfm-head { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 14px; border-bottom:1px solid var(--border); }
+    .oh-cfm-title { font-size:16px; font-weight:800; color:var(--danger); display:flex; align-items:center; gap:9px; margin:0; }
+    .oh-cfm-msg { font-size:14px; color:var(--ink-700-solid); line-height:1.65; padding:18px 24px; }
+    .oh-cfm-foot { padding:14px 24px 20px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
+
+    /* Hàng được chọn */
+    .oh-table tbody tr[data-id].oh-row-sel td { background:var(--sel-row-bg,rgba(31,58,103,.10)) !important; }
+    .oh-table tbody tr[data-id].oh-row-ctx td { background:var(--sel-ctx-bg,rgba(31,58,103,.18)) !important; }
     .oh-table tbody tr[data-id] { cursor:pointer; }
 
-    @@keyframes ohIn {
-        from { opacity:0; transform:translateY(10px) scale(.97); }
-        to   { opacity:1; transform:translateY(0)    scale(1); }
-    }
-
-    .oh-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:10px; font-size:13.5px; font-weight:700; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); animation:ohIn .2s ease; }
-
-    /* CONFIRM MODAL — pattern chuẩn hệ thống */
-    .oh-cfm-bd { display:none; position:fixed; inset:0; z-index:9100; background:rgba(10,14,26,.45); backdrop-filter:blur(3px); align-items:flex-start; justify-content:center; padding-top:70px; }
-    .oh-cfm-bd.open { display:flex !important; }
-    .oh-cfm-box { background:var(--bg-canvas); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.22); width:400px; max-width:95vw; overflow:hidden; animation:ohIn .22s cubic-bezier(.4,0,.2,1); }
-    .oh-cfm-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--border); border-top:4px solid var(--danger); }
-    .oh-cfm-title { font-size:16px; font-weight:700; color:var(--danger); display:flex; align-items:center; gap:8px; margin:0; }
-    .oh-cfm-body { padding:18px 22px; }
-    .oh-cfm-msg { font-size:14px; color:var(--ink-700-solid); line-height:1.6; }
-    .oh-cfm-foot { padding:14px 22px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); }
-    .btn-danger { background:var(--danger); color:#fff; box-shadow:0 4px 12px rgba(214,64,64,.22); }
-    .btn-danger:hover { opacity:.88; transform:translateY(-1px); }
+    @@keyframes ohIn { from{opacity:0;transform:translateY(10px) scale(.97);} to{opacity:1;transform:translateY(0) scale(1);} }
+    @@keyframes ohSlideUp { from{opacity:0;transform:translateY(14px);} to{opacity:1;transform:translateY(0);} }
 </style>
-
-<!-- PAGE -->
+<!-- TRANG LỊCH SỬ GHI SẢN LƯỢNG -->
 <div class="oh-page">
 
-    <!-- TOP BAR -->
+    <!-- THANH TIÊU ĐỀ -->
     <div class="oh-topbar">
         <div class="oh-topbar-left">
             <a href="/ProductionDepartment/RecordOutput" class="btn btn-ghost btn-sm">
                 <i class="fa-solid fa-arrow-left"></i> Quay lại
             </a>
-            <div class="oh-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+            <div class="oh-page-icon">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
             <div>
                 <div class="oh-page-title">Lịch sử ghi sản lượng</div>
-                <div class="oh-page-sub">Tra cứu, cập nhật và xoá các lần ghi</div>
+                <div class="oh-page-sub">Tra cứu, cập nhật và xoá các lần ghi sản lượng</div>
             </div>
         </div>
-        <div class="oh-date-chip">
-            <i class="fa-regular fa-calendar"></i>
-            <span id="ohTodayLabel">—</span>
+        <div class="oh-topbar-right">
+            <div class="oh-live-chip">
+                <div class="oh-live-dot"></div>
+                <span id="ohTodayLabel">—</span>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="exportCsv()">
+                <i class="fa-solid fa-file-csv"></i> Xuất CSV
+            </button>
         </div>
     </div>
 
-    <!-- FILTER BAR -->
+    <!-- THANH BỘ LỌC -->
     <div class="oh-filter">
         <div class="oh-filter-grp">
             <div class="oh-filter-lbl">Từ ngày</div>
@@ -178,27 +175,27 @@
         </div>
         <div class="oh-filter-grp">
             <div class="oh-filter-lbl">Bộ phận</div>
-            <select class="oh-inp" id="ohDeptFilter" style="min-width:140px;">
-                <option value="">Tất cả</option>
+            <select class="oh-inp" id="ohDeptFilter" style="min-width:150px;">
+                <option value="">— Tất cả bộ phận —</option>
             </select>
         </div>
         <div class="oh-filter-grp">
-            <div class="oh-filter-lbl">Tổ</div>
-            <select class="oh-inp" id="ohLineFilter" style="min-width:100px;">
-                <option value="">Tất cả</option>
+            <div class="oh-filter-lbl">Tổ / Line</div>
+            <select class="oh-inp" id="ohLineFilter" style="min-width:110px;">
+                <option value="">— Tất cả —</option>
             </select>
         </div>
         <div class="oh-filter-grp">
-            <div class="oh-filter-lbl">Nguồn</div>
-            <select class="oh-inp" id="ohSourceFilter" style="min-width:120px;">
-                <option value="">Tất cả</option>
+            <div class="oh-filter-lbl">Nguồn nhập</div>
+            <select class="oh-inp" id="ohSourceFilter" style="min-width:130px;">
+                <option value="">— Tất cả —</option>
                 <option value="excel">Excel</option>
                 <option value="manual">Thủ công</option>
             </select>
         </div>
         <div class="oh-filter-grp" style="align-self:flex-end;">
             <button class="btn btn-primary btn-sm" id="ohApplyBtn">
-                <i class="fa-solid fa-filter"></i> Lọc
+                <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
             </button>
         </div>
         <div class="oh-filter-grp" style="align-self:flex-end;">
@@ -207,45 +204,57 @@
             </button>
         </div>
         <div class="oh-filter-grp" style="flex:1;align-self:flex-end;">
-            <div class="oh-filter-lbl">Tìm kiếm</div>
+            <div class="oh-filter-lbl">Tìm kiếm nhanh</div>
             <div class="oh-search-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" class="oh-inp" id="ohSearch"
-                       placeholder="Style, mã SP, máy, công đoạn..." style="width:100%;box-sizing:border-box;min-width:220px;">
+                       placeholder="Style, mã SP, máy, công đoạn…" style="width:100%;box-sizing:border-box;min-width:220px;">
             </div>
         </div>
     </div>
 
-    <!-- SUMMARY CHIPS -->
+    <!-- THỐNG KÊ TỔNG QUAN -->
     <div class="oh-summary" id="ohSummary" style="display:none;">
-        <div class="oh-sum-chip accent-purple">
-            <div class="s-num" id="sumRows">0</div>
-            <div class="s-lbl">Bản ghi</div>
+        <div class="oh-sum-card card-navy">
+            <div class="oh-sum-icon"><i class="fa-solid fa-list-ul"></i></div>
+            <div>
+                <div class="s-num" id="sumRows">0</div>
+                <div class="s-lbl">Số bản ghi</div>
+            </div>
         </div>
-        <div class="oh-sum-chip accent-green">
-            <div class="s-num" id="sumTotal">0</div>
-            <div class="s-lbl">Tổng SL</div>
+        <div class="oh-sum-card card-green">
+            <div class="oh-sum-icon"><i class="fa-solid fa-cubes"></i></div>
+            <div>
+                <div class="s-num" id="sumTotal">0</div>
+                <div class="s-lbl">Tổng sản lượng</div>
+            </div>
         </div>
-        <div class="oh-sum-chip">
-            <div class="s-num" id="sumAvg">0</div>
-            <div class="s-lbl">TB/lần</div>
+        <div class="oh-sum-card card-gold">
+            <div class="oh-sum-icon"><i class="fa-solid fa-chart-simple"></i></div>
+            <div>
+                <div class="s-num" id="sumAvg">0</div>
+                <div class="s-lbl">Trung bình / lần</div>
+            </div>
         </div>
-        <div class="oh-sum-chip">
-            <div class="s-num" id="sumDays">0</div>
-            <div class="s-lbl">Số ngày</div>
+        <div class="oh-sum-card card-gray">
+            <div class="oh-sum-icon"><i class="fa-regular fa-calendar-days"></i></div>
+            <div>
+                <div class="s-num" id="sumDays">0</div>
+                <div class="s-lbl">Số ngày</div>
+            </div>
         </div>
         <div style="margin-left:auto;align-self:center;">
             <span id="ohRecordCount" style="font-size:12px;color:var(--ink-400);font-weight:600;"></span>
         </div>
     </div>
 
-    <!-- TABLE BODY -->
+    <!-- BẢNG DỮ LIỆU -->
     <div class="oh-body">
         <div class="oh-table-wrap">
             <table class="oh-table">
                 <thead>
                     <tr>
-                        <th style="width:38px;">#</th>
+                        <th style="width:40px;">#</th>
                         <th class="sortable sort-active" data-col="date">
                             Ngày <i class="fa-solid fa-sort-down fa-xs"></i>
                         </th>
@@ -254,8 +263,8 @@
                         </th>
                         <th>Bộ phận</th>
                         <th>Máy</th>
-                        <th>Mã SP</th>
-                        <th>Style</th>
+                        <th>Mã sản phẩm</th>
+                        <th>Style / Mã hàng</th>
                         <th class="sortable" data-col="detailName">
                             Công đoạn <i class="fa-solid fa-sort fa-xs"></i>
                         </th>
@@ -269,7 +278,7 @@
                     <tr>
                         <td colspan="10" class="oh-empty">
                             <i class="fa-solid fa-clock-rotate-left"></i>
-                            <p>Chọn khoảng ngày và nhấn <strong>Lọc</strong> để tải dữ liệu</p>
+                            <p>Chọn khoảng ngày và nhấn <strong>Tìm kiếm</strong> để tải dữ liệu</p>
                         </td>
                     </tr>
                 </tbody>
@@ -277,7 +286,7 @@
         </div>
     </div>
 
-    <!-- FOOTER: PAGINATION -->
+    <!-- FOOTER PHÂN TRANG -->
     <div class="oh-foot">
         <div style="display:flex;align-items:center;gap:10px;">
             <span class="oh-page-info" id="ohPageInfo"></span>
@@ -293,29 +302,29 @@
 
 </div><!-- /oh-page -->
 
-<!-- Context menu (right-click) -->
+<!-- Context menu (chuột phải) -->
 <div class="oh-ctx" id="ohCtxMenu">
     <div id="ohCtxSelInfo" style="display:none;padding:4px 13px 8px;font-size:11.5px;color:var(--ink-400);font-weight:700;border-bottom:1px solid var(--border-soft);margin-bottom:3px;">
         Đã chọn: <span id="ohCtxSelCount" style="color:var(--accent-navy);"></span> bản ghi
     </div>
     <div class="oh-ctx-item" id="ohCtxEdit">
-        <i class="fa-solid fa-pen" style="color:var(--accent-navy);"></i> Cập nhật
+        <i class="fa-solid fa-pen" style="color:var(--accent-navy);"></i> Cập nhật sản lượng
     </div>
     <div class="oh-ctx-sep"></div>
     <div class="oh-ctx-item danger" id="ohCtxDelete">
-        <i class="fa-solid fa-trash"></i> <span id="ohCtxDeleteLabel">Xoá</span>
+        <i class="fa-solid fa-trash"></i> <span id="ohCtxDeleteLabel">Xoá bản ghi</span>
     </div>
 </div>
 
-<!-- Drag-select stats bar -->
+<!-- Thanh kéo chọn sản lượng -->
 <div class="oh-sel-bar" id="ohSelBar">
     <div class="oh-sel-stat">
-        <span class="s-lbl">Số ô chọn</span>
+        <span class="s-lbl">Số ô đã chọn</span>
         <span class="s-val" id="ohSelCount">0</span>
     </div>
     <div class="oh-sel-divider"></div>
     <div class="oh-sel-stat">
-        <span class="s-lbl">Tổng</span>
+        <span class="s-lbl">Tổng cộng</span>
         <span class="s-val" id="ohSelSum">0</span>
     </div>
     <div class="oh-sel-divider"></div>
@@ -324,693 +333,375 @@
         <span class="s-val" id="ohSelAvg">0</span>
     </div>
     <button class="oh-sel-close" id="ohSelClose" title="Bỏ chọn">
-        <i class="fa-solid fa-xmark"></i>
+        <i class="fa-solid fa-xmark"></i> Bỏ chọn
     </button>
 </div>
 
-
-
-<!-- Edit modal -->
-<div id="ohEditBd" class="oh-edit-bd">
-    <div class="oh-edit-modal">
-        <div class="oh-edit-head">
-            <h2 class="oh-edit-title">
+<!-- Modal cập nhật sản lượng -->
+<div id="ohEditBd" class="oh-modal-bd">
+    <div class="oh-modal-box">
+        <div class="oh-modal-head">
+            <h2 class="oh-modal-title">
                 <i class="fa-solid fa-pen-to-square" style="color:var(--accent-navy);"></i>
                 Cập nhật sản lượng
             </h2>
             <button class="oh-modal-close" id="ohEditClose">&times;</button>
         </div>
-        <div class="oh-edit-body">
+        <div class="oh-modal-body">
             <div>
-                <label class="oh-edit-lbl">Công đoạn · Mã SP</label>
-                <div class="oh-edit-val" id="ohEditInfo">—</div>
+                <label class="oh-field-lbl">Công đoạn &middot; Mã sản phẩm</label>
+                <div class="oh-field-info" id="ohEditInfo">—</div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                 <div>
-                    <label class="oh-edit-lbl">Ngày <span style="color:var(--danger);">*</span></label>
+                    <label class="oh-field-lbl">Ngày <span style="color:var(--danger);">*</span></label>
                     <input type="date" class="oh-inp" id="ohEditDate" style="width:100%;box-sizing:border-box;">
                 </div>
                 <div>
-                    <label class="oh-edit-lbl">Giờ nhập</label>
+                    <label class="oh-field-lbl">Giờ nhập</label>
                     <input type="time" class="oh-inp" id="ohEditTime" style="width:100%;box-sizing:border-box;">
                 </div>
             </div>
             <div>
-                <label class="oh-edit-lbl">Sản lượng <span style="color:var(--danger);">*</span></label>
+                <label class="oh-field-lbl">Số sản lượng <span style="color:var(--danger);">*</span></label>
                 <input type="number" class="oh-inp" id="ohEditQty" min="0"
-                       style="width:100%;box-sizing:border-box;font-size:22px;font-weight:800;text-align:right;color:var(--accent-navy);height:52px;">
+                       style="width:100%;box-sizing:border-box;font-size:26px;font-weight:900;text-align:right;color:var(--accent-navy);height:58px;">
             </div>
         </div>
-        <div class="oh-edit-foot">
-            <button class="btn btn-ghost btn-sm" id="ohEditCancel">Hủy</button>
+        <div class="oh-modal-foot">
+            <button class="btn btn-ghost btn-sm" id="ohEditCancel">Huỷ</button>
             <button class="btn btn-primary" id="ohEditSave">
-                <i class="fa-solid fa-floppy-disk"></i> Lưu
+                <i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi
             </button>
         </div>
     </div>
 </div>
 
-<!-- Confirm modal -->
+<!-- Modal xác nhận xoá -->
 <div id="ohCfmBd" class="oh-cfm-bd">
     <div class="oh-cfm-box">
         <div class="oh-cfm-head">
             <h2 class="oh-cfm-title">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                <span id="ohCfmTitle">Xác nhận xóa</span>
+                <span id="ohCfmTitle">Xác nhận xoá</span>
             </h2>
             <button class="oh-modal-close" id="ohCfmClose">&times;</button>
         </div>
-        <div class="oh-cfm-body">
-            <div class="oh-cfm-msg" id="ohCfmMsg"></div>
-        </div>
+        <div class="oh-cfm-msg" id="ohCfmMsg"></div>
         <div class="oh-cfm-foot">
-            <button class="btn btn-ghost btn-sm" id="ohCfmCancel">Hủy</button>
+            <button class="btn btn-ghost btn-sm" id="ohCfmCancel">Huỷ bỏ</button>
             <button class="btn btn-danger btn-sm" id="ohCfmOk">
-                <i class="fa-solid fa-trash"></i> Xóa
+                <i class="fa-solid fa-trash"></i> Xoá bản ghi
             </button>
         </div>
     </div>
 </div>
-
 <script>
 (function () {
-    /* ── HELPERS ── */
-    function esc(s) {
-        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    function fmt(n) { return Number(n || 0).toLocaleString('vi-VN'); }
-    function todayStr() {
-        var d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    }
-    function fmtDateVN(s) {
-        if (!s) return '—';
-        var p = (s.split('T')[0]).split('-');
-        return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
-    }
-    function toast(msg, ok) {
-        if (ok) { toastr.success(msg); }
-        else    { toastr.error(msg); }
-    }
+    /* HELPERS */
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmt(n) { return Number(n||0).toLocaleString('vi-VN'); }
+    function todayStr() { var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    function fmtDateVN(s) { if(!s) return '—'; var p=(s.split('T')[0]).split('-'); return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):s; }
+    function fmtDayOfWeek(s) { if(!s) return ''; var days=['CN','T2','T3','T4','T5','T6','T7']; var d=new Date(s.split('T')[0]); return isNaN(d)?'':days[d.getDay()]; }
+    function toastMsg(msg,ok) { if(typeof toastr!=='undefined'){ok?toastr.success(msg):toastr.error(msg);}else{alert((ok?'OK: ':'Loi: ')+msg);} }
 
-    /* ── STATE ── */
-    var allRows    = [];
-    var filtered   = [];
-    var pageSize   = 50;
-    var curPage    = 1;
-    var sortCol    = 'date';
-    var sortDir    = 'desc';
-    var ctxRow     = null;
-    var editRow    = null;
+    /* TRẠNG THÁI */
+    var allRows=[],filtered=[],pageSize=50,curPage=1,sortCol='date',sortDir='desc',ctxRow=null,editRow=null;
 
-    /* ── DOM ── */
-    var ohFrom       = document.getElementById('ohFrom');
-    var ohTo         = document.getElementById('ohTo');
-    var ohSearch     = document.getElementById('ohSearch');
-    var ohDept       = document.getElementById('ohDeptFilter');
-    var ohLine       = document.getElementById('ohLineFilter');
-    var ohSource     = document.getElementById('ohSourceFilter');
-    var ohTbody      = document.getElementById('ohTbody');
-    var ohPaging     = document.getElementById('ohPaging');
-    var ohPageInfo   = document.getElementById('ohPageInfo');
-    var ohPageSizeEl = document.getElementById('ohPageSize');
-    var ohCtxMenu    = document.getElementById('ohCtxMenu');
-    var ohEditBd     = document.getElementById('ohEditBd');
-    var ohSelBar     = document.getElementById('ohSelBar');
+    /* DOM REFS */
+    var ohFrom=document.getElementById('ohFrom'),ohTo=document.getElementById('ohTo'),ohSearch=document.getElementById('ohSearch');
+    var ohDept=document.getElementById('ohDeptFilter'),ohLine=document.getElementById('ohLineFilter'),ohSource=document.getElementById('ohSourceFilter');
+    var ohTbody=document.getElementById('ohTbody'),ohPaging=document.getElementById('ohPaging'),ohPageInfo=document.getElementById('ohPageInfo');
+    var ohPageSizeEl=document.getElementById('ohPageSize'),ohCtxMenu=document.getElementById('ohCtxMenu');
+    var ohEditBd=document.getElementById('ohEditBd'),ohCfmBd=document.getElementById('ohCfmBd'),ohSelBar=document.getElementById('ohSelBar');
 
-    /* ── INIT ── */
+    /* KHỞI TẠO */
     (function init() {
-        var today = todayStr();
-        ohFrom.value = today;
-        ohTo.value   = today;
-        document.getElementById('ohTodayLabel').textContent = fmtDateVN(today);
-        loadDepts();
-        loadHistory();
+        var today=todayStr(); ohFrom.value=today; ohTo.value=today;
+        var d=new Date(); var days=['Chủ nhật','Thứ hai','Thứ ba','Thứ tư','Thứ năm','Thứ sáu','Thứ bảy'];
+        document.getElementById('ohTodayLabel').textContent=days[d.getDay()]+', '+fmtDateVN(today);
+        loadDepts(); loadHistory();
     })();
 
-    /* ── LOAD DEPARTMENTS ── */
+    /* TẢI BỘ PHẬN */
     function loadDepts() {
         fetch('/ProductionDepartment/GetDepartments')
-            .then(function (r) { return r.json(); })
-            .then(function (list) {
-                list.forEach(function (d) {
-                    var o = document.createElement('option');
-                    o.value = d.id; o.textContent = d.departmentName;
-                    ohDept.appendChild(o);
-                });
-            });
+            .then(function(r){return r.json();})
+            .then(function(list){
+                list.forEach(function(d){ var o=document.createElement('option'); o.value=d.id; o.textContent=d.departmentName; ohDept.appendChild(o); });
+            }).catch(function(){});
     }
 
-    /* ── LOAD HISTORY ── */
+    /* TẢI LỊCH SỬ */
     function loadHistory() {
-        ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><p>Đang tải...</p></td></tr>';
-        document.getElementById('ohSummary').style.display = 'none';
-
-        var params = [];
-        if (ohFrom.value) params.push('from=' + encodeURIComponent(ohFrom.value));
-        if (ohTo.value)   params.push('to='   + encodeURIComponent(ohTo.value));
-        if (ohDept.value) params.push('deptId=' + encodeURIComponent(ohDept.value));
-        var url = '/ProductionDepartment/GetOutputHistory?' + params.join('&');
-
-        fetch(url)
-            .then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
-            .then(function (list) {
-                allRows = list;
-
-                // Tự động nạp danh sách Tổ từ dữ liệu trả về
-                var currentLine = ohLine.value;
-                var lines = [...new Set(list.map(function(r) { return r.line; }).filter(Boolean))];
-                lines.sort(function(a, b) {
-                    var av = a === "63" ? 43.5 : (parseInt(a) || 9999);
-                    var bv = b === "63" ? 43.5 : (parseInt(b) || 9999);
-                    return av - bv;
-                });
-                ohLine.innerHTML = '<option value="">Tất cả</option>';
-                lines.forEach(function(l) {
-                    var o = document.createElement('option');
-                    o.value = l; o.textContent = 'Tổ ' + l;
-                    ohLine.appendChild(o);
-                });
-                ohLine.value = currentLine;
-
+        ohTbody.innerHTML='<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><p>Đang tải dữ liệu...</p></td></tr>';
+        document.getElementById('ohSummary').style.display='none';
+        var params=[];
+        if(ohFrom.value) params.push('from='+encodeURIComponent(ohFrom.value));
+        if(ohTo.value)   params.push('to='+encodeURIComponent(ohTo.value));
+        if(ohDept.value) params.push('deptId='+encodeURIComponent(ohDept.value));
+        fetch('/ProductionDepartment/GetOutputHistory?'+params.join('&'))
+            .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+            .then(function(list){
+                allRows=list;
+                var currentLine=ohLine.value;
+                var lines=Array.from(new Set(list.map(function(r){return r.line;}).filter(Boolean)));
+                lines.sort(function(a,b){ var av=a==='63'?43.5:(parseInt(a)||9999),bv=b==='63'?43.5:(parseInt(b)||9999); return av-bv; });
+                ohLine.innerHTML='<option value="">— Tất cả —</option>';
+                lines.forEach(function(l){ var o=document.createElement('option'); o.value=l; o.textContent='Tổ '+l; ohLine.appendChild(o); });
+                ohLine.value=currentLine;
                 applyFilterSort();
-                document.getElementById('ohSummary').style.display = 'flex';
+                document.getElementById('ohSummary').style.display='flex';
             })
-            .catch(function (e) {
-                ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>' + esc(e.message) + '</p></td></tr>';
+            .catch(function(e){
+                ohTbody.innerHTML='<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i><p style="color:var(--danger);">Lỗi tải dữ liệu: '+esc(e.message)+'</p></td></tr>';
             });
     }
 
-    /* ── SUMMARY ── */
+    /* THỐNG KÊ */
     function renderSummary() {
-        var total = filtered.reduce(function (s, r) { return s + (r.outputNumber || 0); }, 0);
-        var avg   = filtered.length ? Math.round(total / filtered.length) : 0;
-        var days  = new Set(filtered.map(function (r) { return (r.createDate || '').split('T')[0]; })).size;
-        document.getElementById('sumRows').textContent  = fmt(filtered.length);
-        document.getElementById('sumTotal').textContent = fmt(total);
-        document.getElementById('sumAvg').textContent   = fmt(avg);
-        document.getElementById('sumDays').textContent  = days;
+        var total=filtered.reduce(function(s,r){return s+(r.outputNumber||0);},0);
+        var avg=filtered.length?Math.round(total/filtered.length):0;
+        var days=new Set(filtered.map(function(r){return (r.createDate||'').split('T')[0];})).size;
+        document.getElementById('sumRows').textContent=fmt(filtered.length);
+        document.getElementById('sumTotal').textContent=fmt(total);
+        document.getElementById('sumAvg').textContent=fmt(avg);
+        document.getElementById('sumDays').textContent=days;
     }
 
-    /* ── FILTER + SORT ── */
+    /* LỌC & SẮP XẾP */
     function applyFilterSort() {
-        var kw = (ohSearch.value || '').toLowerCase().trim();
-        var sv = ohSource.value;
-        var lv = ohLine.value;
-
-        filtered = allRows.filter(function (r) {
-            if (sv && r.source !== sv) return false;
-            if (lv && r.line !== lv) return false;
-            if (!kw) return true;
-            return (r.machineName || '').toLowerCase().includes(kw)
-                || (r.spmain      || '').toLowerCase().includes(kw)
-                || (r.style       || '').toLowerCase().includes(kw)
-                || (r.detailName  || '').toLowerCase().includes(kw)
-                || (r.deptName    || '').toLowerCase().includes(kw);
+        var kw=(ohSearch.value||'').toLowerCase().trim(),sv=ohSource.value,lv=ohLine.value;
+        filtered=allRows.filter(function(r){
+            if(sv && r.source!==sv) return false;
+            if(lv && r.line!==lv) return false;
+            if(!kw) return true;
+            return (r.machineName||'').toLowerCase().includes(kw)||(r.spmain||'').toLowerCase().includes(kw)||(r.style||'').toLowerCase().includes(kw)||(r.detailName||'').toLowerCase().includes(kw)||(r.deptName||'').toLowerCase().includes(kw);
         });
-        filtered.sort(function (a, b) {
-            var av, bv;
-            if (sortCol === 'date') {
-                av = ((a.createDate || '').split('T')[0]) + (a.inputTime || '');
-                bv = ((b.createDate || '').split('T')[0]) + (b.inputTime || '');
-            } else if (sortCol === 'time') {
-                av = a.inputTime || '';
-                bv = b.inputTime || '';
-            } else if (sortCol === 'detailName') {
-                av = (a.detailName || '').toLowerCase();
-                bv = (b.detailName || '').toLowerCase();
-            } else {
-                av = a.outputNumber || 0;
-                bv = b.outputNumber || 0;
-            }
-            if (av < bv) return sortDir === 'asc' ? -1 : 1;
-            if (av > bv) return sortDir === 'asc' ?  1 : -1;
+        filtered.sort(function(a,b){
+            var av,bv;
+            if(sortCol==='date'){av=((a.createDate||'').split('T')[0])+(a.inputTime||'');bv=((b.createDate||'').split('T')[0])+(b.inputTime||'');}
+            else if(sortCol==='time'){av=a.inputTime||'';bv=b.inputTime||'';}
+            else if(sortCol==='detailName'){av=(a.detailName||'').toLowerCase();bv=(b.detailName||'').toLowerCase();}
+            else{av=a.outputNumber||0;bv=b.outputNumber||0;}
+            if(av<bv) return sortDir==='asc'?-1:1;
+            if(av>bv) return sortDir==='asc'?1:-1;
             return 0;
         });
-        curPage = 1;
-        renderTable();
-        renderSummary(); // Cập nhật thống kê dựa trên dữ liệu đã lọc
+        curPage=1; renderTable(); renderSummary();
     }
 
-    /* ── RENDER TABLE ── */
+    /* RENDER BẢNG */
     function renderTable() {
-        document.getElementById('ohRecordCount').textContent = fmt(filtered.length) + ' bản ghi hiển thị';
-        if (!filtered.length) {
-            ohTbody.innerHTML = '<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-inbox"></i><p>Không có dữ liệu phù hợp</p></td></tr>';
-            ohPageInfo.textContent = '';
-            ohPaging.innerHTML = '';
-            return;
+        document.getElementById('ohRecordCount').textContent=fmt(filtered.length)+' bản ghi hiển thị';
+        if(!filtered.length){
+            ohTbody.innerHTML='<tr><td colspan="10" class="oh-empty"><i class="fa-solid fa-inbox"></i><p>Không tìm thấy dữ liệu phù hợp</p></td></tr>';
+            ohPageInfo.textContent=''; ohPaging.innerHTML=''; return;
         }
-
-        var totalPages = Math.ceil(filtered.length / pageSize);
-        if (curPage > totalPages) curPage = totalPages;
-        var start    = (curPage - 1) * pageSize;
-        var end      = Math.min(start + pageSize, filtered.length);
-        var pageRows = filtered.slice(start, end);
-
-        ohTbody.innerHTML = '';
-        pageRows.forEach(function (r, idx) {
-            var tr = document.createElement('tr');
-            tr.dataset.id = r.id || '';
-            var source = r.source === 'excel'
-                ? '<span class="oh-badge excel"><i class="fa-solid fa-file-excel fa-xs"></i>Excel</span>'
-                : '<span class="oh-badge manual"><i class="fa-solid fa-pencil fa-xs"></i>Thủ công</span>';
-            tr.innerHTML =
-                '<td style="font-size:11px;color:var(--ink-300);font-weight:600;">' + (start + idx + 1) + '</td>' +
-                '<td style="font-size:12.5px;font-weight:700;white-space:nowrap;">' + fmtDateVN(r.createDate) + '</td>' +
-                '<td style="font-size:12.5px;color:var(--ink-500);font-weight:600;">' + esc(r.inputTime || '—') + '</td>' +
-                '<td style="font-size:12px;color:var(--ink-500);">' + esc(r.deptName || '—') + '</td>' +
-                '<td style="font-size:12.5px;">' + esc(r.machineName || '—') + '</td>' +
-                '<td><span style="font-family:Courier New;font-size:12px;font-weight:700;color:var(--accent-navy);background:var(--accent-navy-soft);padding:2px 8px;border-radius:5px;">' + esc(r.spmain || '—') + '</span></td>' +
-                '<td style="font-size:12.5px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.style || '') + '">' + esc(r.style || '—') + '</td>' +
-                '<td style="font-size:12.5px;">' + esc(r.detailName || '—') + '</td>' +
-                '<td style="text-align:right;"><span class="oh-num-cell" data-val="' + (r.outputNumber || 0) + '">' + fmt(r.outputNumber) + '</span></td>' +
-                '<td>' + source + '</td>';
-
-            /* right-click */
-            tr.addEventListener('contextmenu', function (e) {
-                e.preventDefault();
-                ctxRow = r;
-                // Nếu row chưa được chọn thì chọn 1 mình nó
-                if (!tr.classList.contains('oh-row-sel')) {
-                    rowClearAll();
-                    rowSelect(tr);
-                }
-                var sel = rowGetSelected();
-                var multi = sel.length > 1;
-                document.getElementById('ohCtxSelInfo').style.display  = multi ? 'block' : 'none';
-                document.getElementById('ohCtxSelCount').textContent    = sel.length;
-                document.getElementById('ohCtxDeleteLabel').textContent = multi ? 'Xóa ' + sel.length + ' bản ghi' : 'Xoá';
-                document.getElementById('ohCtxEdit').style.display = multi ? 'none' : 'flex';
-                showCtxMenu(e.clientX, e.clientY);
+        var totalPages=Math.ceil(filtered.length/pageSize);
+        if(curPage>totalPages) curPage=totalPages;
+        var start=(curPage-1)*pageSize, end=Math.min(start+pageSize,filtered.length);
+        var pageRows=filtered.slice(start,end);
+        ohTbody.innerHTML='';
+        pageRows.forEach(function(r,idx){
+            var tr=document.createElement('tr'); tr.dataset.id=r.id||'';
+            var dow=fmtDayOfWeek(r.createDate);
+            var dowHtml=dow?'<span style="font-size:10px;font-weight:700;color:var(--ink-300);margin-left:5px;">('+dow+')</span>':'';
+            var srcBadge=r.source==='excel'
+                ?'<span class="oh-badge excel"><i class="fa-solid fa-file-excel fa-xs"></i> Excel</span>'
+                :'<span class="oh-badge manual"><i class="fa-solid fa-pencil fa-xs"></i> Thủ công</span>';
+            tr.innerHTML=
+                '<td style="font-size:11px;color:var(--ink-300);font-weight:700;">'+(start+idx+1)+'</td>'+
+                '<td style="white-space:nowrap;"><span style="font-size:13px;font-weight:700;">'+fmtDateVN(r.createDate)+'</span>'+dowHtml+'</td>'+
+                '<td style="font-size:12.5px;color:var(--ink-500);font-weight:600;">'+esc(r.inputTime||'—')+'</td>'+
+                '<td style="font-size:12px;color:var(--ink-500);">'+esc(r.deptName||'—')+'</td>'+
+                '<td style="font-size:12.5px;font-weight:600;">'+esc(r.machineName||'—')+'</td>'+
+                '<td><span class="oh-sp-badge">'+esc(r.spmain||'—')+'</span></td>'+
+                '<td style="font-size:12px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(r.style||'')+'">'+esc(r.style||'—')+'</td>'+
+                '<td style="font-size:12.5px;">'+esc(r.detailName||'—')+'</td>'+
+                '<td style="text-align:right;"><span class="oh-num-cell" data-val="'+(r.outputNumber||0)+'">'+fmt(r.outputNumber)+'</span></td>'+
+                '<td>'+srcBadge+'</td>';
+            tr.addEventListener('contextmenu',function(e){
+                e.preventDefault(); ctxRow=r;
+                if(!tr.classList.contains('oh-row-sel')){rowClearAll();rowSelect(tr);}
+                var sel=rowGetSelected(),multi=sel.length>1;
+                document.getElementById('ohCtxSelInfo').style.display=multi?'block':'none';
+                document.getElementById('ohCtxSelCount').textContent=sel.length;
+                document.getElementById('ohCtxDeleteLabel').textContent=multi?'Xoá '+sel.length+' bản ghi':'Xoá bản ghi';
+                document.getElementById('ohCtxEdit').style.display=multi?'none':'flex';
+                showCtxMenu(e.clientX,e.clientY);
             });
             ohTbody.appendChild(tr);
         });
-
-        ohPageInfo.textContent = 'Hiển thị ' + (start + 1) + '–' + end + ' / ' + filtered.length;
-        renderPagination(totalPages);
-        initDragSelect();
+        ohPageInfo.textContent='Hiển thị '+(start+1)+'–'+end+' / '+fmt(filtered.length)+' bản ghi';
+        renderPagination(totalPages); initDragSelect();
     }
 
-    /* ── PAGINATION ── */
+    /* PHÂN TRANG */
     function renderPagination(totalPages) {
-        ohPaging.innerHTML = '';
-        if (totalPages <= 1) return;
-
-        function mkBtn(label, page, isActive, disabled) {
-            var btn = document.createElement('button');
-            btn.className = 'oh-paging-btn' + (isActive ? ' active' : '');
-            btn.textContent = label;
-            if (disabled) btn.setAttribute('disabled', '');
-            btn.addEventListener('click', function () { curPage = page; renderTable(); });
-            return btn;
+        ohPaging.innerHTML=''; if(totalPages<=1) return;
+        function mkBtn(label,page,isActive,disabled){
+            var btn=document.createElement('button');
+            btn.className='oh-paging-btn'+(isActive?' active':''); btn.textContent=label;
+            if(disabled) btn.setAttribute('disabled','');
+            btn.addEventListener('click',function(){curPage=page;renderTable();}); return btn;
         }
-
-        ohPaging.appendChild(mkBtn('‹', Math.max(1, curPage - 1), false, curPage === 1));
-
-        var rangeStart = Math.max(1, curPage - 2);
-        var rangeEnd   = Math.min(totalPages, rangeStart + 4);
-
-        if (rangeStart > 1) {
-            ohPaging.appendChild(mkBtn('1', 1, false, false));
-            if (rangeStart > 2) { var e1 = document.createElement('span'); e1.textContent = '…'; e1.style.padding = '0 4px'; ohPaging.appendChild(e1); }
-        }
-        for (var i = rangeStart; i <= rangeEnd; i++) {
-            ohPaging.appendChild(mkBtn(i, i, i === curPage, false));
-        }
-        if (rangeEnd < totalPages) {
-            if (rangeEnd < totalPages - 1) { var e2 = document.createElement('span'); e2.textContent = '…'; e2.style.padding = '0 4px'; ohPaging.appendChild(e2); }
-            ohPaging.appendChild(mkBtn(totalPages, totalPages, false, false));
-        }
-
-        ohPaging.appendChild(mkBtn('›', Math.min(totalPages, curPage + 1), false, curPage === totalPages));
+        ohPaging.appendChild(mkBtn('‹',Math.max(1,curPage-1),false,curPage===1));
+        var rs=Math.max(1,curPage-2),re=Math.min(totalPages,rs+4);
+        if(rs>1){ohPaging.appendChild(mkBtn('1',1,false,false)); if(rs>2){var e1=document.createElement('span');e1.textContent='…';e1.style.padding='0 5px';ohPaging.appendChild(e1);}}
+        for(var i=rs;i<=re;i++) ohPaging.appendChild(mkBtn(i,i,i===curPage,false));
+        if(re<totalPages){if(re<totalPages-1){var e2=document.createElement('span');e2.textContent='…';e2.style.padding='0 5px';ohPaging.appendChild(e2);} ohPaging.appendChild(mkBtn(totalPages,totalPages,false,false));}
+        ohPaging.appendChild(mkBtn('›',Math.min(totalPages,curPage+1),false,curPage===totalPages));
     }
 
-    /* ── SORT HEADERS ── */
-    document.querySelectorAll('.oh-table thead th.sortable').forEach(function (th) {
-        th.addEventListener('click', function () {
-            var col = this.dataset.col;
-            if (sortCol === col) {
-                sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortCol = col;
-                sortDir = 'desc';
-            }
-            /* update header styles */
-            document.querySelectorAll('.oh-table thead th').forEach(function (h) { h.classList.remove('sort-active'); });
-            this.classList.add('sort-active');
-            applyFilterSort();
+    /* SẮP XẾP CỘT */
+    document.querySelectorAll('.oh-table thead th.sortable').forEach(function(th){
+        th.addEventListener('click',function(){
+            var col=this.dataset.col;
+            if(sortCol===col){sortDir=sortDir==='asc'?'desc':'asc';}else{sortCol=col;sortDir='desc';}
+            document.querySelectorAll('.oh-table thead th').forEach(function(h){h.classList.remove('sort-active');});
+            this.classList.add('sort-active'); applyFilterSort();
         });
     });
 
-    /* ── FILTER EVENTS ── */
-    document.getElementById('ohApplyBtn').addEventListener('click', function () {
-        curPage = 1; loadHistory();
-    });
-    document.getElementById('ohResetBtn').addEventListener('click', function () {
-        ohFrom.value = todayStr(); ohTo.value = todayStr();
-        ohSearch.value = ''; ohDept.value = '';
-        ohLine.value = ''; ohSource.value = '';
-        curPage = 1; loadHistory();
+    /* SỰ KIỆN LỌC */
+    document.getElementById('ohApplyBtn').addEventListener('click',function(){curPage=1;loadHistory();});
+    document.getElementById('ohResetBtn').addEventListener('click',function(){
+        var t=todayStr(); ohFrom.value=t; ohTo.value=t; ohSearch.value=''; ohDept.value=''; ohLine.value=''; ohSource.value=''; curPage=1; loadHistory();
     });
     var searchTimer;
-    ohSearch.addEventListener('input', function () {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(applyFilterSort, 250);
-    });
-    ohPageSizeEl.addEventListener('change', function () {
-        pageSize = parseInt(this.value) || 50;
-        curPage = 1;
-        renderTable();
-    });
-    ohDept.addEventListener('change', function () { curPage = 1; loadHistory(); });
-    ohLine.addEventListener('change', function () { curPage = 1; applyFilterSort(); });
-    ohSource.addEventListener('change', function () { curPage = 1; applyFilterSort(); });
+    ohSearch.addEventListener('input',function(){clearTimeout(searchTimer);searchTimer=setTimeout(applyFilterSort,280);});
+    ohPageSizeEl.addEventListener('change',function(){pageSize=parseInt(this.value)||50;curPage=1;renderTable();});
+    ohDept.addEventListener('change',function(){curPage=1;loadHistory();});
+    ohLine.addEventListener('change',function(){curPage=1;applyFilterSort();});
+    ohSource.addEventListener('change',function(){curPage=1;applyFilterSort();});
 
-    /* ── CONTEXT MENU ── */
-    function showCtxMenu(x, y) {
-        var mw = 170, mh = 90;
-        ohCtxMenu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
-        ohCtxMenu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
-        ohCtxMenu.classList.add('visible');
-    }
-    function closeCtxMenu() { ohCtxMenu.classList.remove('visible'); ctxRow = null; }
-    document.addEventListener('click', function (e) {
-        if (!ohCtxMenu.contains(e.target)) closeCtxMenu();
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeCtxMenu(); closeEditModal(); closeConfirm(); }
-    });
+    /* CONTEXT MENU */
+    function showCtxMenu(x,y){var mw=180,mh=100; ohCtxMenu.style.left=(x+mw>window.innerWidth?x-mw:x)+'px'; ohCtxMenu.style.top=(y+mh>window.innerHeight?y-mh:y)+'px'; ohCtxMenu.classList.add('visible');}
+    function closeCtxMenu(){ohCtxMenu.classList.remove('visible');ctxRow=null;}
+    document.addEventListener('click',function(e){if(!ohCtxMenu.contains(e.target))closeCtxMenu();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeCtxMenu();closeEditModal();closeConfirm();}});
 
-    /* ── CONFIRM MODAL ── */
-    var cfmCallback = null;
-    var ohCfmBd = document.getElementById('ohCfmBd');
-    function showConfirm(title, msg, cb) {
-        document.getElementById('ohCfmTitle').textContent = title;
-        document.getElementById('ohCfmMsg').innerHTML = msg;
-        cfmCallback = cb;
-        ohCfmBd.classList.add('open');
-    }
-    function closeConfirm() { ohCfmBd.classList.remove('open'); cfmCallback = null; }
-    document.getElementById('ohCfmCancel').addEventListener('click', closeConfirm);
-    document.getElementById('ohCfmClose') && document.getElementById('ohCfmClose').addEventListener('click', closeConfirm);
-    document.getElementById('ohCfmOk').addEventListener('click', function () {
-        var cb = cfmCallback;   // lưu trước khi closeConfirm() gán cfmCallback = null
-        closeConfirm();
-        if (cb) cb();
-    });
-    ohCfmBd.addEventListener('click', function (e) { if (e.target === ohCfmBd) closeConfirm(); });
-
-    document.getElementById('ohCtxEdit').addEventListener('click', function () {
-        if (!ctxRow) return;
-        var row = ctxRow;   // lưu trước khi closeCtxMenu() gán ctxRow = null
-        closeCtxMenu();
-        openEditModal(row);
-    });
-    document.getElementById('ohCtxDelete').addEventListener('click', function () {
-        if (!ctxRow) return;
-        var row = ctxRow; closeCtxMenu();
-        showConfirm(
-            'Xóa bản ghi',
-            '<strong>' + esc(row.detailName || '') + '</strong> &mdash; ' + fmt(row.outputNumber) + ' SP<br>' +
-            '<span style="color:var(--ink-400);font-size:12px;">Ngày: ' + fmtDateVN(row.createDate) + ' ' + (row.inputTime || '') + '</span>',
-            function () { deleteRecord(row); }
-        );
-    });
-
-    /* ── DELETE ── */
-    function deleteRecord(row) {
-        fetch('/ProductionDepartment/DeleteOutputRecord', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: row.id })
-        })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (data) {
-            if (!data.success) { toast(data.message || 'Lỗi xoá', false); return; }
-            toast('Đã xoá bản ghi', true);
-            allRows = allRows.filter(function (x) { return x.id !== row.id; });
-            applyFilterSort();
-            renderSummary();
-        })
-        .catch(function (e) { toast('Lỗi xoá: ' + e.message, false); });
-    }
-
-    /* ── EDIT MODAL ── */
-    function openEditModal(row) {
-        editRow = row;
-        document.getElementById('ohEditInfo').textContent = (row.detailName || '—') + '  ·  ' + (row.spmain || '');
-        document.getElementById('ohEditDate').value = (row.createDate || '').split('T')[0];
-        document.getElementById('ohEditTime').value = row.inputTime || '';
-        document.getElementById('ohEditQty').value  = row.outputNumber || 0;
-        ohEditBd.classList.add('open');
-        setTimeout(function () { document.getElementById('ohEditQty').focus(); document.getElementById('ohEditQty').select(); }, 200);
-    }
-    function closeEditModal() { ohEditBd.classList.remove('open'); editRow = null; }
-
-    document.getElementById('ohEditClose').addEventListener('click', closeEditModal);
-    document.getElementById('ohEditCancel').addEventListener('click', closeEditModal);
-    ohEditBd.addEventListener('click', function (e) { if (e.target === ohEditBd) closeEditModal(); });
-
-    document.getElementById('ohEditSave').addEventListener('click', function () {
-        if (!editRow) return;
-        var qty = parseInt(document.getElementById('ohEditQty').value) || 0;
-        if (qty < 0) { toast('Sản lượng không hợp lệ', false); return; }
-        var btn = this, orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Lưu...';
-
-        fetch('/ProductionDepartment/UpdateOutputRecord', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id:           editRow.id,
-                outputNumber: qty,
-                date:         document.getElementById('ohEditDate').value,
-                time:         document.getElementById('ohEditTime').value
-            })
-        })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (data) {
-            btn.disabled = false; btn.innerHTML = orig;
-            if (!data.success) { toast(data.message || 'Lỗi cập nhật', false); return; }
-            toast('Đã cập nhật', true);
-            allRows.forEach(function (x) {
-                if (x.id === editRow.id) {
-                    x.outputNumber = qty;
-                    x.inputTime    = document.getElementById('ohEditTime').value;
-                    x.createDate   = document.getElementById('ohEditDate').value;
-                }
-            });
-            closeEditModal();
-            applyFilterSort();
-            renderSummary();
-        })
-        .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; toast('Lỗi: ' + e.message, false); });
-    });
-
-    /* ── DRAG-SELECT (cột Sản lượng) ── */
-    var isDragging   = false;
-    var dragStartIdx = -1;
-    var selectedIdxs = new Set();
-    var autoScrollRaf = null;
-    var lastMouseY = 0;
-    var SCROLL_ZONE = 60;
-    var SCROLL_SPD  = 8;
-
-    var cellLastIdx = -1; // dùng cho Shift+Click
-
-    function initDragSelect() {
-        var cells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
-        cells.forEach(function (cell, idx) {
-            cell.addEventListener('mousedown', function (e) {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                var freshCells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
-                var freshIdx = freshCells.indexOf(cell);
-                if (e.ctrlKey) {
-                    // Ctrl+Click: toggle ô, giữ lại các ô khác
-                    if (selectedIdxs.has(freshIdx)) {
-                        selectedIdxs.delete(freshIdx);
-                        cell.classList.remove('selecting');
-                    } else {
-                        selectedIdxs.add(freshIdx);
-                        cell.classList.add('selecting');
-                    }
-                    cellLastIdx = freshIdx;
-                    updateSelBar();
-                } else if (e.shiftKey && cellLastIdx > -1) {
-                    // Shift+Click: chọn range từ cellLastIdx đến freshIdx, giữ cũ
-                    var lo = Math.min(cellLastIdx, freshIdx), hi = Math.max(cellLastIdx, freshIdx);
-                    for (var i = lo; i <= hi; i++) selectCell(freshCells, i);
-                    updateSelBar();
-                } else {
-                    // Click thường: bắt đầu kéo
-                    clearSelection();
-                    isDragging = true;
-                    dragStartIdx = freshIdx;
-                    cellLastIdx = freshIdx;
-                    selectCell(freshCells, freshIdx);
-                }
-            });
-            cell.addEventListener('mouseenter', function () {
-                if (!isDragging) return;
-                var freshCells = Array.from(ohTbody.querySelectorAll('.oh-num-cell'));
-                var freshIdx = freshCells.indexOf(cell);
-                clearSelection();
-                var lo = Math.min(dragStartIdx, freshIdx), hi = Math.max(dragStartIdx, freshIdx);
-                for (var i = lo; i <= hi; i++) selectCell(freshCells, i);
-            });
-        });
-    }
-
-    var ohBodyEl = document.querySelector('.oh-body');
-    document.addEventListener('mousemove', function (e) {
-        lastMouseY = e.clientY;
-        if (!isDragging) return;
-        if (!autoScrollRaf) autoScrollRaf = requestAnimationFrame(doAutoScroll);
-    });
-
-    function doAutoScroll() {
-        autoScrollRaf = null;
-        if (!isDragging || !ohBodyEl) return;
-        var rect = ohBodyEl.getBoundingClientRect();
-        var rel  = lastMouseY - rect.top;
-        var h    = rect.height;
-        if (rel < SCROLL_ZONE) {
-            ohBodyEl.scrollTop -= Math.round(SCROLL_SPD * (1 - rel / SCROLL_ZONE));
-            autoScrollRaf = requestAnimationFrame(doAutoScroll);
-        } else if (rel > h - SCROLL_ZONE) {
-            ohBodyEl.scrollTop += Math.round(SCROLL_SPD * (1 - (h - rel) / SCROLL_ZONE));
-            autoScrollRaf = requestAnimationFrame(doAutoScroll);
+    document.getElementById('ohCtxEdit').addEventListener('click',function(){ if(!ctxRow)return; var r=ctxRow; closeCtxMenu(); openEditModal(r); });
+    document.getElementById('ohCtxDelete').addEventListener('click',function(){
+        if(!ctxRow)return; var row=ctxRow; closeCtxMenu();
+        var sel=rowGetSelected();
+        if(sel.length>1){
+            var ids=sel.map(function(tr){return tr.dataset.id;}).filter(Boolean);
+            showConfirm('Xác nhận xoá nhiều bản ghi','<p>Bạn sắp xoá <strong>'+ids.length+' bản ghi</strong>.</p><p style="color:var(--danger);font-size:12.5px;margin-top:8px;">Thao tác này không thể hoàn tác!</p>',function(){deleteBulk(ids);});
+        } else {
+            showConfirm('Xác nhận xoá bản ghi','<strong>'+esc(row.detailName||'')+'</strong> &mdash; '+fmt(row.outputNumber)+' SP<br><span style="color:var(--ink-400);font-size:12px;">Ngày: '+fmtDateVN(row.createDate)+' '+(row.inputTime||'')+'</span>',function(){deleteSingle(row);});
         }
+    });
+
+    /* XOÁ */
+    function deleteSingle(row){
+        fetch('/ProductionDepartment/DeleteOutputRecord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:row.id})})
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+        .then(function(data){ if(!data.success){toastMsg(data.message||'Lỗi xoá',false);return;} toastMsg('Đã xoá bản ghi thành công',true); allRows=allRows.filter(function(x){return x.id!==row.id;}); applyFilterSort(); })
+        .catch(function(e){toastMsg('Lỗi xoá: '+e.message,false);});
+    }
+    function deleteBulk(ids){
+        Promise.all(ids.map(function(id){ return fetch('/ProductionDepartment/DeleteOutputRecord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}); }))
+        .then(function(){ toastMsg('Đã xoá '+ids.length+' bản ghi',true); var s=new Set(ids); allRows=allRows.filter(function(x){return !s.has(x.id);}); rowClearAll(); applyFilterSort(); })
+        .catch(function(e){toastMsg('Lỗi xoá: '+e.message,false);});
     }
 
-    function selectCell(cells, idx) {
-        selectedIdxs.add(idx);
-        if (cells[idx]) cells[idx].classList.add('selecting');
+    /* MODAL CẬP NHẬT */
+    function openEditModal(row){
+        editRow=row;
+        document.getElementById('ohEditInfo').textContent=(row.detailName||'—')+'  ·  '+(row.spmain||'');
+        document.getElementById('ohEditDate').value=(row.createDate||'').split('T')[0];
+        document.getElementById('ohEditTime').value=row.inputTime||'';
+        document.getElementById('ohEditQty').value=row.outputNumber||0;
+        ohEditBd.classList.add('open');
+        setTimeout(function(){var q=document.getElementById('ohEditQty');q.focus();q.select();},200);
     }
+    function closeEditModal(){ohEditBd.classList.remove('open');editRow=null;}
+    document.getElementById('ohEditClose').addEventListener('click',closeEditModal);
+    document.getElementById('ohEditCancel').addEventListener('click',closeEditModal);
+    ohEditBd.addEventListener('click',function(e){if(e.target===ohEditBd)closeEditModal();});
+    document.getElementById('ohEditSave').addEventListener('click',function(){
+        if(!editRow)return;
+        var qty=parseInt(document.getElementById('ohEditQty').value)||0;
+        if(qty<0){toastMsg('Sản lượng không hợp lệ',false);return;}
+        var btn=this,orig=btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...';
+        fetch('/ProductionDepartment/UpdateOutputRecord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:editRow.id,outputNumber:qty,date:document.getElementById('ohEditDate').value,time:document.getElementById('ohEditTime').value})})
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+        .then(function(data){
+            btn.disabled=false;btn.innerHTML=orig;
+            if(!data.success){toastMsg(data.message||'Lỗi cập nhật',false);return;}
+            toastMsg('Cập nhật sản lượng thành công',true);
+            allRows.forEach(function(x){if(x.id===editRow.id){x.outputNumber=qty;x.inputTime=document.getElementById('ohEditTime').value;x.createDate=document.getElementById('ohEditDate').value;}});
+            closeEditModal(); applyFilterSort();
+        })
+        .catch(function(e){btn.disabled=false;btn.innerHTML=orig;toastMsg('Lỗi: '+e.message,false);});
+    });
 
-    function clearSelection() {
-        selectedIdxs.clear();
-        ohTbody.querySelectorAll('.oh-num-cell.selecting').forEach(function (c) { c.classList.remove('selecting'); });
-        ohSelBar.classList.remove('visible');
-    }
+    /* MODAL XÁC NHẬN */
+    var cfmCallback=null;
+    function showConfirm(title,msg,cb){ document.getElementById('ohCfmTitle').textContent=title; document.getElementById('ohCfmMsg').innerHTML=msg; cfmCallback=cb; ohCfmBd.classList.add('open'); }
+    function closeConfirm(){ohCfmBd.classList.remove('open');cfmCallback=null;}
+    document.getElementById('ohCfmCancel').addEventListener('click',closeConfirm);
+    document.getElementById('ohCfmClose') && document.getElementById('ohCfmClose').addEventListener('click',closeConfirm);
+    document.getElementById('ohCfmOk').addEventListener('click',function(){var cb=cfmCallback;closeConfirm();if(cb)cb();});
+    ohCfmBd.addEventListener('click',function(e){if(e.target===ohCfmBd)closeConfirm();});
 
-    function updateSelBar() {
-        if (!selectedIdxs.size) { ohSelBar.classList.remove('visible'); return; }
-        var cells = ohTbody.querySelectorAll('.oh-num-cell');
-        var total = 0, count = 0;
-        selectedIdxs.forEach(function (i) {
-            if (cells[i]) { total += parseFloat(cells[i].dataset.val) || 0; count++; }
-        });
-        document.getElementById('ohSelCount').textContent = count;
-        document.getElementById('ohSelSum').textContent   = fmt(total);
-        document.getElementById('ohSelAvg').textContent   = count > 0 ? fmt(Math.round(total / count)) : '0';
+    /* CHỌN NHIỀU HÀNG */
+    function rowSelect(tr){tr.classList.add('oh-row-sel');}
+    function rowClearAll(){ohTbody.querySelectorAll('tr.oh-row-sel').forEach(function(r){r.classList.remove('oh-row-sel');});}
+    function rowGetSelected(){return Array.from(ohTbody.querySelectorAll('tr.oh-row-sel'));}
+
+    /* KÉO CHỌN SẢN LƯỢNG */
+    var isDragging=false,dragStartIdx=-1,selectedIdxs=new Set(),cellLastIdx=-1;
+    function getCells(){return Array.from(ohTbody.querySelectorAll('.oh-num-cell'));}
+    function selectCell(cells,idx){if(idx<0||idx>=cells.length)return;selectedIdxs.add(idx);cells[idx].classList.add('selecting');}
+    function clearSelection(){getCells().forEach(function(c){c.classList.remove('selecting');});selectedIdxs.clear();ohSelBar.classList.remove('visible');}
+    function updateSelBar(){
+        if(selectedIdxs.size===0){ohSelBar.classList.remove('visible');return;}
+        var cells=getCells(),vals=Array.from(selectedIdxs).map(function(i){return parseInt(cells[i]&&cells[i].dataset.val)||0;});
+        var sum=vals.reduce(function(a,b){return a+b;},0),avg=Math.round(sum/vals.length);
+        document.getElementById('ohSelCount').textContent=fmt(vals.length);
+        document.getElementById('ohSelSum').textContent=fmt(sum);
+        document.getElementById('ohSelAvg').textContent=fmt(avg);
         ohSelBar.classList.add('visible');
     }
-
-    /* ── ROW MULTI-SELECT ── */
-    var rowLastIdx = -1, rowIsDragging = false;
-
-    function rowGetRows()  { return Array.from(ohTbody.querySelectorAll('tr[data-id]')); }
-    function rowSelect(tr) { tr.classList.add('oh-row-sel'); }
-    function rowDesel(tr)  { tr.classList.remove('oh-row-sel','oh-row-ctx'); }
-    function rowClearAll() { rowGetRows().forEach(rowDesel); }
-    function rowGetSelected() { return rowGetRows().filter(function(r){ return r.classList.contains('oh-row-sel'); }); }
-
-    function rowSelectRange(a, b) {
-        var rows = rowGetRows(), lo = Math.min(a,b), hi = Math.max(a,b);
-        for (var i=lo; i<=hi; i++) if (rows[i]) rowSelect(rows[i]);
-    }
-
-    ohTbody.addEventListener('mousedown', function(e) {
-        if (e.button !== 0) return;
-        var tr = e.target.closest('tr[data-id]');
-        if (!tr) { rowClearAll(); return; }
-        // Bỏ qua nếu đang click vào oh-num-cell (drag-select SL)
-        if (e.target.closest('.oh-num-cell')) return;
-        var rows = rowGetRows(), idx = rows.indexOf(tr);
-        if (e.shiftKey && rowLastIdx > -1) {
-            e.preventDefault();
-            rowClearAll();
-            rowSelectRange(rowLastIdx, idx);
-        } else if (e.ctrlKey) {
-            tr.classList.contains('oh-row-sel') ? rowDesel(tr) : rowSelect(tr);
-            rowLastIdx = idx;
-        } else {
-            rowClearAll();
-            rowSelect(tr);
-            rowLastIdx = idx;
-            rowIsDragging = true;
-        }
-        rowUpdateBulk();
-    });
-
-    ohTbody.addEventListener('mouseover', function(e) {
-        if (!rowIsDragging) return;
-        var tr = e.target.closest('tr[data-id]');
-        if (!tr) return;
-        var idx = rowGetRows().indexOf(tr);
-        if (rowLastIdx > -1) { rowClearAll(); rowSelectRange(rowLastIdx, idx); }
-    });
-
-    document.addEventListener('mouseup', function(e) {
-        rowIsDragging = false;
-        if (isDragging) {
-            isDragging = false;
-            if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = null; }
-            updateSelBar();
-        }
-    });
-
-
-    function bulkDeleteRows(ids) {
-        var pending = ids.length, failed = 0;
-        ids.forEach(function(id) {
-            fetch('/ProductionDepartment/DeleteOutputRecord', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.success) failed++;
-                else allRows = allRows.filter(function(x) { return x.id !== id; });
-            })
-            .catch(function() { failed++; })
-            .finally(function() {
-                pending--;
-                if (pending === 0) {
-                    rowClearAll();
-                    applyFilterSort();
-                    renderSummary();
-                    toast(failed === 0 ? 'Đã xóa ' + ids.length + ' bản ghi' : 'Xóa ' + (ids.length-failed) + '/' + ids.length + ', lỗi: ' + failed, failed === 0);
-                }
+    function initDragSelect(){
+        getCells().forEach(function(cell){
+            cell.addEventListener('mousedown',function(e){
+                if(e.button!==0)return; e.preventDefault();
+                var fc=getCells(),fi=fc.indexOf(cell);
+                if(e.ctrlKey){ if(selectedIdxs.has(fi)){selectedIdxs.delete(fi);cell.classList.remove('selecting');}else{selectedIdxs.add(fi);cell.classList.add('selecting');} cellLastIdx=fi;updateSelBar(); }
+                else if(e.shiftKey&&cellLastIdx>-1){ var lo=Math.min(cellLastIdx,fi),hi=Math.max(cellLastIdx,fi); for(var i=lo;i<=hi;i++)selectCell(fc,i); updateSelBar(); }
+                else{ clearSelection();isDragging=true;dragStartIdx=fi;cellLastIdx=fi;selectCell(fc,fi); }
+            });
+            cell.addEventListener('mouseenter',function(){
+                if(!isDragging)return;
+                var fc=getCells(),fi=fc.indexOf(cell);
+                fc.forEach(function(c){c.classList.remove('selecting');});selectedIdxs.clear();
+                var lo=Math.min(dragStartIdx,fi),hi=Math.max(dragStartIdx,fi);
+                for(var i=lo;i<=hi;i++)selectCell(fc,i); updateSelBar();
             });
         });
+        document.addEventListener('mouseup',function(){isDragging=false;});
     }
+    document.getElementById('ohSelClose').addEventListener('click',clearSelection);
 
-    // Override delete để hỗ trợ bulk từ context menu
-    document.getElementById('ohCtxDelete').addEventListener('click', function () {
-        var sel = rowGetSelected();
-        var ids = sel.map(function(tr){ return tr.dataset.id; });
-        closeCtxMenu();
-        if (ids.length > 1) {
-            showConfirm('Xóa hàng loạt', '<strong>Xóa ' + ids.length + ' bản ghi đã chọn?</strong><br><span style="font-size:12px;color:var(--ink-400);">Thao tác này không thể hoàn tác.</span>',
-                function () { bulkDeleteRows(ids); });
-        } else if (ctxRow) {
-            var row = ctxRow;
-            showConfirm('Xóa bản ghi',
-                '<strong>' + esc(row.detailName || '') + '</strong> &mdash; ' + fmt(row.outputNumber) + ' SP<br>' +
-                '<span style="color:var(--ink-400);font-size:12px;">Ngày: ' + fmtDateVN(row.createDate) + ' ' + (row.inputTime || '') + '</span>',
-                function () { deleteRecord(row); });
-        }
-    });
+    /* XUẤT CSV */
+    window.exportCsv=function(){
+        if(!filtered.length){toastMsg('Chưa có dữ liệu để xuất. Vui lòng tìm kiếm trước.',false);return;}
+        var headers=['STT','Ngày','Giờ nhập','Bộ phận','Máy','Mã sản phẩm','Style','Công đoạn','Sản lượng','Nguồn'];
+        var rows=filtered.map(function(r,i){
+            return [i+1,fmtDateVN(r.createDate),r.inputTime||'',r.deptName||'',r.machineName||'',r.spmain||'',r.style||'',r.detailName||'',r.outputNumber||0,r.source==='excel'?'Excel':'Thủ công']
+                .map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');
+        });
+        var csv='\uFEFF'+headers.join(',')+'\n'+rows.join('\n');
+        var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='LichSuSanLuong_'+(ohFrom.value||'all')+'_'+(ohTo.value||'all')+'.csv';
+        a.click(); toastMsg('Xuất CSV thành công ('+fmt(filtered.length)+' bản ghi)',true);
+    };
 
-    document.getElementById('ohSelClose').addEventListener('click', clearSelection);
-
-}());
+})();
 </script>

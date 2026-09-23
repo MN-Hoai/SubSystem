@@ -309,12 +309,12 @@ namespace Sub_Services.Execute
 
             // Cache StyleInfo: StyleCode (upper) → StyleInfoId
             // CHỈ lấy StyleInfo của bộ phận này (deptId) — mỗi bộ phận có công đoạn riêng
-            var styleInfoCache = await _context.StyleInfos
+            var styleInfoCache = (await _context.StyleInfos
                 .AsNoTracking()
                 .Where(s => s.Status == 1 && s.ProductionDepartmentId == deptId)
-                .ToDictionaryAsync(
-                    s => (s.StyleCode ?? "").Trim().ToUpperInvariant(),
-                    s => s.Id);
+                .ToListAsync())
+                .GroupBy(s => (s.StyleCode ?? "").Trim().ToUpperInvariant())
+                .ToDictionary(g => g.Key, g => g.First().Id);
 
             // Cache StyleDetail: (styleInfoId, detailName) → StyleDetail
             // Chỉ lấy các StyleDetail thuộc StyleInfo của bộ phận này

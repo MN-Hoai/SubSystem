@@ -196,7 +196,10 @@ namespace Sub_Services.Execute
             if (!todayDailyList.Any()) return layouts;
 
             var todayDailyIds = todayDailyList.Select(d => d.Id).ToList();
-            var dailyInfoMap  = todayDailyList.ToDictionary(d => d.Id, d => d.ProductionInfoId);
+            // Map DailyOutput.Id → (MachineId, ProductionInfoId) để phân biệt từng máy
+            var dailyKeyMap = todayDailyList.ToDictionary(
+                d => d.Id,
+                d => (MachineId: d.MachineId, InfoId: d.ProductionInfoId));
 
             // Lấy tất cả detail hôm nay
             var detailList = await _context.DailyOutputDetails
@@ -209,58 +212,31 @@ namespace Sub_Services.Execute
 
             if (!detailList.Any()) return layouts;
 
-            // Lấy StyleInfoId từ StyleDetail đã nhập
-            var allStyleDetailIds = detailList.Select(dt => dt.StyleDetailId).Distinct().ToList();
-            var detailToStyleInfo = await _context.StyleDetails
-                .Where(sd => allStyleDetailIds.Contains(sd.Id))
-                .Select(sd => new { sd.Id, sd.StyleInfoId })
-                .ToDictionaryAsync(x => x.Id, x => x.StyleInfoId);
-
-            // Số chi tiết kỳ vọng từ bảng StyleDetail
-            var allStyleInfoIds = detailToStyleInfo.Values.Distinct().ToList();
-            var expectedDetailCount = await _context.StyleDetails
-                .Where(sd => sd.Status == 1 && allStyleInfoIds.Contains(sd.StyleInfoId))
-                .GroupBy(sd => sd.StyleInfoId)
-                .Select(g => new { StyleInfoId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.StyleInfoId, x => x.Count);
-
-            // Góm theo (ProductionInfoId, StyleDetailId) → cộng tổng tất cả máy
-            var perInfoPerDetail = new Dictionary<Guid, Dictionary<Guid, int>>();
+            // Góm theo (MachineId, ProductionInfoId, StyleDetailId) — mỗi máy tính độc lập
+            var perMachinePerDetail = new Dictionary<(Guid MachineId, Guid InfoId), Dictionary<Guid, int>>();
             foreach (var dt in detailList)
             {
-                var infoId   = dailyInfoMap[dt.DailyOutputId!.Value];
+                if (!dailyKeyMap.TryGetValue(dt.DailyOutputId!.Value, out var key)) continue;
                 var detailId = dt.StyleDetailId;
-                if (!perInfoPerDetail.TryGetValue(infoId, out var detMap))
-                    perInfoPerDetail[infoId] = detMap = new Dictionary<Guid, int>();
+                if (!perMachinePerDetail.TryGetValue(key, out var detMap))
+                    perMachinePerDetail[key] = detMap = new Dictionary<Guid, int>();
                 detMap[detailId] = (detMap.TryGetValue(detailId, out var v) ? v : 0) + dt.OutputNumber!.Value;
             }
 
-            // Xác định StyleInfoId từ StyleDetail đã nhập
-            var infoToStyleInfo = new Dictionary<Guid, Guid>();
-            foreach (var (infoId, detMap) in perInfoPerDetail)
-                foreach (var detailId in detMap.Keys)
-                    if (detailToStyleInfo.TryGetValue(detailId, out var si))
-                    { infoToStyleInfo[infoId] = si; break; }
-
-            // Tính TodayOutput (min khi đủ công đoạn, 0 nếu thiếu)
-            var todayOutputMap = new Dictionary<Guid, int>();
-            foreach (var (infoId, detMap) in perInfoPerDetail)
+            // Tính TodayOutput = min(tổng từng công đoạn) — riêng theo từng máy
+            var todayOutputMap = new Dictionary<(Guid MachineId, Guid InfoId), int>();
+            foreach (var (key, detMap) in perMachinePerDetail)
             {
-                if (!infoToStyleInfo.TryGetValue(infoId, out var styleInfoId))
-                    { todayOutputMap[infoId] = 0; continue; }
-                if (!expectedDetailCount.TryGetValue(styleInfoId, out var expectedCount))
-                    { todayOutputMap[infoId] = 0; continue; }
-                if (detMap.Count < expectedCount)
-                    { todayOutputMap[infoId] = 0; continue; }
-                todayOutputMap[infoId] = detMap.Values.Any() ? detMap.Values.Min() : 0;
+                todayOutputMap[key] = detMap.Values.Any() ? detMap.Values.Min() : 0;
             }
 
-            // Gán lại TodayOutput và TodayOutputPct vào từng ProductionCode
+            // Gán lại TodayOutput và TodayOutputPct — lookup theo (MachineId, ProductionInfoId)
             foreach (var layout in layouts)
                 foreach (var item in layout.Items)
                     foreach (var code in item.ProductionCodes)
                     {
-                        var output = todayOutputMap.TryGetValue(code.ProductionInfoId, out var o) ? o : 0;
+                        var lookupKey = (item.MachineId, code.ProductionInfoId);
+                        var output = todayOutputMap.TryGetValue(lookupKey, out var o) ? o : 0;
                         var target = code.Target ?? 0;
                         code.TodayOutput    = output;
                         code.TodayOutputPct = target > 0

@@ -191,56 +191,103 @@ namespace Sub_Services.Execute
             Guid productionInfoId, Guid machineId,
             DateTime? fromDate = null, DateTime? toDate = null)
         {
-            var query = _context.DailyOutputs
+            // Dùng DateTime boundary thuần — EF có thể dùng index trên CreateDate
+            var from = fromDate.HasValue ? fromDate.Value.Date             : DateTime.MinValue;
+            var to   = toDate.HasValue   ? toDate.Value.Date.AddDays(1)    : DateTime.MaxValue;
+
+            // Bước 1: lấy DailyOutput header (không navigation property)
+            var dailyList = await _context.DailyOutputs
                 .AsNoTracking()
-                .Where(d => d.ProductionInfoId == productionInfoId
+                .Where(d => d.ProductionInfoId    == productionInfoId
                          && d.ProductionMachineId == machineId
-                         && d.Status == 1);
-
-            if (fromDate.HasValue)
-                query = query.Where(d => d.CreateDate.Date >= fromDate.Value.Date);
-            if (toDate.HasValue)
-                query = query.Where(d => d.CreateDate.Date <= toDate.Value.Date);
-
-            var outputs = await query
+                         && d.Status              == 1
+                         && d.CreateDate          >= from
+                         && d.CreateDate          <  to)
                 .OrderByDescending(d => d.CreateDate)
-                .Select(d => new MachineDetail_DailyOutputDto
+                .Select(d => new
                 {
-                    Id = d.Id,
-                    StyleCode = d.StyleInfo != null ? d.StyleInfo.StyleCode : null,
-                    StyleInfoId = d.StyleInfoId.HasValue ? d.StyleInfoId.Value.ToString() : null,
-                    TotalOutputNumber = d.TotalOutputNumber,   // sẽ override bên dưới
-                    CreateDate = d.CreateDate.ToString("yyyy-MM-dd"),
-                    Details = d.DailyOutputDetails
-                        .Where(dt => dt.Status == 1)
-                        .OrderBy(dt => dt.InputTime)
-                        .Select(dt => new MachineDetail_DailyOutputDetailDto
-                        {
-                            Id = dt.Id,
-                            StyleDetailId = dt.StyleDetailId,
-                            DetailName = dt.StyleDetail.DetailName,
-                            OutputNumber = dt.OutputNumber,
-                            InputTime = dt.InputTime.ToString("HH:mm")
-                        }).ToList()
+                    d.Id,
+                    d.StyleInfoId,
+                    d.TotalOutputNumber,
+                    d.CreateDate
                 })
                 .ToListAsync();
 
-            // Tính lại TotalOutputNumber = min(tổng sản lượng từng công đoạn) nếu có chi tiết
-            // Cơ chế: Gom nhóm theo từng công đoạn (StyleDetailId / DetailName), tính tổng sản lượng mỗi công đoạn trong ngày,
-            // sau đó lấy min của các công đoạn (1 thành phẩm hoàn chỉnh cần đủ tất cả các công đoạn)
-            foreach (var o in outputs)
-            {
-                if (o.Details != null && o.Details.Count > 0)
-                {
-                    var sumsByDetail = o.Details
-                        .Where(dt => dt.OutputNumber.HasValue)
-                        .GroupBy(dt => dt.StyleDetailId.HasValue ? (object)dt.StyleDetailId.Value : (dt.DetailName ?? string.Empty))
-                        .Select(g => g.Sum(dt => dt.OutputNumber.Value))
-                        .ToList();
+            if (!dailyList.Any())
+                return new List<MachineDetail_DailyOutputDto>();
 
-                    o.TotalOutputNumber = sumsByDetail.Count > 0 ? sumsByDetail.Min() : o.TotalOutputNumber;
+            var dailyIds = dailyList.Select(d => d.Id).ToList();
+
+            // Bước 2: lấy tất cả StyleInfo cần thiết (1 query)
+            var styleInfoIds = dailyList
+                .Where(d => d.StyleInfoId.HasValue)
+                .Select(d => d.StyleInfoId!.Value)
+                .Distinct().ToList();
+            var styleCodeMap = styleInfoIds.Any()
+                ? await _context.StyleInfos
+                    .AsNoTracking()
+                    .Where(s => styleInfoIds.Contains(s.Id))
+                    .Select(s => new { s.Id, s.StyleCode })
+                    .ToDictionaryAsync(s => s.Id, s => s.StyleCode)
+                : new Dictionary<Guid, string>();
+
+            // Bước 3: lấy tất cả detail (1 query, join StyleDetail)
+            var detailList = await _context.DailyOutputDetails
+                .AsNoTracking()
+                .Where(dt => dt.DailyOutputId.HasValue
+                          && dt.Status == 1
+                          && dailyIds.Contains(dt.DailyOutputId!.Value))
+                .OrderBy(dt => dt.InputTime)
+                .Select(dt => new
+                {
+                    dt.DailyOutputId,
+                    dt.Id,
+                    dt.StyleDetailId,
+                    DetailName   = dt.StyleDetail != null ? dt.StyleDetail.DetailName : null,
+                    dt.OutputNumber,
+                    InputTime    = dt.InputTime.ToString("HH:mm")
+                })
+                .ToListAsync();
+
+            // Bước 4: nhóm detail theo DailyOutputId (in-memory, 1 lần)
+            var detailsByDaily = detailList
+                .GroupBy(dt => dt.DailyOutputId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Bước 5: ghép kết quả + tính min in-memory
+            var outputs = dailyList.Select(d =>
+            {
+                var details = detailsByDaily.TryGetValue(d.Id, out var dts) ? dts : new();
+
+                // min(tổng từng công đoạn) — thành phẩm hoàn chỉnh
+                int? totalOutput = d.TotalOutputNumber;
+                if (details.Count > 0)
+                {
+                    var sums = details
+                        .Where(dt => dt.OutputNumber.HasValue)
+                        .GroupBy(dt => dt.StyleDetailId)
+                        .Select(g => g.Sum(dt => dt.OutputNumber!.Value))
+                        .ToList();
+                    if (sums.Count > 0) totalOutput = sums.Min();
                 }
-            }
+
+                return new MachineDetail_DailyOutputDto
+                {
+                    Id                = d.Id,
+                    StyleInfoId       = d.StyleInfoId?.ToString(),
+                    StyleCode         = d.StyleInfoId.HasValue && styleCodeMap.TryGetValue(d.StyleInfoId.Value, out var sc) ? sc : null,
+                    TotalOutputNumber = totalOutput,
+                    CreateDate        = d.CreateDate.ToString("yyyy-MM-dd"),
+                    Details           = details.Select(dt => new MachineDetail_DailyOutputDetailDto
+                    {
+                        Id            = dt.Id,
+                        StyleDetailId = dt.StyleDetailId,
+                        DetailName    = dt.DetailName,
+                        OutputNumber  = dt.OutputNumber,
+                        InputTime     = dt.InputTime
+                    }).ToList()
+                };
+            }).ToList();
 
             return outputs;
         }

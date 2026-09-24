@@ -902,8 +902,22 @@
         var qty = info.totalQty || 0;
         var target = info.target || 0;
 
+        // Pass 1: tính _dayTotal = min(tổng từng công đoạn) cho mỗi ngày
+        list.forEach(function(d) {
+            var detailById = {};
+            (d.details || []).forEach(function(dt) {
+                var key = dt.styleDetailId || dt.detailName || 'x';
+                if (!detailById[key]) detailById[key] = 0;
+                detailById[key] += (dt.outputNumber || 0);
+            });
+            var vals = Object.values(detailById);
+            d._dayTotal = vals.length > 0
+                ? vals.reduce(function(m, v) { return Math.min(m, v); }, vals[0])
+                : (d.totalOutputNumber || 0);
+        });
+
         var totalOutput = 0;
-        list.forEach(function(d) { totalOutput += (d.totalOutputNumber || 0); });
+        list.forEach(function(d) { totalOutput += d._dayTotal; });
 
         var pctQty = qty > 0 ? Math.min(100, Math.round(totalOutput / qty * 100)) : 0;
         document.getElementById('detailTotalOutput').textContent = fmt(totalOutput) + ' / ' + fmt(qty);
@@ -922,12 +936,17 @@
             var card = document.createElement('div');
             card.className = 'md-day-card';
 
-            var detailMap = {};
+            // Gom nhóm theo từng công đoạn để hiển thị summary
+            var detailMap  = {};   // detailName → tổng sản lượng
             (d.details || []).forEach(function(dt) {
                 var name = dt.detailName || 'Khác';
-                if (!detailMap[name]) detailMap[name] = 0;
+                if (!detailMap[name])  detailMap[name]  = 0;
                 detailMap[name] += (dt.outputNumber || 0);
             });
+
+            // _dayTotal đã được tính ở Pass 1
+            var dayTotal = d._dayTotal;
+
             var summaryArr = [];
             for (var k in detailMap) summaryArr.push(k + ': ' + fmt(detailMap[k]));
             var summaryText = summaryArr.length ? '<div style="padding: 10px 16px; font-size: 12px; color: var(--ink-500); background: var(--bg-canvas); border-bottom: 1px solid var(--border-soft);">Tổng: ' + esc(summaryArr.join(', ')) + '</div>' : '';
@@ -947,7 +966,7 @@
             card.innerHTML =
                 '<div class="md-day-card-head" style="cursor:pointer; user-select:none;">' +
                     '<div class="md-day-date"><i class="fa-regular fa-calendar"></i>' + fmtDate(d.createDate) + (d.styleCode ? ' &nbsp;·&nbsp; <span style="font-family:Courier New;font-size:11.5px;color:var(--ink-400);">' + esc(d.styleCode) + '</span>' : '') + '</div>' +
-                    '<div class="md-day-total"><i class="fa-solid fa-box"></i> ' + fmt(d.totalOutputNumber) + ' thành phẩm <i class="fa-solid fa-chevron-down" style="font-size:11px; margin-left:6px; transition:transform 0.2s; transform:' + initRot + '"></i></div>' +
+                    '<div class="md-day-total"><i class="fa-solid fa-box"></i> ' + fmt(dayTotal) + ' thành phẩm <i class="fa-solid fa-chevron-down" style="font-size:11px; margin-left:6px; transition:transform 0.2s; transform:' + initRot + '"></i></div>' +
                 '</div>' +
                 '<div class="md-day-card-content" style="display:' + initDisplay + ';">' +
                 summaryText +

@@ -40,7 +40,13 @@ namespace SNP_SubSystem.Controllers.ImportExport
         // ---------------------------------------------------------------
 
         [HttpPost]
-        public async Task<IActionResult> ImportOutputExcel(IFormFile file, Guid? deptId = null)
+        public async Task<IActionResult> ImportOutputExcel(
+            IFormFile file,
+            Guid? deptId = null,
+            bool autoCreate = false,
+            bool autoActivate = false,
+            bool skipOnDuplicate = false,
+            bool autoCreateStyleDetail = false)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, message = "Vui lòng chọn file Excel." });
@@ -55,8 +61,16 @@ namespace SNP_SubSystem.Controllers.ImportExport
             if (file.Length > 10 * 1024 * 1024) // 10 MB limit
                 return BadRequest(new { success = false, message = "File quá lớn (tối đa 10 MB)." });
 
+            var options = new SubSystemService.ImportOutput_Options
+            {
+                AutoCreateProductionInfo = autoCreate,
+                AutoActivateStatus       = autoActivate,
+                SkipOnDuplicate          = skipOnDuplicate,
+                AutoCreateStyleDetail    = autoCreateStyleDetail,
+            };
+
             using var stream = file.OpenReadStream();
-            var result = await _service.ImportOutputFromExcel(stream, deptId.Value);
+            var result = await _service.ImportOutputFromExcel(stream, deptId.Value, options);
 
             return Ok(result);
         }

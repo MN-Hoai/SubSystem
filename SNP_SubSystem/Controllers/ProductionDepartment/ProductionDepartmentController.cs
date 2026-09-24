@@ -312,9 +312,9 @@ namespace SNP_SubSystem.Controllers.ProductionDepartment
         {
             if (req == null)
                 return BadRequest(new { success = false, message = "Thiếu dữ liệu." });
-            var (ok, msg) = await _service.SaveOutputRecord(req);
+            var (ok, msg, updatedCount) = await _service.SaveOutputRecord(req);
             if (!ok) return BadRequest(new { success = false, message = msg });
-            return Ok(new { success = true, message = msg });
+            return Ok(new { success = true, message = msg, updatedCount });
         }
 
         // ---------------------------------------------------------------

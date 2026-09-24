@@ -122,6 +122,16 @@
                 <div class="panel-sub" id="panelTableSub">Đang tải dữ liệu...</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+                <!-- Chọn số item hiển thị -->
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <label for="pageSizeSelect" style="font-size:12px;color:var(--ink-500);white-space:nowrap;">Hiển thị:</label>
+                    <select id="pageSizeSelect" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface);color:var(--ink-700);cursor:pointer;">
+                        <option value="20" selected>20</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="0">Tất cả</option>
+                    </select>
+                </div>
                 <button class="btn btn-ghost" id="btnTodayActive" title="Lọc mã hàng đang sản xuất và có target hôm nay">
                     <i class="fa-solid fa-calendar-check"></i>Đang SX hôm nay
                 </button>
@@ -143,6 +153,9 @@
         </div>
 
         <div class="table-wrap" id="tableWrap">
+            <!-- Sentinel trên: khi cuộn lên chạm vào → chuyển trang trước -->
+            <div id="sentinelTop" style="height:1px;width:100%;"></div>
+
             <table id="progressTable">
                 <thead>
                     <tr>
@@ -163,6 +176,9 @@
                     <!-- Render động từ JS -->
                 </tbody>
             </table>
+
+            <!-- Sentinel dưới: khi cuộn xuống chạm vào → chuyển trang tiếp -->
+            <div id="sentinelBottom" style="height:1px;width:100%;"></div>
         </div>
 
         <!-- PAGINATION -->
@@ -462,8 +478,18 @@
     // ---------------------------------------------------------------
     // State phân trang
     // ---------------------------------------------------------------
-    let currentPage = 1;
-    const PAGE_SIZE = 20;
+    let currentPage      = 1;
+    let currentPageSize  = 20;   // đồng bộ với select #pageSizeSelect
+    let totalPagesState  = 1;    // lưu lại để sentinel dùng
+    let _manualNavActive = false; // flag: đang chuyển trang thủ công → tắt sentinel
+
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+
+    // Đọc pageSize từ select (0 = ALL → dùng 9999)
+    function getPageSize() {
+        const v = parseInt(pageSizeSelect.value);
+        return v === 0 ? 9999 : v;
+    }
 
     // ---------------------------------------------------------------
     // 1. Load danh sách Bộ phận
@@ -530,7 +556,7 @@
             productionDepartmentId: deptId,
             status:                 status,
             page:                   page,
-            pageSize:               PAGE_SIZE
+            pageSize:               getPageSize()
         };
 
         try {
@@ -565,6 +591,7 @@
             tableWrap.style.display = 'block';
             renderRows(data.items);
             renderPagination(data.totalCount, data.page, data.totalPages);
+            totalPagesState = data.totalPages ?? 1;
 
             // Cập nhật thống kê hiển thị
             const from = (data.page - 1) * data.pageSize + 1;
@@ -728,58 +755,249 @@
         paginationCtrl.innerHTML = '';
         if (totalPages <= 1) return;
 
-        // Nút Prev
-        const prev = btn('<i class="fa-solid fa-chevron-left"></i>', page <= 1);
-        prev.addEventListener('click', () => { if (page > 1) goPage(page - 1); });
-        paginationCtrl.appendChild(prev);
+        // ‹‹ Trang đầu
+        const bFirst = mkBtn('<i class="fa-solid fa-angles-left"></i>', page <= 1, false, 'Trang đầu');
+        bFirst.addEventListener('click', () => goPage(1));
+        paginationCtrl.appendChild(bFirst);
 
-        // Số trang (hiển thị tối đa 7 nút, dùng dấu "…" khi cần)
-        const pages = buildPageRange(page, totalPages);
-        pages.forEach(p => {
+        // ‹ Trang trước
+        const bPrev = mkBtn('<i class="fa-solid fa-chevron-left"></i>', page <= 1, false, 'Trang trước');
+        bPrev.addEventListener('click', () => { if (page > 1) goPage(page - 1); });
+        paginationCtrl.appendChild(bPrev);
+
+        paginationCtrl.appendChild(mkSep());
+
+        // Dãy số trang (luôn có 1 và totalPages)
+        buildPageRange(page, totalPages).forEach(p => {
             if (p === '...') {
-                const dots = document.createElement('span');
-                dots.className   = 'page-dots';
-                dots.textContent = '…';
-                paginationCtrl.appendChild(dots);
+                paginationCtrl.appendChild(mkDots());
             } else {
-                const b = btn(p, false, p === page);
+                const b = mkBtn(p, false, p === page);
                 b.addEventListener('click', () => goPage(p));
                 paginationCtrl.appendChild(b);
             }
         });
 
-        // Nút Next
-        const next = btn('<i class="fa-solid fa-chevron-right"></i>', page >= totalPages);
-        next.addEventListener('click', () => { if (page < totalPages) goPage(page + 1); });
-        paginationCtrl.appendChild(next);
+        paginationCtrl.appendChild(mkSep());
+
+        // › Trang tiếp
+        const bNext = mkBtn('<i class="fa-solid fa-chevron-right"></i>', page >= totalPages, false, 'Trang tiếp');
+        bNext.addEventListener('click', () => { if (page < totalPages) goPage(page + 1); });
+        paginationCtrl.appendChild(bNext);
+
+        // ›› Trang cuối
+        const bLast = mkBtn('<i class="fa-solid fa-angles-right"></i>', page >= totalPages, false, 'Trang cuối');
+        bLast.addEventListener('click', () => goPage(totalPages));
+        paginationCtrl.appendChild(bLast);
+
+        paginationCtrl.appendChild(mkSep());
+
+        // Label "Trang X / Y"
+        const lbl = document.createElement('span');
+        lbl.className = 'page-label';
+        lbl.innerHTML = `<span style="color:var(--ink-400);font-size:11px;margin-right:3px;">Trang</span><strong>${page}</strong><span style="color:var(--ink-300);margin:0 3px;">/</span><span>${totalPages}</span>`;
+        paginationCtrl.appendChild(lbl);
+
+        paginationCtrl.appendChild(mkSep());
+
+        // Input nhảy trang nhanh
+        const jumpWrap = document.createElement('span');
+        jumpWrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+        const ji = document.createElement('input');
+        ji.type        = 'number';
+        ji.min         = '1';
+        ji.max         = String(totalPages);
+        ji.placeholder = 'Trang...';
+        ji.title       = 'Nhảy đến trang';
+        ji.style.cssText = 'width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center;color:var(--ink-700);background:var(--bg-surface);';
+        const doJump = () => {
+            const p = parseInt(ji.value);
+            if (p >= 1 && p <= totalPages) { goPage(p); ji.value = ''; }
+        };
+        ji.addEventListener('keydown', e => { if (e.key === 'Enter') doJump(); });
+        const jb = mkBtn('<i class="fa-solid fa-arrow-right" style="font-size:11px;"></i>', false, false, 'Đi đến trang');
+        jb.style.padding = '4px 8px';
+        jb.addEventListener('click', doJump);
+        jumpWrap.appendChild(ji);
+        jumpWrap.appendChild(jb);
+        paginationCtrl.appendChild(jumpWrap);
     }
 
     function buildPageRange(current, total) {
-        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-        const pages = [];
-        if (current <= 4) {
-            pages.push(1, 2, 3, 4, 5, '...', total);
-        } else if (current >= total - 3) {
-            pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
-        } else {
-            pages.push(1, '...', current - 1, current, current + 1, '...', total);
+        if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1);
+
+        // Luôn có trang 1, trang cuối, và current ± 1
+        const set = new Set();
+        set.add(1);
+        set.add(total);
+        for (let i = Math.max(1, current - 1); i <= Math.min(total, current + 1); i++) set.add(i);
+
+        const sorted = [...set].sort((a, b) => a - b);
+        const result = [];
+        let prev = 0;
+        for (const p of sorted) {
+            const gap = p - prev;
+            if (gap > 2)      result.push('...'); // khoảng cách lớn → chèn ...
+            else if (gap === 2) result.push(p - 1); // thiếu đúng 1 số → điền luôn
+            result.push(p);
+            prev = p;
         }
-        return pages;
+        return result;
     }
 
-    function btn(html, disabled, active) {
+    // ── Helpers tạo element phân trang ────────────────────────────────
+    function mkBtn(html, disabled, active, title) {
         const b = document.createElement('button');
-        b.className   = 'page-btn' + (active ? ' active' : '');
-        b.disabled    = !!disabled;
-        b.innerHTML   = html;
+        b.className = 'page-btn' + (active ? ' active' : '');
+        b.disabled  = !!disabled;
+        b.innerHTML = html;
+        if (title) b.title = title;
         return b;
     }
 
-    function goPage(page) {
-        currentPage = page;
-        fetchList(currentPage);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    function mkDots() {
+        const s = document.createElement('span');
+        s.className   = 'page-dots';
+        s.textContent = '…';
+        return s;
     }
+
+    function mkSep() {
+        const s = document.createElement('span');
+        s.style.cssText = 'display:inline-block;width:1px;height:16px;background:var(--border,#d1d5e0);margin:0 4px;vertical-align:middle;opacity:.6;';
+        return s;
+    }
+
+    function goPage(pg) {
+        currentPage      = pg;
+        _manualNavActive = true;       // tắt sentinel trong lúc chuyển trang thủ công
+        fetchList(currentPage);
+        // Scroll instant (không smooth) → tránh trigger sentinel atTop
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        setTimeout(() => { _manualNavActive = false; }, 1500);
+    }
+
+    // ---------------------------------------------------------------
+    // 5b. Scroll → chuyển trang khi thanh cuộn chạm đáy / đỉnh tuyệt đối
+    // Điều kiện kích hoạt:
+    //   - Next: scrollY + innerHeight >= scrollHeight (đáy tuyệt đối, tolerance 2px)
+    //   - Prev : scrollY <= 0                         (đỉnh tuyệt đối)
+    // Sau khi chạm đáy/đỉnh phải GIỮ ở đó đủ DWELL_MS ms mới chuyển trang
+    // (tránh trigger vô tình khi lướt qua).
+    // ---------------------------------------------------------------
+    (function setupScrollNav() {
+        const DWELL_MS  = 800;   // ms phải dừng ở cùng cực trước khi chuyển trang
+        const TOLERANCE = 2;     // px sai số để coi là "chạm đáy"
+        const COOLDOWN  = 1400;  // ms chờ sau khi chuyển trang xong, không trigger tiếp
+
+        let isNavigating    = false;
+        let bottomHoldTimer = null;
+        let topHoldTimer    = null;
+
+        function navigate(direction) {
+            if (isNavigating) return;
+            if (getPageSize() >= 9999) return;  // ALL mode → bỏ qua
+
+            if (direction === 'next' && currentPage < totalPagesState) {
+                isNavigating = true;
+                currentPage++;
+                showPageNavToast(currentPage, totalPagesState, 'next');
+                fetchList(currentPage);
+                // Nhảy lên đầu trang mới ngay lập tức
+                setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 60);
+                setTimeout(() => { isNavigating = false; }, COOLDOWN);
+
+            } else if (direction === 'prev' && currentPage > 1) {
+                isNavigating = true;
+                currentPage--;
+                showPageNavToast(currentPage, totalPagesState, 'prev');
+                fetchList(currentPage);
+                // Nhảy xuống cuối trang trước
+                setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }), 60);
+                setTimeout(() => { isNavigating = false; }, COOLDOWN);
+            }
+        }
+
+        function onScroll() {
+            // Khởi chạy sentinel chỉ khi KHÔNG đang chuyển trang thủ công
+            if (isNavigating || _manualNavActive) {
+                // Xoá timer đang chạy để tránh trigger sai
+                clearTimeout(bottomHoldTimer); bottomHoldTimer = null;
+                clearTimeout(topHoldTimer);    topHoldTimer    = null;
+                return;
+            }
+
+            const scrollY    = window.scrollY || window.pageYOffset;
+            const innerH     = window.innerHeight;
+            const scrollH    = document.documentElement.scrollHeight;
+
+            // ── Kiểm tra ĐÁY: thanh cuộn ở tận cùng dưới ──
+            const atBottom = (scrollY + innerH) >= (scrollH - TOLERANCE);
+            if (atBottom) {
+                if (!bottomHoldTimer) {
+                    bottomHoldTimer = setTimeout(() => {
+                        navigate('next');
+                        bottomHoldTimer = null;
+                    }, DWELL_MS);
+                }
+            } else {
+                clearTimeout(bottomHoldTimer);
+                bottomHoldTimer = null;
+            }
+
+            // ── Kiểm tra ĐỈNH: thanh cuộn ở tận cùng trên ──
+            const atTop = scrollY <= TOLERANCE;
+            if (atTop) {
+                if (!topHoldTimer) {
+                    topHoldTimer = setTimeout(() => {
+                        navigate('prev');
+                        topHoldTimer = null;
+                    }, DWELL_MS);
+                }
+            } else {
+                clearTimeout(topHoldTimer);
+                topHoldTimer = null;
+            }
+        }
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+    })();
+
+    // ---------------------------------------------------------------
+    // Toast thông báo chuyển trang (scroll-sentinel)
+    // ---------------------------------------------------------------
+    (function setupPageNavToast() {
+        const el = document.createElement('div');
+        el.id = 'pageNavToast';
+        el.style.cssText = [
+            'position:fixed', 'top:72px', 'left:50%', 'transform:translateX(-50%) translateY(-8px)',
+            'z-index:99999', 'background:rgba(15,23,42,.88)', 'backdrop-filter:blur(6px)',
+            'color:#e2e8f0', 'font-size:13px', 'font-weight:700',
+            'font-family:Manrope,sans-serif',
+            'padding:8px 20px', 'border-radius:32px',
+            'box-shadow:0 6px 24px rgba(0,0,0,.35)',
+            'pointer-events:none', 'opacity:0',
+            'transition:opacity .22s ease, transform .22s ease',
+            'white-space:nowrap', 'display:flex', 'align-items:center', 'gap:8px'
+        ].join(';');
+        document.body.appendChild(el);
+
+        let toastHideTimer = null;
+
+        window.showPageNavToast = function(page, total, dir) {
+            const icon = dir === 'next'
+                ? '<i class="fa-solid fa-chevron-down" style="font-size:11px;"></i>'
+                : '<i class="fa-solid fa-chevron-up"   style="font-size:11px;"></i>';
+            el.innerHTML = `${icon} Trang ${page} / ${total}`;
+            el.style.opacity   = '1';
+            el.style.transform = 'translateX(-50%) translateY(0)';
+            clearTimeout(toastHideTimer);
+            toastHideTimer = setTimeout(() => {
+                el.style.opacity   = '0';
+                el.style.transform = 'translateX(-50%) translateY(-8px)';
+            }, 1600);
+        };
+    })();
 
     // ---------------------------------------------------------------
     // 6. Helpers
@@ -855,6 +1073,12 @@
     // Tự động gọi fetch khi đổi Line, Status, Từ ngày, Đến ngày
     [lineSelect, statusSelect, fromDateInput, toDateInput].forEach(el => {
         el.addEventListener('change', () => { currentPage = 1; fetchList(1); });
+    });
+
+    // Đổi số item/trang → reset về trang 1 rồi fetch
+    pageSizeSelect.addEventListener('change', () => {
+        currentPage = 1;
+        fetchList(1);
     });
 
     // Nút Đặt lại

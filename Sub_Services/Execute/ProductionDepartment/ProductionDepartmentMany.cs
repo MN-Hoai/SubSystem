@@ -840,14 +840,14 @@ namespace Sub_Services.Execute
         /// Ghi sản lượng: tạo/cập nhật DailyOutput và upsert DailyOutputDetail theo ngày + giờ.
         /// Nếu cùng ngày + cùng giờ (hour) + cùng công đoạn → cập nhật sản lượng, không tạo mới.
         /// </summary>
-        public async Task<(bool Success, string Message)> SaveOutputRecord(
+        public async Task<(bool Success, string Message, int UpdatedCount)> SaveOutputRecord(
             RecordOutput_SaveRequest req)
         {
             if (req.Details == null || !req.Details.Any())
-                return (false, "Không có chi tiết nào để ghi.");
+                return (false, "Không có chi tiết nào để ghi.", 0);
 
             if (!DateOnly.TryParse(req.Date, out var date))
-                return (false, "Ngày không hợp lệ.");
+                return (false, "Ngày không hợp lệ.", 0);
 
             if (!TimeOnly.TryParse(req.Time, out var time))
                 time = TimeOnly.FromDateTime(DateTime.Now);
@@ -882,8 +882,9 @@ namespace Sub_Services.Execute
 
             // Upsert/Insert từng chi tiết:
             // - source == "manual" → luôn INSERT mới (cho phép ghi thêm cùng ngày giờ)
-            // - source khác (excel, null…) → upsert theo giờ + công đoạn để tránh trùng lặp
+            // - source khác (excel, null…) → upsert theo giờ+phút + công đoạn để tránh trùng lặp
             var isManual = string.Equals(req.Source, "manual", StringComparison.OrdinalIgnoreCase);
+            int updatedCount = 0;  // đếm số record được UPDATE (cùng giờ + phút)
 
             foreach (var entry in req.Details)
             {
@@ -892,21 +893,27 @@ namespace Sub_Services.Execute
                 Sub_Entities.Entities.DailyOutputDetail existing = null;
                 if (!isManual)
                 {
-                    // Tìm record có cùng giờ + công đoạn trong ngày này (chỉ áp dụng cho Excel/upsert)
+                    // Tìm record có cùng giờ + cùng phút + công đoạn trong ngày này
+                    // Giống cả giờ và phút → đây là duplicate → UPDATE
+                    // Khác giờ hoặc khác phút → lần ghi mới → INSERT
                     existing = daily.DailyOutputDetails
                         .FirstOrDefault(dt =>
                             dt.StyleDetailId == entry.StyleDetailId
                             && dt.Status == 1
-                            && dt.InputTime.Hour == time.Hour);
+                            && dt.InputTime.Hour   == time.Hour
+                            && dt.InputTime.Minute == time.Minute);
                 }
 
                 if (existing != null)
                 {
-                    // Cùng giờ + công đoạn (excel mode) → cập nhật sản lượng
+                    // Cùng giờ + cùng phút + công đoạn (excel mode) → cập nhật sản lượng
+                    var oldQty  = existing.OutputNumber;
+                    var oldTime = existing.InputTime;
                     existing.OutputNumber = entry.OutputNumber;
                     existing.InputTime    = time;
                     existing.Keyword      = req.Keyword;
                     existing.UpdateDate   = now;
+                    updatedCount++;
                 }
                 else
                 {
@@ -945,7 +952,7 @@ namespace Sub_Services.Execute
                 await _context.SaveChangesAsync();
             }
 
-            return (true, "Đã ghi sản lượng thành công.");
+            return (true, "Đã ghi sản lượng thành công.", updatedCount);
         }
 
 

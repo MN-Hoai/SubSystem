@@ -27,9 +27,9 @@ namespace Sub_Services.Execute
             var ws = wb.AddWorksheet("NhapSanLuong");
             ws.SheetView.FreezeRows(2);
 
-            // Total columns: 9
-            // Col: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Màu | Công đoạn | Số lượng
-            const int TOTAL_COLS = 9;
+            // Total columns: 10
+            // Col: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng
+            const int TOTAL_COLS = 10;
 
             // Title row
             var titleRow = ws.Range(1, 1, 1, TOTAL_COLS);
@@ -51,6 +51,7 @@ namespace Sub_Services.Execute
                 ("Line (*)",         "VD: 01, 02, AT-04",                  true),
                 ("Style (*)",        "Tên style chính xác",                true),
                 ("Mã SP (*)",        "VD: 26090783TB",                     false),
+                ("Order Qty",        "Số lượng đơn hàng (tùy chọn)",        false),
                 ("Màu (*)",          "VD: 010, RED, BLK",                  true),
                 ("Tên công đoạn (*)","Tên công đoạn chính xác",            false),
                 ("Số lượng (*)",     "Số nguyên dương",                    false),
@@ -73,14 +74,14 @@ namespace Sub_Services.Execute
                     cell.Style.Font.Italic = true; // đánh dấu cột mới
             }
 
-            // Sample data rows (9 cột)
+            // Sample data rows (10 cột)
             var today = DateTime.Today.ToString("dd/MM/yyyy");
             var sampleData = new[]
             {
-                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", "010", "Thân trước", 100),
-                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", "010", "Thân sau",   95),
-                (today, "13:00", "AT-04", "01", "IM2024", "26090783TB", "010", "Tay áo",     80),
-                (today, "08:00", "AT-05", "02", "VN2025", "26090784SP", "BLK", "Thân trước", 120),
+                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân trước", 100),
+                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân sau",   95),
+                (today, "13:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Tay áo",     80),
+                (today, "08:00", "AT-05", "02", "VN2025", "26090784SP", 300, "BLK", "Thân trước", 120),
             };
 
             int dataStartRow = 2;
@@ -94,9 +95,10 @@ namespace Sub_Services.Execute
                 ws.Cell(dataStartRow + r, 4).Value = d.Item4;
                 ws.Cell(dataStartRow + r, 5).Value = d.Item5;
                 ws.Cell(dataStartRow + r, 6).Value = d.Item6;
-                ws.Cell(dataStartRow + r, 7).Value = d.Item7;
-                ws.Cell(dataStartRow + r, 8).Value = d.Item8;
-                ws.Cell(dataStartRow + r, 9).Value = d.Item9;
+                ws.Cell(dataStartRow + r, 7).Value = d.Item7;  // Order Qty
+                ws.Cell(dataStartRow + r, 8).Value = d.Item8;  // Màu
+                ws.Cell(dataStartRow + r, 9).Value = d.Item9;  // Công đoạn
+                ws.Cell(dataStartRow + r, 10).Value = d.Item10; // Số lượng
 
                 if (r % 2 == 0)
                     rowEl.Cells(1, TOTAL_COLS).Style.Fill.BackgroundColor = XLColor.FromArgb(0xF7, 0xF8, 0xFC);
@@ -118,13 +120,14 @@ namespace Sub_Services.Execute
             ws.Column(4).Width = 12;  // Line  ← mới
             ws.Column(5).Width = 18;  // Style ← mới
             ws.Column(6).Width = 18;  // Mã SP
-            ws.Column(7).Width = 12;  // Màu   ← mới
-            ws.Column(8).Width = 24;  // Công đoạn
-            ws.Column(9).Width = 14;  // Số lượng
+            ws.Column(7).Width = 14;  // Order Qty ← mới
+            ws.Column(8).Width = 12;  // Màu   ← mới
+            ws.Column(9).Width = 24;  // Công đoạn
+            ws.Column(10).Width = 14; // Số lượng
 
             // Note below table
             int noteRow = blankStart + 50 + 1;
-            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Cột nền xanh lá (Line, Style, Màu) giúp hệ thống tìm đúng mã hàng. Dữ liệu sẽ được CỘNG DỒN, không ghi đè.";
+            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Cột nền xanh lá (Line, Style, Màu) giúp hệ thống tìm đúng mã hàng. Cột Order Qty (tùy chọn): ghi số lượng đơn hàng khi mã cần tự tạo mới. Dữ liệu sản lượng sẽ được CỘNG DỒN, không ghi đè.";
             ws.Cell(noteRow, 1).Style.Font.Italic = true;
             ws.Cell(noteRow, 1).Style.Font.FontColor = XLColor.FromArgb(0x64, 0x69, 0x7F);
             ws.Range(noteRow, 1, noteRow, TOTAL_COLS).Merge();
@@ -192,10 +195,19 @@ namespace Sub_Services.Execute
         /// Logic:
         ///   1. Parse sheet "NhapSanLuong" bỏ qua 2 dòng header
         ///   2. Với mỗi dòng: tìm machine → productionInfo → styleDetail → SaveOutputRecord
+        ///   3. Nếu options.AutoCreateProductionInfo = true và mã không tồn tại → tạo mới
+        ///   4. Nếu options.AutoActivateStatus = true → gán Status = 1 khi tạo mới
         /// </summary>
-        public async Task<ImportOutput_Result> ImportOutputFromExcel(Stream fileStream, Guid deptId)
+        public async Task<ImportOutput_Result> ImportOutputFromExcel(
+            Stream fileStream,
+            Guid deptId,
+            ImportOutput_Options options = null)
         {
-            var result = new ImportOutput_Result();
+            var result  = new ImportOutput_Result();
+            options   ??= new ImportOutput_Options();
+            int autoCreatedCount  = 0;  // đếm mã hàng tự tạo mới
+            int autoActivatedCount = 0; // đếm mã hàng được bật trạng thái
+            var activatedInfoIds  = new HashSet<Guid>(); // tránh update trùng
 
             XLWorkbook wb;
             try { wb = new XLWorkbook(fileStream); }
@@ -206,7 +218,7 @@ namespace Sub_Services.Execute
                 return new ImportOutput_Result { Success = false, Message = "Không tìm thấy sheet 'NhapSanLuong' trong file." };
 
             // Parse rows starting from row 3 (skip title + header)
-            // Format 9 cột: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Màu | Công đoạn | Số lượng
+            // Format 10 cột: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng
             var rows = new List<ImportOutput_Row>();
             int lastRow = ws.LastRowUsed()?.RowNumber() ?? 2;
 
@@ -218,9 +230,10 @@ namespace Sub_Services.Execute
                 var lineVal    = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
                 var styleVal   = ws.Cell(r, 5).GetString().Trim().ToUpperInvariant();
                 var spVal      = ws.Cell(r, 6).GetString().Trim().ToUpperInvariant();
-                var colorVal   = ws.Cell(r, 7).GetString().Trim().ToUpperInvariant();
-                var detailVal  = ws.Cell(r, 8).GetString().Trim();
-                var qtyCell    = ws.Cell(r, 9).GetString().Trim();
+                var orderQtyCell = ws.Cell(r, 7).GetString().Trim();  // cột 7: Order Qty (tùy chọn)
+                var colorVal   = ws.Cell(r, 8).GetString().Trim().ToUpperInvariant(); // cột 8
+                var detailVal  = ws.Cell(r, 9).GetString().Trim();                    // cột 9
+                var qtyCell    = ws.Cell(r, 10).GetString().Trim();                   // cột 10
 
                 // Skip dòng không có dữ liệu thực tế:
                 // — dòng hoàn toàn trống
@@ -273,6 +286,11 @@ namespace Sub_Services.Execute
                     continue;
                 }
 
+                // Parse Order Qty (tùy chọn, không bắt buộc)
+                int? orderQty = null;
+                if (int.TryParse(orderQtyCell, out var oq) && oq > 0)
+                    orderQty = oq;
+
                 rows.Add(new ImportOutput_Row
                 {
                     Date         = date,
@@ -281,6 +299,7 @@ namespace Sub_Services.Execute
                     Line         = lineVal,
                     Style        = styleVal,
                     Spmain       = spVal,
+                    OrderQty     = orderQty,
                     Color        = colorVal,
                     DetailName   = detailVal,
                     OutputNumber = qty,
@@ -307,18 +326,43 @@ namespace Sub_Services.Execute
                 .Where(p => p.Status >= 0 && p.ProductionDepartmentId == deptId)
                 .ToListAsync();
 
-            // Cache StyleInfo: StyleCode (upper) → StyleInfoId
+            // Cache StyleInfo: StyleCode (upper) → StyleInfo object
             // CHỈ lấy StyleInfo của bộ phận này (deptId) — mỗi bộ phận có công đoạn riêng
-            var styleInfoCache = (await _context.StyleInfos
+            var styleInfoList = await _context.StyleInfos
                 .AsNoTracking()
                 .Where(s => s.Status == 1 && s.ProductionDepartmentId == deptId)
-                .ToListAsync())
-                .GroupBy(s => (s.StyleCode ?? "").Trim().ToUpperInvariant())
-                .ToDictionary(g => g.Key, g => g.First().Id);
+                .ToListAsync();
+
+            // Cache chính: (StyleCode.Upper, Keyword.Upper) → StyleInfo
+            // Cho phép nhiều StyleInfo có cùng StyleCode nhưng Keyword khác nhau
+            var styleInfoCache = styleInfoList
+                .GroupBy(s => (
+                    Code: (s.StyleCode ?? "").Trim().ToUpperInvariant(),
+                    KW:   (s.Keyword    ?? "").Trim().ToUpperInvariant()
+                ))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // Lookup helper: tìm StyleInfo khớp StyleCode + Keyword == SP
+            Sub_Entities.Entities.StyleInfo FindStyleInfo(string styleCode, string spmain)
+            {
+                if (string.IsNullOrWhiteSpace(styleCode)) return null;
+                var codeKey = styleCode.Trim().ToUpperInvariant();
+                var kwKey   = (spmain ?? "").Trim().ToUpperInvariant();
+
+                // 1. Khớp cả StyleCode lẫn Keyword
+                if (styleInfoCache.TryGetValue((codeKey, kwKey), out var exact))
+                    return exact;
+
+                // 2. Fallback: StyleCode khớp, Keyword trống/null (StyleInfo chưa điền Keyword)
+                if (styleInfoCache.TryGetValue((codeKey, ""), out var noKw))
+                    return noKw;
+
+                return null;
+            }
 
             // Cache StyleDetail: (styleInfoId, detailName) → StyleDetail
             // Chỉ lấy các StyleDetail thuộc StyleInfo của bộ phận này
-            var deptStyleInfoIds = styleInfoCache.Values.ToHashSet();
+            var deptStyleInfoIds = styleInfoCache.Values.Select(s => s.Id).ToHashSet();
             var allStyleDetails = await _context.StyleDetails
                 .AsNoTracking()
                 .Where(sd => sd.Status == 1 && deptStyleInfoIds.Contains(sd.StyleInfoId))
@@ -347,106 +391,246 @@ namespace Sub_Services.Execute
                     if (row.Line != null && row.Style != null && row.Color != null)
                     {
                         // Format mới: tra trực tiếp bằng Line + Style + Spmain + Color (chính xác)
-                        var spUpper    = row.Spmain.ToUpperInvariant();
-                        var lineUpper  = row.Line;
+                        var spUpper = row.Spmain.ToUpperInvariant();
+                        var lineUpper = row.Line;
                         var styleUpper = row.Style;
                         var colorUpper = row.Color;
 
                         productionInfo = allProdInfoCache.FirstOrDefault(p =>
-                            string.Equals(p.Line,   lineUpper,  StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(p.Style,  styleUpper, StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(p.Spmain, spUpper,    StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(p.Color,  colorUpper, StringComparison.OrdinalIgnoreCase));
+                            string.Equals(p.Line, lineUpper, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(p.Style, styleUpper, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(p.Spmain, spUpper, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(p.Color, colorUpper, StringComparison.OrdinalIgnoreCase));
 
                         if (productionInfo == null)
                         {
-                            result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy mã hàng Line='{row.Line}' Style='{row.Style}' SP='{row.Spmain}' Màu='{row.Color}'.");
-                            result.SkippedRows++;
-                            continue;
+                            if (options.AutoCreateProductionInfo
+                                && !string.IsNullOrEmpty(row.Line)
+                                && !string.IsNullOrEmpty(row.Style)
+                                && !string.IsNullOrEmpty(row.Spmain))
+                            {
+                                // Tự tạo ProductionInfo mới
+                                var newInfo = new Sub_Entities.Entities.ProductionInfo
+                                {
+                                    Id = Guid.NewGuid(),
+                                    ProductionDepartmentId = deptId,
+                                    Line = row.Line,
+                                    Style = row.Style,
+                                    Spmain = row.Spmain,
+                                    Color = row.Color ?? "",
+                                    TotalQty = row.OrderQty,
+                                    Status = 0, // Option 2 sẽ bật sau SaveOutputRecord (áp dụng đồng nhất cả mã mới lẫn có sẵn)
+                                    CreateDate = DateTime.Now,
+                                    UpdateDate = DateTime.Now,
+                                };
+                                _context.ProductionInfos.Add(newInfo);
+                                await _context.SaveChangesAsync();
+
+                                // Cập nhật cache để các dòng tiếp theo trong file cùng được dùng
+                                allProdInfoCache.Add(newInfo);
+                                productionInfo = newInfo;
+                                autoCreatedCount++;
+                                result.Logs.Add($"Dòng {row.RowIndex}: Tự tạo mã hàng mới Line='{row.Line}' Style='{row.Style}' SP='{row.Spmain}' Màu='{row.Color}' OrderQty={row.OrderQty?.ToString() ?? "-"}.");
+                            }
+                            else
+                            {
+                                result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy mã hàng Line='{row.Line}' Style='{row.Style}' SP='{row.Spmain}' Màu='{row.Color}'.");
+                                result.SkippedRows++;
+                                continue;
+                            }
                         }
-                    }
-                    else
-                    {
-                        // Format cũ: tìm theo Spmain qua DailyOutput của máy (tương thích ngược)
-                        var infoIds = await _context.DailyOutputs
-                            .Where(d => d.ProductionMachineId == machine.Id && d.Status == 1)
-                            .Select(d => d.ProductionInfoId)
-                            .Distinct()
-                            .ToListAsync();
-
-                        productionInfo = allProdInfoCache.FirstOrDefault(p =>
-                            infoIds.Contains(p.Id) &&
-                            string.Equals(p.Spmain, row.Spmain, StringComparison.OrdinalIgnoreCase));
-
-                        if (productionInfo == null)
+                        else
                         {
-                            result.Errors.Add($"Dòng {row.RowIndex}: Máy '{row.MachineName}' không có mã SP '{row.Spmain}'.");
-                            result.SkippedRows++;
-                            continue;
+                            // Format cũ: tìm theo Spmain qua DailyOutput của máy (tương thích ngược)
+                            var infoIds = await _context.DailyOutputs
+                                .Where(d => d.ProductionMachineId == machine.Id && d.Status == 1)
+                                .Select(d => d.ProductionInfoId)
+                                .Distinct()
+                                .ToListAsync();
+
+                            productionInfo = allProdInfoCache.FirstOrDefault(p =>
+                                infoIds.Contains(p.Id) &&
+                                string.Equals(p.Spmain, row.Spmain, StringComparison.OrdinalIgnoreCase));
+
+                            if (productionInfo == null)
+                            {
+                                // Fallback: khớp đủ cả 4 — Line + Style + Spmain + Color
+                                var matched = allProdInfoCache.FirstOrDefault(p =>
+                                    string.Equals(p.Line,   row.Line,   StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(p.Style,  row.Style,  StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(p.Spmain, row.Spmain, StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(p.Color,  row.Color,  StringComparison.OrdinalIgnoreCase) &&
+                                    p.ProductionDepartmentId == deptId);
+
+                                if (matched != null)
+                                {
+                                    // Tìm thấy khớp đủ 4 trường → liên kết
+                                    productionInfo = matched;
+                                    result.Logs.Add($"Dòng {row.RowIndex}: Máy '{row.MachineName}' chưa liên kết mã → tự động dùng mã khớp Line='{matched.Line}' Style='{matched.Style}' SP='{matched.Spmain}' Màu='{matched.Color}'.");
+                                }
+                                else if (options.AutoCreateProductionInfo
+                                    && !string.IsNullOrEmpty(row.Line)
+                                    && !string.IsNullOrEmpty(row.Style)
+                                    && !string.IsNullOrEmpty(row.Spmain))
+                                {
+                                    // Không tìm thấy + bật autoCreate → tạo mới
+                                    var newInfo = new Sub_Entities.Entities.ProductionInfo
+                                    {
+                                        Id                     = Guid.NewGuid(),
+                                        ProductionDepartmentId = deptId,
+                                        Line                   = row.Line,
+                                        Style                  = row.Style,
+                                        Spmain                 = row.Spmain,
+                                        Color                  = row.Color ?? "",
+                                        TotalQty               = row.OrderQty,
+                                        Status                 = 0,
+                                        CreateDate             = DateTime.Now,
+                                        UpdateDate             = DateTime.Now,
+                                    };
+                                    _context.ProductionInfos.Add(newInfo);
+                                    await _context.SaveChangesAsync();
+                                    allProdInfoCache.Add(newInfo);
+                                    productionInfo = newInfo;
+                                    autoCreatedCount++;
+                                    result.Logs.Add($"Dòng {row.RowIndex}: Tự tạo mã hàng mới Line='{row.Line}' Style='{row.Style}' SP='{row.Spmain}' Màu='{row.Color}' OrderQty={row.OrderQty?.ToString() ?? "-"}.");
+                                }
+                                else
+                                {
+                                    result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy mã khớp Line='{row.Line}' Style='{row.Style}' SP='{row.Spmain}' Màu='{row.Color}'" +
+                                        (options.AutoCreateProductionInfo ? "." : " — bật 'Tự động tạo mã hàng' để tạo mới."));
+                                    result.SkippedRows++;
+                                    continue;
+                                }
+                            }
                         }
-                    }
 
-                    // 3. Tìm StyleInfoId từ cache
-                    Guid? styleInfoId = null;
+                        // 3. Tìm StyleInfo — dùng (StyleCode + Keyword==SP) để phân biệt khi nhiều StyleInfo cùng StyleCode
+                        Guid? styleInfoId = null;
 
-                    // Ưu tiên 1: lấy từ DailyOutput đã có, verify StyleInfo thuộc đúng bộ phận
-                    var doStyleId = await _context.DailyOutputs
-                        .Where(d => d.ProductionInfoId == productionInfo.Id
-                                 && d.ProductionMachineId == machine.Id
-                                 && d.StyleInfoId != null
-                                 && _context.StyleInfos.Any(s => s.Id == d.StyleInfoId
-                                                              && s.ProductionDepartmentId == deptId
-                                                              && s.Status == 1))
-                        .Select(d => d.StyleInfoId)
-                        .FirstOrDefaultAsync();
-                    styleInfoId = doStyleId;
+                        // Ưu tiên 1: lấy từ DailyOutput đã có, verify StyleInfo thuộc đúng bộ phận + Keyword khớp SP
+                        var doStyleId = await _context.DailyOutputs
+                            .Where(d => d.ProductionInfoId == productionInfo.Id
+                                     && d.ProductionMachineId == machine.Id
+                                     && d.StyleInfoId != null
+                                     && _context.StyleInfos.Any(s => s.Id == d.StyleInfoId
+                                                                  && s.ProductionDepartmentId == deptId
+                                                                  && s.Status == 1
+                                                                  && (s.Keyword == null || s.Keyword.ToUpper() == row.Spmain.ToUpper())))
+                            .Select(d => d.StyleInfoId)
+                            .FirstOrDefaultAsync();
+                        styleInfoId = doStyleId;
 
-                    // Ưu tiên 2: tìm qua Style trong Excel (row.Style) → match StyleCode
-                    if (styleInfoId == null && !string.IsNullOrWhiteSpace(row.Style))
-                    {
-                        if (styleInfoCache.TryGetValue(row.Style.Trim().ToUpperInvariant(), out var sid2))
-                            styleInfoId = sid2;
-                    }
+                        // Ưu tiên 2: tìm qua Style trong Excel (row.Style) + SP → (StyleCode, Keyword)
+                        if (styleInfoId == null && !string.IsNullOrWhiteSpace(row.Style))
+                        {
+                            var si2 = FindStyleInfo(row.Style, row.Spmain);
+                            if (si2 != null) styleInfoId = si2.Id;
+                        }
 
-                    // Ưu tiên 3: tìm qua productionInfo.Style (từ DB) → match StyleCode
-                    if (styleInfoId == null && !string.IsNullOrWhiteSpace(productionInfo.Style))
-                    {
-                        if (styleInfoCache.TryGetValue(productionInfo.Style.Trim().ToUpperInvariant(), out var sid3))
-                            styleInfoId = sid3;
-                    }
+                        // Ưu tiên 3: tìm qua productionInfo.Style (từ DB) + SP → (StyleCode, Keyword)
+                        if (styleInfoId == null && !string.IsNullOrWhiteSpace(productionInfo.Style))
+                        {
+                            var si3 = FindStyleInfo(productionInfo.Style, row.Spmain);
+                            if (si3 != null) styleInfoId = si3.Id;
+                        }
 
-                    // Fallback cuối: thử qua Keyword
-                    if (styleInfoId == null && productionInfo.Keyword != null)
-                    {
-                        var kw = productionInfo.Keyword.Trim().ToUpperInvariant();
-                        if (styleInfoCache.TryGetValue(kw, out var sid4))
-                            styleInfoId = sid4;
-                    }
+                        // Fallback cuối: tìm qua Keyword của ProductionInfo làm StyleCode + SP → (StyleCode, Keyword)
+                        if (styleInfoId == null && !string.IsNullOrWhiteSpace(productionInfo.Keyword))
+                        {
+                            var si4 = FindStyleInfo(productionInfo.Keyword, row.Spmain);
+                            if (si4 != null) styleInfoId = si4.Id;
+                        }
 
-                    // 4. Tìm StyleDetail từ cache
-                    Sub_Entities.Entities.StyleDetail styleDetail = null;
-                    if (styleInfoId != null)
-                    {
-                        var detKey = (styleInfoId.Value, row.DetailName.Trim().ToUpperInvariant());
-                        styleDetailCache.TryGetValue(detKey, out styleDetail);
-                    }
+                        // 4. Tìm StyleDetail từ cache
+                        Sub_Entities.Entities.StyleDetail styleDetail = null;
+                        if (styleInfoId != null)
+                        {
+                            var detKey = (styleInfoId.Value, row.DetailName.Trim().ToUpperInvariant());
+                            styleDetailCache.TryGetValue(detKey, out styleDetail);
+                        }
 
-                    if (styleDetail == null)
-                    {
-                        result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy công đoạn '{row.DetailName}' cho mã '{row.Spmain}'.");
-                        result.SkippedRows++;
-                        continue;
-                    }
+                        if (styleDetail == null)
+                        {
+                            if (options.AutoCreateStyleDetail && !string.IsNullOrWhiteSpace(row.DetailName))
+                            {
+                                // Bước A: xác định StyleInfo target
+                                Sub_Entities.Entities.StyleInfo targetStyleInfo = null;
 
-                    // 5. Save (accumulate)
-                    var saveReq = new RecordOutput_SaveRequest
-                    {
-                        ProductionInfoId = productionInfo.Id,
-                        MachineId        = machine.Id,
-                        Date             = row.Date,
-                        Time             = row.Time,
-                        Keyword          = "excel",
-                        Details          = new List<RecordOutput_DetailEntry>
+                                if (styleInfoId.HasValue)
+                                {
+                                    // Đã tìm được StyleInfo — lấy từ list
+                                    targetStyleInfo = styleInfoList.FirstOrDefault(s => s.Id == styleInfoId.Value);
+                                }
+
+                                if (targetStyleInfo == null)
+                                {
+                                    // Không tìm được → tạo mới StyleInfo
+                                    targetStyleInfo = new Sub_Entities.Entities.StyleInfo
+                                    {
+                                        Id                     = Guid.NewGuid(),
+                                        ProductionDepartmentId = deptId,
+                                        StyleCode              = row.Style?.Trim() ?? "",
+                                        Keyword                = row.Spmain?.Trim(),
+                                        Status                 = 1,
+                                        CreateDate             = DateTime.Now,
+                                        UpdateDate             = DateTime.Now,
+                                    };
+                                    _context.StyleInfos.Add(targetStyleInfo);
+                                    await _context.SaveChangesAsync();
+
+                                    // Cập nhật các cache
+                                    styleInfoList.Add(targetStyleInfo);
+                                    var ck = (
+                                        Code: (targetStyleInfo.StyleCode ?? "").Trim().ToUpperInvariant(),
+                                        KW:   (targetStyleInfo.Keyword   ?? "").Trim().ToUpperInvariant()
+                                    );
+                                    styleInfoCache[ck] = targetStyleInfo;
+                                    deptStyleInfoIds.Add(targetStyleInfo.Id);
+                                    styleInfoId = targetStyleInfo.Id;
+
+                                    result.Logs.Add($"Dòng {row.RowIndex}: Tự tạo StyleInfo — StyleCode='{targetStyleInfo.StyleCode}' Keyword='{targetStyleInfo.Keyword}'.");
+                                }
+
+                                // Bước B: tạo StyleDetail
+                                var newDetail = new Sub_Entities.Entities.StyleDetail
+                                {
+                                    Id          = Guid.NewGuid(),
+                                    StyleInfoId = targetStyleInfo.Id,
+                                    DetailName  = row.DetailName.Trim(),
+                                    Status      = 1,
+                                    CreateDate  = DateTime.Now,
+                                    UpdateDate  = DateTime.Now,
+                                };
+                                _context.StyleDetails.Add(newDetail);
+                                await _context.SaveChangesAsync();
+
+                                var dk = (targetStyleInfo.Id, row.DetailName.Trim().ToUpperInvariant());
+                                styleDetailCache[dk] = newDetail;
+                                styleDetail = newDetail;
+
+                                result.Logs.Add($"Dòng {row.RowIndex}: Tự tạo công đoạn '{row.DetailName}' — StyleCode='{targetStyleInfo.StyleCode}' Keyword='{targetStyleInfo.Keyword}'.");
+                            }
+                            else
+                            {
+                                // Option tắt → báo lỗi
+                                if (styleInfoId == null)
+                                    result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy StyleInfo khớp Style='{row.Style}' SP='{row.Spmain}'. Kiểm tra lại hoặc bật 'Tự tạo chi tiết mã hàng'.");
+                                else
+                                    result.Errors.Add($"Dòng {row.RowIndex}: Không tìm thấy công đoạn '{row.DetailName}' trong Style='{row.Style}' SP='{row.Spmain}'. Kiểm tra lại hoặc bật 'Tự tạo chi tiết mã hàng'.");
+                                result.SkippedRows++;
+                                continue;
+                            }
+                        }
+
+                        // 5. Save (accumulate)
+                        var saveReq = new RecordOutput_SaveRequest
+                        {
+                            ProductionInfoId = productionInfo.Id,
+                            MachineId = machine.Id,
+                            Date = row.Date,
+                            Time = row.Time,
+                            Keyword = "excel",
+                            Details = new List<RecordOutput_DetailEntry>
                         {
                             new RecordOutput_DetailEntry
                             {
@@ -454,15 +638,69 @@ namespace Sub_Services.Execute
                                 OutputNumber  = row.OutputNumber
                             }
                         }
-                    };
+                        };
 
-                    var (ok, msg) = await SaveOutputRecord(saveReq);
-                    if (ok)
-                        result.ImportedRows++;
-                    else
-                    {
-                        result.Errors.Add($"Dòng {row.RowIndex}: {msg}");
-                        result.SkippedRows++;
+                        // Option 3: Bỏ qua nếu đã tồn tại DailyOutputDetail cùng giờ+phút+công đoạn
+                        if (options.SkipOnDuplicate
+                            && DateOnly.TryParse(row.Date, out var skipDate)
+                            && TimeOnly.TryParse(row.Time, out var skipTime))
+                        {
+                            var targetDate = skipDate.ToDateTime(TimeOnly.MinValue).Date;
+                            var alreadyExists = await _context.DailyOutputs
+                                .Where(d => d.ProductionInfoId    == productionInfo.Id
+                                         && d.ProductionMachineId == machine.Id
+                                         && d.Status              == 1
+                                         && d.CreateDate.Date     == targetDate)
+                                .AnyAsync(d => d.DailyOutputDetails
+                                    .Any(dt => dt.StyleDetailId == styleDetail.Id
+                                            && dt.Status        == 1
+                                            && dt.InputTime.Hour   == skipTime.Hour
+                                            && dt.InputTime.Minute == skipTime.Minute));
+                            if (alreadyExists)
+                            {
+                                result.Logs.Add($"Dòng {row.RowIndex}: Bỏ qua — đã có sản lượng lúc {row.Time} ngày {row.Date} — Line='{productionInfo.Line}' Style='{productionInfo.Style}' SP='{productionInfo.Spmain}' Màu='{productionInfo.Color}'.");
+                                result.SkippedRows++;
+                                continue;
+                            }
+                        }
+
+                        var (ok, msg, updatedCount) = await SaveOutputRecord(saveReq);
+                        if (ok)
+                        {
+                            result.ImportedRows++;
+                            if (updatedCount > 0)
+                            {
+                                result.UpdatedRows++;
+                                result.Logs.Add($"Dòng {row.RowIndex}: Cập nhật {updatedCount} chi tiết — Line='{productionInfo.Line}' Style='{productionInfo.Style}' SP='{productionInfo.Spmain}' Màu='{productionInfo.Color}' (StyleDetail '{row.DetailName}', Giờ '{row.Time}').");
+                            }
+                            else
+                            {
+                                result.InsertedRows++;
+                            }
+
+                            // Option 2: Tự động bật trạng thái Đang SX cho tất cả mã được ghi thành công
+                            if (options.AutoActivateStatus
+                                && productionInfo.Status != 1
+                                && !activatedInfoIds.Contains(productionInfo.Id))
+                            {
+                                var infoToActivate = await _context.ProductionInfos.FindAsync(productionInfo.Id);
+                                if (infoToActivate != null && infoToActivate.Status != 1)
+                                {
+                                    infoToActivate.Status     = 1;
+                                    infoToActivate.UpdateDate = DateTime.Now;
+                                    await _context.SaveChangesAsync();
+                                    productionInfo.Status = 1; // đồng bộ cache
+                                    activatedInfoIds.Add(productionInfo.Id);
+                                    autoActivatedCount++;
+                                    result.Logs.Add($"Đã bật trạng thái Đang SX — Line='{productionInfo.Line}' Style='{productionInfo.Style}' SP='{productionInfo.Spmain}' Màu='{productionInfo.Color}'.");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            result.Errors.Add($"Dòng {row.RowIndex}: {msg}");
+                            result.SkippedRows++;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -474,7 +712,10 @@ namespace Sub_Services.Execute
 
             result.Success = result.ImportedRows > 0;
             result.Message = result.ImportedRows > 0
-                ? $"Nhập thành công {result.ImportedRows}/{result.TotalRows} dòng."
+                ? $"Nhập thành công {result.ImportedRows}/{result.TotalRows} dòng" +
+                  (autoCreatedCount  > 0 ? $" | Tự tạo {autoCreatedCount} mã mới"    : "") +
+                  (autoActivatedCount > 0 ? $" | Kích hoạt {autoActivatedCount} mã"   : "") +
+                  (result.Logs.Any() ? "." : ".")
                 : "Không có dòng nào được nhập thành công.";
 
             return result;

@@ -32,12 +32,15 @@ public class ExcelSnapshotService : IExcelSnapshotService
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        // Key = RowKey, Value = Entity
+        // Cùng một RowKey có thể nằm ở nhiều Tổ khác nhau, nên GroupName + RowKey mới là định danh duy nhất.
         var dict = new Dictionary<string, ExcelSnapshotRow>(StringComparer.Ordinal);
         foreach (var row in rows)
         {
             if (!string.IsNullOrEmpty(row.RowKey))
-                dict[row.RowKey] = row;
+            {
+                var uniqueKey = $"{row.GroupName ?? ""}||{row.RowKey}";
+                dict[uniqueKey] = row;
+            }
         }
 
         return dict;

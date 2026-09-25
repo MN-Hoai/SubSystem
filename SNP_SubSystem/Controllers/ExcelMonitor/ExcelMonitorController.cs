@@ -200,57 +200,26 @@ public class ExcelMonitorController : Controller
             query = query.Where(c => c.SheetName == sheetName);
         }
 
-        // Lấy tất cả lịch sử thay đổi theo thứ tự thời gian
-        var logs = await query.OrderBy(c => c.ChangeDate).ThenBy(c => c.Id).ToListAsync();
-
-        // Mô phỏng lại quá trình để tìm ra trạng thái CUỐI CÙNG của từng mã
-        var finalStates = new Dictionary<string, Sub_Entities.Entities.ExcelChangeLog>(StringComparer.Ordinal);
-        var everAdded = new HashSet<string>(StringComparer.Ordinal);
-        
-        foreach (var log in logs)
+        // Lấy đợt thay đổi mới nhất (vì backend giờ so sánh trực tiếp với bản gốc)
+        var maxDate = await query.MaxAsync(c => (DateTime?)c.ChangeDate);
+        if (maxDate == null)
         {
-            if (log.ChangeType == "ROW_ADDED" && !string.IsNullOrEmpty(log.RowKey))
-            {
-                everAdded.Add(log.RowKey);
-                finalStates[log.RowKey] = log;
-            }
-            else if (log.ChangeType == "ROWKEY_CHANGED")
-            {
-                // Nếu mã cũ từng được thêm, thì mã mới cũng được coi là mã thêm
-                if (!string.IsNullOrEmpty(log.OldRowKey) && everAdded.Contains(log.OldRowKey))
-                {
-                    everAdded.Remove(log.OldRowKey);
-                    if (!string.IsNullOrEmpty(log.NewRowKey))
-                        everAdded.Add(log.NewRowKey);
-                }
-
-                if (!string.IsNullOrEmpty(log.OldRowKey))
-                    finalStates.Remove(log.OldRowKey);
-                
-                if (!string.IsNullOrEmpty(log.NewRowKey))
-                    finalStates[log.NewRowKey] = log;
-            }
-            else if (!string.IsNullOrEmpty(log.RowKey))
-            {
-                // Các thao tác khác: ROW_DELETED, VALUE_CHANGED, GROUP_CHANGED, FORMULA_CHANGED
-                // Ghi đè trạng thái cuối cùng của RowKey này
-                finalStates[log.RowKey] = log;
-            }
+            return Json(new { success = true, added = new object[0], groupChanged = new object[0], rowkeyChanged = new object[0], valueChanged = new object[0], deleted = new object[0] });
         }
 
-        var finalLogs = finalStates.Values;
+        // Trích xuất toàn bộ log của đợt so sánh mới nhất này
+        var finalLogs = await query.Where(c => c.ChangeDate == maxDate).ToListAsync();
 
-        // Lấy danh sách Thêm mã (Gồm những mã từng được sinh ra và hiện CHƯA BỊ XÓA)
-        // Những mã này nếu có bị thay đổi thông tin (VALUE_CHANGED) hay đổi tên (ROWKEY_CHANGED) thì VẪN sẽ xuất hiện ở tab Thêm mã
-        var added = finalLogs
-            .Where(c => {
-                var currentKey = c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey;
-                return !string.IsNullOrEmpty(currentKey) && everAdded.Contains(currentKey) && c.ChangeType != "ROW_DELETED";
-            })
+        // Lấy danh sách Thêm mã
+        // Yêu cầu: Gôm thêm dữ liệu ở tab thay đổi mã (ROWKEY_CHANGED) vào tab thêm mã
+        var addedRecords = finalLogs.Where(c => c.ChangeType == "ROW_ADDED" || c.ChangeType == "ROWKEY_CHANGED").ToList();
+        var added = addedRecords
             .GroupBy(c => c.GroupName)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey).Distinct().ToList()
+                Rows = g.Select(c => c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey)
+                        .Where(k => !string.IsNullOrEmpty(k))
+                        .Distinct().ToList()
             })
             .OrderBy(x => x.GroupName)
             .ToList();
@@ -266,6 +235,7 @@ public class ExcelMonitorController : Controller
             .OrderBy(x => x.OldGroupName)
             .ToList();
 
+        // Tab thay đổi mã vẫn giữ nguyên
         var rowkeyChanged = finalLogs.Where(c => c.ChangeType == "ROWKEY_CHANGED")
             .GroupBy(c => c.GroupName)
             .Select(g => new {

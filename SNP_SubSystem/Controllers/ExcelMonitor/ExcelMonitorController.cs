@@ -300,9 +300,9 @@ public class ExcelMonitorController : Controller
         var activeStates = states.Values.ToList();
 
         // Lấy danh sách Thêm mã (Gồm những mã từng được sinh ra và hiện CHƯA BỊ XÓA)
-        // Yêu cầu: Gôm thêm dữ liệu ở tab thay đổi mã (HasRowKeyChanged) vào tab thêm mã
+        // Yêu cầu: Gôm thêm dữ liệu ở tab thay đổi mã (HasRowKeyChanged) VÀ tab chuyển tổ (HasGroupChanged) vào tab thêm mã
         var added = activeStates
-            .Where(s => !s.IsDeleted && (s.IsAdded || s.HasRowKeyChanged))
+            .Where(s => !s.IsDeleted && (s.IsAdded || s.HasRowKeyChanged || s.HasGroupChanged))
             .GroupBy(s => s.CurrentGroup)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,

@@ -188,6 +188,12 @@
                     <i class="fa-solid fa-border-all"></i>
                     <span class="label">Thiết kế layout</span>
                 </a>
+                <a href="/excel-monitor"
+                   class="nav-item @(currentCtrl == "ExcelMonitor" ? "active" : "")"
+                   data-tip="Theo dõi thay đổi file Excel">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span class="label">Excel Monitor</span>
+                </a>
             </div>
 
             <!-- Quản trị -->
@@ -362,4 +368,5 @@
     }
 </script>
 <script src="~/js/site.js"></script>
+@RenderSection("Scripts", required: false)
 </html>

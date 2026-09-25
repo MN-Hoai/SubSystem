@@ -153,6 +153,9 @@
         <button class="pid-btn pid-btn-ghost" id="pidFilterToday">
             <i class="fa-solid fa-calendar-day"></i> Hôm nay
         </button>
+        <button class="pid-btn pid-btn-ghost" id="pidFilterYesterday">
+            <i class="fa-solid fa-calendar-minus"></i> Hôm trước
+        </button>
         <span class="pid-filter-count" id="pidDateCount"></span>
     </div>
 
@@ -231,6 +234,16 @@
     document.getElementById('pidFilterToday').addEventListener('click', function() {
         document.getElementById('pidFromDate').value = todayStr;
         document.getElementById('pidToDate').value   = todayStr;
+        loadData();
+    });
+    document.getElementById('pidFilterYesterday').addEventListener('click', function() {
+        var curFrom = document.getElementById('pidFromDate').value || todayStr;
+        var d = new Date(curFrom + 'T00:00:00');
+        d.setDate(d.getDate() - 1);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        var s = d.toISOString().split('T')[0];
+        document.getElementById('pidFromDate').value = s;
+        document.getElementById('pidToDate').value   = s;
         loadData();
     });
 

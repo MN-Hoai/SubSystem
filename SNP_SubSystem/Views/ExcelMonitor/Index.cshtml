@@ -1,0 +1,1088 @@
+@model List<SNP_SubSystem.Controllers.ExcelMonitor.ExcelMonitorIndexVm>
+@{
+    ViewData["Title"] = "Excel Monitor – Theo dõi file Excel";
+}
+
+<div class="em-page">
+    <div class="em-header">
+        <div class="em-header-left">
+            <div class="em-header-icon">
+                <i class="em-icon-file"></i>
+            </div>
+            <div>
+                <h1 class="em-title">Excel Monitor</h1>
+                <p class="em-subtitle">Theo dõi thay đổi file Excel theo thời gian thực</p>
+            </div>
+        </div>
+        <button class="em-btn em-btn-primary" onclick="showAddModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Thêm file
+        </button>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="em-stats">
+        <div class="em-stat-card">
+            <div class="em-stat-value">@Model.Count</div>
+            <div class="em-stat-label">File đang monitor</div>
+        </div>
+        <div class="em-stat-card">
+            <div class="em-stat-value">@Model.Count(f => f.Status == 1)</div>
+            <div class="em-stat-label">Đang hoạt động</div>
+        </div>
+        <div class="em-stat-card">
+            <div class="em-stat-value">@Model.Sum(f => f.TotalChanges).ToString("N0")</div>
+            <div class="em-stat-label">Tổng thay đổi</div>
+        </div>
+        <div class="em-stat-card">
+            <div class="em-stat-value">@(Model.Where(f => f.LastChangeDate.HasValue).OrderByDescending(f => f.LastChangeDate).FirstOrDefault()?.LastChangeDate?.ToString("HH:mm") ?? "--")</div>
+            <div class="em-stat-label">Thay đổi gần nhất</div>
+        </div>
+    </div>
+
+    <!-- File Grid -->
+    @if (!Model.Any())
+    {
+        <div class="em-empty">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p>Chưa có file nào được monitor</p>
+            <button class="em-btn em-btn-primary" onclick="showAddModal()">Thêm file đầu tiên</button>
+        </div>
+    }
+    else
+    {
+        <div class="em-file-grid">
+            @foreach (var file in Model)
+            {
+                <div class="em-file-card @(file.Status == 0 ? "em-file-card--inactive" : "")">
+                    <div class="em-file-card-header">
+                        <div class="em-file-type-badge em-file-type-@file.FileType?.ToLower()">
+                            @file.FileType?.ToUpper()
+                        </div>
+                        <div class="em-file-status @(file.Status == 1 ? "em-status-active" : "em-status-inactive")">
+                            <span class="em-status-dot"></span>
+                            @(file.Status == 1 ? "Monitoring" : "Paused")
+                        </div>
+                    </div>
+
+                    <div class="em-file-name">@file.FileName</div>
+                    <div class="em-file-path" title="@file.FilePath">@file.FilePath</div>
+
+                    <div class="em-file-meta">
+                        <div class="em-meta-item">
+                            <span class="em-meta-label">Lần đọc cuối</span>
+                            <span class="em-meta-value">@(file.LastReadDate?.ToString("dd/MM HH:mm") ?? "–")</span>
+                        </div>
+                        <div class="em-meta-item">
+                            <span class="em-meta-label">Thay đổi cuối</span>
+                            <span class="em-meta-value">@(file.LastChangeDate?.ToString("dd/MM HH:mm") ?? "–")</span>
+                        </div>
+                    </div>
+
+                    <div class="em-file-changes">
+                        <span class="em-change-count">@file.TotalChanges.ToString("N0")</span>
+                        <span class="em-change-label">thay đổi</span>
+                    </div>
+
+                    <div class="em-file-actions">
+                        <a href="/excel-monitor/@file.Id" class="em-action-btn em-action-detail">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Chi tiết
+                        </a>
+                        <a href="/excel-monitor/@file.Id/history" class="em-action-btn em-action-history">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                            Lịch sử
+                        </a>
+                        <button class="em-action-btn em-action-edit"
+                                onclick="showEditModal('@file.Id', '@file.FileName.Replace("'", "\\'"))')"
+                                title="Sửa cấu hình">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="em-action-btn em-action-pause"
+                                onclick="pauseFile('@file.Id', '@file.FileName.Replace("'", "\\'"))')"
+                                title="Tạm ngừng monitor">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+                        <button class="em-action-btn em-action-hard-delete"
+                                onclick="hardDeleteFile('@file.Id', '@file.FileName.Replace("'", "\\'"))')"
+                                title="Xóa cứng – xóa toàn bộ dữ liệu khỏi DB">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M8 6V4h8v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Modal Thêm File -->
+<div class="em-modal-overlay" id="addModal" style="display:none">
+    <div class="em-modal">
+        <div class="em-modal-header">
+            <h3>Thêm file Excel cần monitor</h3>
+            <button class="em-modal-close" onclick="closeAddModal()">×</button>
+        </div>
+        <div class="em-modal-body">
+            <div class="em-form-group">
+                <label class="em-form-label">Đường dẫn file *</label>
+                <input type="text" id="filePath" class="em-form-input"
+                       placeholder="D:\Production\SNP Production.xlsb" />
+                <div class="em-form-hint">Đường dẫn vật lý tới file Excel trên máy chủ</div>
+            </div>
+
+            <div id="sheetConfigsContainer">
+                <div class="em-sheet-config-header">
+                    <label class="em-form-label">Cấu hình Sheet</label>
+                    <button type="button" class="em-btn-small" onclick="addSheetConfig()">+ Thêm Sheet</button>
+                </div>
+                <div id="sheetConfigs"></div>
+            </div>
+        </div>
+        <div class="em-modal-footer">
+            <button class="em-btn em-btn-ghost" onclick="closeAddModal()">Hủy</button>
+            <button class="em-btn em-btn-primary" onclick="submitAddFile()" id="submitBtn">
+                <span id="submitText">Thêm & bắt đầu Monitor</span>
+                <span id="submitSpinner" style="display:none">Đang xử lý...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ─── Modal Chỉnh sửa cấu hình ─────────────────────────────────── -->
+<div class="em-modal-overlay" id="editModal" style="display:none">
+    <div class="em-modal em-modal-wide">
+        <div class="em-modal-header">
+            <div>
+                <h3 id="editModalTitle">Cấu hình file</h3>
+                <div id="editModalPath" style="font-size:11px;color:#718096;margin-top:3px;font-family:monospace"></div>
+            </div>
+            <button class="em-modal-close" onclick="closeEditModal()">×</button>
+        </div>
+        <div class="em-modal-body" id="editModalBody">
+
+            <!-- Loading state -->
+            <div id="editLoading" style="text-align:center;padding:30px">
+                <div class="em-spinner"></div>
+                <div style="margin-top:8px;font-size:13px;color:#718096">Đang tải cấu hình...</div>
+            </div>
+
+            <!-- Form content (hidden until loaded) -->
+            <div id="editFormContent" style="display:none">
+
+                <!-- Status toggle -->
+                <div class="em-form-group">
+                    <label class="em-form-label">Trạng thái Monitor</label>
+                    <div class="em-status-row">
+                        <label class="em-switch">
+                            <input type="checkbox" id="editStatusToggle" onchange="onStatusToggle(this)">
+                            <span class="em-switch-slider"></span>
+                        </label>
+                        <span id="editStatusLabel" style="font-size:14px;font-weight:600;color:#2f855a;margin-left:10px">Đang Monitor</span>
+                    </div>
+                </div>
+
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
+
+                <!-- Sheet configs -->
+                <div class="em-sheet-config-header">
+                    <label class="em-form-label" style="margin:0">Cấu hình Sheet</label>
+                    <button type="button" class="em-btn-small" onclick="addEditSheetRow()">+ Thêm Sheet</button>
+                </div>
+                <div id="editSheetList" style="margin-top:10px"></div>
+
+            </div>
+        </div>
+        <div class="em-modal-footer">
+            <button class="em-btn em-btn-ghost" onclick="closeEditModal()">Hủy</button>
+            <button class="em-btn em-btn-primary" onclick="submitEditFile()" id="editSubmitBtn">
+                <span id="editSubmitText">Lưu cấu hình</span>
+                <span id="editSubmitSpinner" style="display:none">Đang lưu...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ─── EXCEL MONITOR PAGE ─────────────────────────────────────────── */
+.em-page {
+    padding: 24px;
+   
+    margin: 0 auto;
+}
+
+.em-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+}
+
+.em-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.em-header-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+.em-icon-file::before { content: "📊"; }
+
+.em-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 4px;
+}
+
+.em-subtitle {
+    font-size: 13px;
+    color: #718096;
+    margin: 0;
+}
+
+/* Buttons */
+.em-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.em-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+}
+
+.em-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(102,126,234,0.5);
+}
+
+.em-btn-ghost {
+    background: transparent;
+    color: #4a5568;
+    border: 1.5px solid #e2e8f0;
+}
+
+.em-btn-ghost:hover { background: #f7fafc; }
+
+.em-btn-small {
+    padding: 4px 12px;
+    font-size: 12px;
+    background: #edf2ff;
+    color: #667eea;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* Stats */
+.em-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.em-stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.em-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #667eea;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+
+.em-stat-label {
+    font-size: 12px;
+    color: #718096;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* File Grid */
+.em-file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.em-file-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+}
+
+.em-file-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.em-file-card--inactive::before { background: #cbd5e0; }
+.em-file-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+
+.em-file-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.em-file-type-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.em-file-type-xlsx { background: #e3fcef; color: #0b7a3e; }
+.em-file-type-xlsb { background: #e8f4fd; color: #1a6fa0; }
+.em-file-type-xlsm { background: #fef3e2; color: #a05c1a; }
+
+.em-file-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.em-status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.em-status-active { color: #2f855a; }
+.em-status-active .em-status-dot { background: #48bb78; }
+.em-status-inactive { color: #718096; }
+.em-status-inactive .em-status-dot { background: #a0aec0; animation: none; }
+
+@@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.em-file-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.em-file-path {
+    font-size: 11px;
+    color: #718096;
+    margin-bottom: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+}
+
+.em-file-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    background: #f7fafc;
+    border-radius: 8px;
+    margin-bottom: 14px;
+}
+
+.em-meta-label { font-size: 10px; color: #a0aec0; font-weight: 600; text-transform: uppercase; }
+.em-meta-value { font-size: 13px; color: #2d3748; font-weight: 600; margin-top: 2px; }
+
+.em-file-changes {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.em-change-count {
+    font-size: 26px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.em-change-label { font-size: 13px; color: #718096; }
+
+.em-file-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.em-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.em-action-detail {
+    background: #edf2ff;
+    color: #667eea;
+    flex: 1;
+    justify-content: center;
+}
+
+.em-action-detail:hover { background: #667eea; color: white; }
+
+.em-action-history {
+    background: #f0fff4;
+    color: #2f855a;
+    flex: 1;
+    justify-content: center;
+}
+
+.em-action-history:hover { background: #2f855a; color: white; }
+
+.em-action-delete {
+    background: #fff5f5;
+    color: #e53e3e;
+    padding: 7px 10px;
+}
+
+.em-action-delete:hover { background: #e53e3e; color: white; }
+
+.em-action-pause {
+    background: #fffbeb;
+    color: #b7791f;
+    padding: 7px 10px;
+}
+.em-action-pause:hover { background: #d69e2e; color: white; }
+
+.em-action-hard-delete {
+    background: #fff5f5;
+    color: #9b2335;
+    padding: 7px 10px;
+    border: 1.5px solid #fed7d7 !important;
+}
+.em-action-hard-delete:hover {
+    background: #9b2335;
+    color: white;
+    border-color: #9b2335 !important;
+}
+
+.em-action-edit {
+    background: #fffaf0;
+    color: #dd6b20;
+    padding: 7px 10px;
+}
+
+.em-action-edit:hover { background: #dd6b20; color: white; }
+
+/* Modal wide */
+.em-modal-wide { width: 640px !important; }
+
+/* Status toggle row */
+.em-status-row { display: flex; align-items: center; }
+
+/* iOS-style switch */
+.em-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.em-switch input { opacity: 0; width: 0; height: 0; }
+.em-switch-slider {
+    position: absolute; inset: 0;
+    background: #cbd5e0; border-radius: 24px;
+    cursor: pointer; transition: 0.3s;
+}
+.em-switch-slider::before {
+    content: ''; position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: white; border-radius: 50%;
+    transition: 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.em-switch input:checked + .em-switch-slider { background: #48bb78; }
+.em-switch input:checked + .em-switch-slider::before { transform: translateX(20px); }
+
+/* Spinner */
+.em-spinner {
+    width: 28px; height: 28px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+@@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Edit sheet config row */
+.em-edit-sheet-row {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+}
+.em-edit-sheet-row .em-row-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.em-edit-sheet-row .em-row-title {
+    font-size: 12px; font-weight: 700;
+    color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.em-remove-sheet-btn {
+    background: none; border: none; color: #e53e3e;
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    padding: 2px 6px; border-radius: 4px;
+    transition: background 0.2s;
+}
+.em-remove-sheet-btn:hover { background: #fff5f5; }
+.em-disabled-badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; background: #fed7d7; color: #c53030;
+    border-radius: 4px; margin-left: 6px; vertical-align: middle;
+}
+
+/* Empty state */
+.em-empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: #718096;
+}
+
+.em-empty p { margin: 16px 0 24px; font-size: 15px; }
+
+/* Modal */
+.em-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s;
+}
+
+@@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.em-modal {
+    background: white;
+    border-radius: 20px;
+    width: 560px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    animation: slideUp 0.3s;
+}
+
+@@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.em-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 24px 0;
+}
+
+.em-modal-header h3 { font-size: 18px; font-weight: 700; color: #1a202c; margin: 0; }
+
+.em-modal-close {
+    background: none; border: none; font-size: 24px; cursor: pointer;
+    color: #718096; line-height: 1; padding: 4px;
+}
+
+.em-modal-body { padding: 24px; }
+.em-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.em-form-group { margin-bottom: 20px; }
+.em-form-label { display: block; font-size: 13px; font-weight: 600; color: #2d3748; margin-bottom: 6px; }
+.em-form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1a202c;
+    transition: border 0.2s;
+    box-sizing: border-box;
+}
+
+.em-form-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+.em-form-hint { font-size: 11px; color: #a0aec0; margin-top: 4px; }
+
+.em-sheet-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.em-sheet-config-item {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+
+.em-sheet-config-item .em-form-group { margin-bottom: 10px; }
+.em-sheet-config-item .em-form-group:last-child { margin-bottom: 0; }
+
+@@media (max-width: 768px) {
+    .em-stats { grid-template-columns: 1fr 1fr; }
+    .em-file-grid { grid-template-columns: 1fr; }
+    .em-modal { width: 95vw; }
+}
+</style>
+
+@section Scripts {
+<script>
+    let sheetConfigCount = 0;
+
+    function showAddModal() {
+        document.getElementById('addModal').style.display = 'flex';
+        sheetConfigCount = 0;
+        document.getElementById('sheetConfigs').innerHTML = '';
+        document.getElementById('filePath').value = '';
+        addSheetConfig();
+    }
+
+    function closeAddModal() {
+        document.getElementById('addModal').style.display = 'none';
+    }
+
+    function addSheetConfig() {
+        const idx = sheetConfigCount++;
+        const html = `
+            <div class="em-sheet-config-item" id="sc_${idx}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <strong style="font-size:13px;color:#4a5568">Sheet ${idx + 1}</strong>
+                    ${idx > 0 ? `<button type="button" onclick="removeSheet(${idx})" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:12px">✕ Xóa</button>` : ''}
+                </div>
+                <div class="em-form-group">
+                    <label class="em-form-label">Tên Sheet *</label>
+                    <input type="text" class="em-form-input" id="sc_sheet_${idx}" placeholder="09.09" />
+                </div>
+                <div class="em-form-group">
+                    <label class="em-form-label">Cột Tổ (GroupColumn)</label>
+                    <input type="text" class="em-form-input" id="sc_group_${idx}" placeholder="TỔ" value="TỔ" />
+                </div>
+                <div class="em-form-group">
+                    <label class="em-form-label">Cột RowKey (phân cách bằng dấu phẩy)</label>
+                    <input type="text" class="em-form-input" id="sc_rowkey_${idx}" placeholder="STYLE,SP,COLOR" value="STYLE,SP,COLOR" />
+                    <div class="em-form-hint">Các cột định danh dòng duy nhất trong sheet</div>
+                </div>
+            </div>`;
+        document.getElementById('sheetConfigs').insertAdjacentHTML('beforeend', html);
+    }
+
+    function removeSheet(idx) {
+        document.getElementById('sc_' + idx)?.remove();
+    }
+
+    async function submitAddFile() {
+        const filePath = document.getElementById('filePath').value.trim();
+        if (!filePath) { alert('Vui lòng nhập đường dẫn file'); return; }
+
+        const sheetConfigs = [];
+        for (let i = 0; i < sheetConfigCount; i++) {
+            const el = document.getElementById('sc_' + i);
+            if (!el) continue;
+            const sheetName = document.getElementById('sc_sheet_' + i)?.value?.trim();
+            if (!sheetName) continue;
+            const groupCol  = document.getElementById('sc_group_' + i)?.value?.trim() || 'TỔ';
+            const rowKeyRaw = document.getElementById('sc_rowkey_' + i)?.value?.trim() || '';
+            const rowKeys   = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
+            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys });
+        }
+
+        const submitBtn  = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const submitSpinner = document.getElementById('submitSpinner');
+        submitBtn.disabled   = true;
+        submitText.style.display   = 'none';
+        submitSpinner.style.display = 'inline';
+
+        try {
+            const resp = await fetch('/api/excel-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filePath, sheetConfigs })
+            });
+
+            if (resp.ok) {
+                closeAddModal();
+                location.reload();
+            } else {
+                const err = await resp.text();
+                alert('Lỗi: ' + err);
+            }
+        } catch (e) {
+            alert('Lỗi kết nối: ' + e.message);
+        } finally {
+            submitBtn.disabled   = false;
+            submitText.style.display   = 'inline';
+            submitSpinner.style.display = 'none';
+        }
+    }
+
+    async function pauseFile(id, name) {
+        const result = await Swal.fire({
+            title: 'Tạm ngừng monitor?',
+            html: `File <strong>${name}</strong> sẽ bị tạm dừng.<br><span style="font-size:12px;color:#718096">Lịch sử thay đổi vẫn được giữ lại.</span>`,
+            icon: 'warning',
+            iconColor: '#d69e2e',
+            showCancelButton: true,
+            confirmButtonText: 'Tạm ngừng',
+            cancelButtonText: 'Hủy',
+            confirmButtonColor: '#d69e2e',
+            cancelButtonColor: '#a0aec0',
+            reverseButtons: true,
+        });
+        if (!result.isConfirmed) return;
+
+        const resp = await fetch(`/api/excel-file/${id}`, { method: 'DELETE' });
+        if (resp.ok) {
+            Swal.fire({ title: 'Đã tạm ngừng', icon: 'success', timer: 1500, showConfirmButton: false });
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            Swal.fire('Lỗi', 'Không thể tạm ngừng monitor', 'error');
+        }
+    }
+
+    async function hardDeleteFile(id, name) {
+        // Bước 1: Cảnh báo + xác nhận tên file
+        const step1 = await Swal.fire({
+            title: '<span style="color:#9b2335">⚠️ Xóa cứng file</span>',
+            html: `
+                <p style="margin:0 0 12px">Thao tác này sẽ <strong>xóa vĩnh viễn</strong> toàn bộ:</p>
+                <ul style="text-align:left;font-size:13px;color:#4a5568;margin:0 0 14px;padding-left:20px">
+                    <li>File monitor: <strong>${name}</strong></li>
+                    <li>Toàn bộ lịch sử thay đổi (ChangeLog)</li>
+                    <li>Snapshot dữ liệu hiện tại</li>
+                    <li>Cấu hình Sheet</li>
+                </ul>
+                <p style="color:#e53e3e;font-size:13px;font-weight:700;margin:0">Dữ liệu KHÔNG thể khôi phục!</p>`,
+            icon: 'warning',
+            iconColor: '#9b2335',
+            showCancelButton: true,
+            confirmButtonText: 'Tiếp tục →',
+            cancelButtonText: 'Hủy',
+            confirmButtonColor: '#9b2335',
+            cancelButtonColor: '#718096',
+            reverseButtons: true,
+        });
+        if (!step1.isConfirmed) return;
+
+        // Bước 2: Nhập password xác nhận
+        const step2 = await Swal.fire({
+            title: 'Nhập mật khẩu xác nhận',
+            html: `
+                <p style="font-size:13px;color:#718096;margin:0 0 12px">
+                    Nhập mật khẩu để xác nhận xóa cứng:
+                </p>
+                <input id="swal-pwd" type="password" class="swal2-input"
+                       placeholder="Mật khẩu xác nhận"
+                       style="font-size:15px;letter-spacing:2px"
+                       autofocus>`,
+            icon: 'warning',
+            iconColor: '#9b2335',
+            showCancelButton: true,
+            confirmButtonText: 'Xác nhận xóa',
+            cancelButtonText: 'Hủy',
+            confirmButtonColor: '#9b2335',
+            cancelButtonColor: '#718096',
+            reverseButtons: true,
+            focusConfirm: false,
+            preConfirm: () => {
+                const pwd = document.getElementById('swal-pwd').value;
+                if (pwd !== 'Snp-753951') {
+                    Swal.showValidationMessage('Mật khẩu không đúng!');
+                    return false;
+                }
+                return true;
+            },
+            didOpen: () => {
+                // Enter để submit
+                document.getElementById('swal-pwd').addEventListener('keydown', e => {
+                    if (e.key === 'Enter') Swal.clickConfirm();
+                });
+            }
+        });
+        if (!step2.isConfirmed) return;
+
+        // Thực hiện hard delete
+        const loading = Swal.fire({
+            title: 'Đang xóa dữ liệu...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
+
+        const resp = await fetch(`/api/excel-file/${id}/hard-delete`, { method: 'DELETE' });
+        await loading;
+
+        if (resp.ok) {
+            await Swal.fire({
+                title: 'Đã xóa thành công',
+                text: `File "${name}" và toàn bộ dữ liệu liên quan đã bị xóa.`,
+                icon: 'success',
+                confirmButtonColor: '#667eea',
+            });
+            location.reload();
+        } else {
+            const err = await resp.text();
+            Swal.fire('Lỗi', `Không thể xóa: ${err}`, 'error');
+        }
+    }
+
+    async function deleteFile(id, name) {
+        await pauseFile(id, name);
+    }
+
+    // Đóng modal khi click overlay
+    document.getElementById('addModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAddModal();
+    });
+    document.getElementById('editModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+    });
+
+    // ─── EDIT MODAL ──────────────────────────────────────────────────────
+    let currentEditId   = null;
+    let editSheetCount  = 0;
+
+    async function showEditModal(fileId, fileName) {
+        currentEditId  = fileId;
+        editSheetCount = 0;
+
+        document.getElementById('editModalTitle').textContent = fileName;
+        document.getElementById('editModalPath').textContent  = '';
+        document.getElementById('editLoading').style.display      = 'block';
+        document.getElementById('editFormContent').style.display  = 'none';
+        document.getElementById('editSheetList').innerHTML = '';
+        document.getElementById('editModal').style.display = 'flex';
+
+        try {
+            const resp = await fetch(`/api/excel-file/${fileId}`);
+            if (!resp.ok) { alert('Không thể tải cấu hình file'); closeEditModal(); return; }
+
+            const data = await resp.json();
+
+            // Điền thông tin
+            document.getElementById('editModalPath').textContent = data.filePath || '';
+
+            const toggle = document.getElementById('editStatusToggle');
+            toggle.checked = data.status === 1;
+            updateStatusLabel(toggle.checked);
+
+            // Điền SheetConfigs
+            (data.sheetConfigs || []).forEach(sc => {
+                addEditSheetRow(sc.sheetName, sc.groupColumn, parseRowKeys(sc.rowKeyColumns), sc.status);
+            });
+
+            document.getElementById('editLoading').style.display     = 'none';
+            document.getElementById('editFormContent').style.display = 'block';
+
+        } catch (e) {
+            alert('Lỗi tải cấu hình: ' + e.message);
+            closeEditModal();
+        }
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+        currentEditId = null;
+    }
+
+    function onStatusToggle(el) {
+        updateStatusLabel(el.checked);
+    }
+
+    function updateStatusLabel(isActive) {
+        const lbl = document.getElementById('editStatusLabel');
+        if (isActive) {
+            lbl.textContent = 'Đang Monitor';
+            lbl.style.color = '#2f855a';
+        } else {
+            lbl.textContent = 'Tạm dừng';
+            lbl.style.color = '#718096';
+        }
+    }
+
+    function addEditSheetRow(sheetName = '', groupCol = 'TỔ', rowKeys = 'STYLE,SP,COLOR', status = 1) {
+        const idx = editSheetCount++;
+        const isActive = status === 1;
+        const html = `
+            <div class="em-edit-sheet-row" id="esr_${idx}">
+                <div class="em-row-header">
+                    <span class="em-row-title">
+                        Sheet ${idx + 1}
+                        ${!isActive ? '<span class="em-disabled-badge">Tắt</span>' : ''}
+                    </span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                            <input type="checkbox" id="esr_active_${idx}" ${isActive ? 'checked' : ''}
+                                   onchange="toggleSheetActive(${idx}, this.checked)"
+                                   style="width:14px;height:14px">
+                            Bật
+                        </label>
+                        <button type="button" class="em-remove-sheet-btn" onclick="removeEditSheetRow(${idx})">✕ Xóa</button>
+                    </div>
+                </div>
+                <div class="em-form-group">
+                    <label class="em-form-label">Tên Sheet *</label>
+                    <input type="text" class="em-form-input" id="esr_sheet_${idx}"
+                           value="${escHtml(sheetName)}" placeholder="09.09" />
+                </div>
+                <div class="em-form-group">
+                    <label class="em-form-label">Cột Tổ (GroupColumn)</label>
+                    <input type="text" class="em-form-input" id="esr_group_${idx}"
+                           value="${escHtml(groupCol)}" placeholder="TỔ" />
+                </div>
+                <div class="em-form-group" style="margin-bottom:0">
+                    <label class="em-form-label">Cột RowKey (phân cách dấu phẩy)</label>
+                    <input type="text" class="em-form-input" id="esr_rowkey_${idx}"
+                           value="${escHtml(rowKeys)}" placeholder="STYLE,SP,COLOR" />
+                </div>
+            </div>`;
+        document.getElementById('editSheetList').insertAdjacentHTML('beforeend', html);
+    }
+
+    function removeEditSheetRow(idx) {
+        document.getElementById('esr_' + idx)?.remove();
+    }
+
+    function toggleSheetActive(idx, isActive) {
+        const badge = document.querySelector(`#esr_${idx} .em-disabled-badge`);
+        const title = document.querySelector(`#esr_${idx} .em-row-title`);
+        if (isActive) {
+            badge?.remove();
+        } else if (!badge) {
+            const span = document.createElement('span');
+            span.className = 'em-disabled-badge';
+            span.textContent = 'Tắt';
+            title.appendChild(span);
+        }
+    }
+
+    // rowKeyColumns từ API có thể là: Array, JSON string "[...]", hoặc null
+    function parseRowKeys(val) {
+        if (!val) return '';
+        if (Array.isArray(val)) return val.join(',');
+        if (typeof val === 'string') {
+            try {
+                const arr = JSON.parse(val);
+                return Array.isArray(arr) ? arr.join(',') : val;
+            } catch {
+                return val; // đã là dạng "STYLE,SP,COLOR"
+            }
+        }
+        return '';
+    }
+
+    function escHtml(str) {
+        return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function submitEditFile() {
+        if (!currentEditId) return;
+
+        const status = document.getElementById('editStatusToggle').checked ? 1 : 0;
+        const sheetConfigs = [];
+
+        for (let i = 0; i < editSheetCount; i++) {
+            const el = document.getElementById('esr_' + i);
+            if (!el) continue;
+            const sheetName = document.getElementById('esr_sheet_' + i)?.value?.trim();
+            if (!sheetName) continue;
+            const groupCol  = document.getElementById('esr_group_' + i)?.value?.trim()   || 'TỔ';
+            const rowKeyRaw = document.getElementById('esr_rowkey_' + i)?.value?.trim()  || '';
+            const rowKeys   = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const isActive  = document.getElementById('esr_active_' + i)?.checked ? 1 : 0;
+            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys, status: isActive });
+        }
+
+        const editSubmitBtn     = document.getElementById('editSubmitBtn');
+        const editSubmitText    = document.getElementById('editSubmitText');
+        const editSubmitSpinner = document.getElementById('editSubmitSpinner');
+        editSubmitBtn.disabled         = true;
+        editSubmitText.style.display   = 'none';
+        editSubmitSpinner.style.display = 'inline';
+
+        try {
+            const resp = await fetch(`/api/excel-file/${currentEditId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, sheetConfigs })
+            });
+
+            if (resp.ok) {
+                closeEditModal();
+                location.reload();
+            } else {
+                const err = await resp.text();
+                alert('Lỗi: ' + err);
+            }
+        } catch (e) {
+            alert('Lỗi kết nối: ' + e.message);
+        } finally {
+            editSubmitBtn.disabled         = false;
+            editSubmitText.style.display   = 'inline';
+            editSubmitSpinner.style.display = 'none';
+        }
+    }
+</script>
+}

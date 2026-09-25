@@ -1,0 +1,699 @@
+@model SNP_SubSystem.Controllers.ExcelMonitor.ChangeHistoryVm
+@{
+    ViewData["Title"] = $"Lịch sử thay đổi – {Model.File.FileName}";
+}
+
+<div class="em-page">
+    <!-- Breadcrumb -->
+    <div class="em-breadcrumb">
+        <a href="/excel-monitor">Excel Monitor</a>
+        <span>›</span>
+        <a href="/excel-monitor/@Model.File.Id">@Model.File.FileName</a>
+        <span>›</span>
+        <span>Lịch sử thay đổi</span>
+    </div>
+
+    <!-- Header -->
+    <div class="em-history-header">
+        <h1 class="em-title">Lịch sử thay đổi</h1>
+        <div class="em-history-subtitle">@Model.File.FilePath</div>
+    </div>
+
+    <!-- Sheet Tabs -->
+    @if (Model.Sheets.Count > 0)
+    {
+        <div class="em-sheet-tabs">
+            @{
+                var baseUrl = $"/excel-monitor/{Model.File.Id}/history";
+                // Giữ nguyên các filter khác khi chuyển sheet
+                string OtherParams(string? s)
+                {
+                    var p = new System.Collections.Generic.List<string>();
+                    if (!string.IsNullOrEmpty(Model.ChangeType)) p.Add($"changeType={Uri.EscapeDataString(Model.ChangeType)}");
+                    if (!string.IsNullOrEmpty(Model.GroupName))  p.Add($"groupName={Uri.EscapeDataString(Model.GroupName)}");
+                    if (!string.IsNullOrEmpty(s))                p.Add($"sheetName={Uri.EscapeDataString(s)}");
+                    if (Model.FromDate.HasValue) p.Add($"fromDate={Model.FromDate.Value:yyyy-MM-dd}");
+                    if (Model.ToDate.HasValue)   p.Add($"toDate={Model.ToDate.Value:yyyy-MM-dd}");
+                    return p.Count > 0 ? "?" + string.Join("&", p) : "";
+                }
+            }
+            <a href="@baseUrl@OtherParams(null)"
+               class="em-sheet-tab @(string.IsNullOrEmpty(Model.SheetName) ? "active" : "")">
+                Tất cả sheet
+            </a>
+            @foreach (var s in Model.Sheets)
+            {
+                <a href="@baseUrl@OtherParams(s)"
+                   class="em-sheet-tab @(Model.SheetName == s ? "active" : "")">
+                    @s
+                </a>
+            }
+        </div>
+    }
+
+    <!-- Filter Bar -->
+    <form method="get" class="em-filter-bar">
+        <input type="hidden" name="page" value="1" />
+        @if (!string.IsNullOrEmpty(Model.SheetName))
+        {
+            <input type="hidden" name="sheetName" value="@Model.SheetName" />
+        }
+        <div class="em-filter-group">
+            <label>Từ ngày</label>
+            <input type="date" name="fromDate" class="em-filter-input"
+                   value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="em-filter-group">
+            <label>Đến ngày</label>
+            <input type="date" name="toDate" class="em-filter-input"
+                   value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="em-filter-group">
+            <label>Loại thay đổi</label>
+            @{
+                var ct = Model.ChangeType ?? "";
+                var ctOptions = new[] { "ROW_ADDED", "ROW_DELETED", "VALUE_CHANGED", "FORMULA_CHANGED", "GROUP_CHANGED" };
+            }
+            <select name="changeType" class="em-filter-input">
+                <option value="">Tất cả</option>
+                @foreach (var opt in ctOptions)
+                {
+                    if (ct == opt)
+                    { <option value="@opt" selected="selected">@opt</option> }
+                    else
+                    { <option value="@opt">@opt</option> }
+                }
+            </select>
+        </div>
+        <div class="em-filter-group">
+            <label>Tổ</label>
+            @{ var gn = Model.GroupName ?? ""; }
+            <select name="groupName" class="em-filter-input">
+                <option value="">Tất cả</option>
+                @foreach (var g in Model.Groups.Where(g => !string.IsNullOrEmpty(g)))
+                {
+                    if (gn == g)
+                    { <option value="@g" selected="selected">@g</option> }
+                    else
+                    { <option value="@g">@g</option> }
+                }
+            </select>
+        </div>
+        <div class="em-filter-group">
+            <label>Cột</label>
+            @{ var cn = Model.ColumnName ?? ""; }
+            <select name="columnName" class="em-filter-input">
+                <option value="">Tất cả</option>
+                @foreach (var col in Model.Columns.Where(c => !string.IsNullOrEmpty(c)))
+                {
+                    if (cn == col)
+                    { <option value="@col" selected="selected">@col</option> }
+                    else
+                    { <option value="@col">@col</option> }
+                }
+            </select>
+        </div>
+        <button type="submit" class="em-btn em-btn-filter">Lọc</button>
+        <a href="/excel-monitor/@Model.File.Id/history@(!string.IsNullOrEmpty(Model.SheetName) ? $"?sheetName={Uri.EscapeDataString(Model.SheetName)}" : "")"
+           class="em-btn em-btn-reset">Xóa bộ lọc</a>
+    </form>
+
+    <!-- Result Summary -->
+    <div class="em-result-summary">
+        @if (!string.IsNullOrEmpty(Model.SheetName))
+        {
+            <span class="em-sheet-badge">📄 @Model.SheetName</span>
+        }
+        Tìm thấy <strong>@Model.Total.ToString("N0")</strong> thay đổi
+        @if (Model.FromDate.HasValue || Model.ToDate.HasValue || !string.IsNullOrEmpty(Model.ChangeType)
+             || !string.IsNullOrEmpty(Model.GroupName) || !string.IsNullOrEmpty(Model.ColumnName))
+        {
+            <span class="em-filter-tag">Đang lọc</span>
+        }
+    </div>
+
+
+    @{
+        var rkCols = Model.RowKeyColumnNames;
+        int baseColCount = 2 + rkCols.Count + 3;
+        if (string.IsNullOrEmpty(Model.SheetName)) baseColCount++;
+        int detailColspan = baseColCount + 1;
+    }
+
+    @if (!Model.Changes.Any())
+    {
+        <div class="em-no-data">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p>Không có thay đổi nào trong khoảng thời gian đã chọn</p>
+        </div>
+    }
+    else
+    {
+        <div class="em-table-wrap">
+            <table class="em-history-table">
+                <thead>
+                    <tr>
+                        <th class="col-time">Thời gian</th>
+                        @if (string.IsNullOrEmpty(Model.SheetName))
+                        {
+                            <th class="col-sheet">Sheet</th>
+                        }
+                        <th class="col-group">Tổ</th>
+                        @foreach (var rk in rkCols)
+                        {
+                            <th class="col-rk">@rk</th>
+                        }
+                        <th class="col-type">Loại</th>
+                        <th class="col-col">Đối tượng</th>
+                        <th class="col-val">Giá trị cũ</th>
+                        <th class="col-val">Giá trị mới</th>
+                        <th class="col-act"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ int rowIdx = 0; }
+                    @foreach (var change in Model.Changes)
+                    {
+                        var rkParts  = (change.RowKey ?? "").Split('|');
+                        var typeInfo = change.ChangeType switch {
+                            "ROW_ADDED"       => (cls: "type-added",   icon: "+",  label: "Thêm dòng"),
+                            "ROW_DELETED"     => (cls: "type-deleted",  icon: "−",  label: "Xóa dòng"),
+                            "VALUE_CHANGED"   => (cls: "type-value",    icon: "⇄",  label: "Thay đổi"),
+                            "FORMULA_CHANGED" => (cls: "type-formula",  icon: "fλ", label: "Công thức"),
+                            "GROUP_CHANGED"   => (cls: "type-group",    icon: "➜",  label: "Chuyển tổ"),
+                            _                 => (cls: "type-other",    icon: "?",  label: change.ChangeType ?? "")
+                        };
+                        var isEven = rowIdx++ % 2 == 0;
+
+                        <tr class="em-row @(isEven ? "em-row-even" : "em-row-odd")" onclick="toggleDetail(this)">
+                            <td class="col-time">
+                                <div class="em-dt-date">@change.ChangeDate.ToString("dd/MM/yyyy")</div>
+                                <div class="em-dt-time">@change.ChangeDate.ToString("HH:mm:ss")</div>
+                            </td>
+                            @if (string.IsNullOrEmpty(Model.SheetName))
+                            {
+                                <td class="col-sheet"><span class="em-sheet-pill">@change.SheetName</span></td>
+                            }
+                            <td class="col-group">
+                                <span class="em-group-pill @(string.IsNullOrEmpty(change.GroupName) ? "em-group-empty" : "")">@(change.GroupName ?? "—")</span>
+                            </td>
+                            @for (int i = 0; i < rkCols.Count; i++)
+                            {
+                                var part = i < rkParts.Length ? rkParts[i] : "";
+                                <td class="col-rk">
+                                    @if (!string.IsNullOrEmpty(part))
+                                    { <span class="em-rk-val">@part</span> }
+                                    else
+                                    { <span class="em-rk-empty">—</span> }
+                                </td>
+                            }
+                            <td class="col-type">
+                                <span class="em-type-badge @typeInfo.cls">
+                                    <span class="em-type-icon">@typeInfo.icon</span>
+                                    @typeInfo.label
+                                </span>
+                            </td>
+                            <td class="col-col">
+                                @if (!string.IsNullOrEmpty(change.ColumnName))
+                                {
+                                    <span class="em-col-pill">@change.ColumnName</span>
+                                }
+                                @if (change.ExcelRowNumber.HasValue)
+                                {
+                                    <div class="em-rownum">#@change.ExcelRowNumber</div>
+                                }
+                            </td>
+                            <td class="col-val">
+                                @if (!string.IsNullOrEmpty(change.OldValue))
+                                {
+                                    <div class="em-val em-val-old" title="@change.OldValue">@TruncateValue(change.OldValue, 45)</div>
+                                }
+                                @if (!string.IsNullOrEmpty(change.OldFormula))
+                                {
+                                    <div class="em-formula em-formula-old" title="@change.OldFormula">@TruncateValue(change.OldFormula, 35)</div>
+                                }
+                            </td>
+                            <td class="col-val">
+                                @if (!string.IsNullOrEmpty(change.NewValue))
+                                {
+                                    <div class="em-val em-val-new" title="@change.NewValue">@TruncateValue(change.NewValue, 45)</div>
+                                }
+                                @if (!string.IsNullOrEmpty(change.NewFormula))
+                                {
+                                    <div class="em-formula em-formula-new" title="@change.NewFormula">@TruncateValue(change.NewFormula, 35)</div>
+                                }
+                            </td>
+                            <td class="col-act">
+                                <a href="/api/excel-change/@change.Id" target="_blank" class="em-ext-link"
+                                   onclick="event.stopPropagation()" title="Xem JSON">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                </a>
+                            </td>
+                        </tr>
+
+                        @* ─ Detail expand row ─ *@
+                        @if (change.ChangeType == "GROUP_CHANGED")
+                        {
+                            <tr class="em-detail-row" style="display:none">
+                                <td colspan="@detailColspan">
+                                    <div class="em-detail-box em-detail-group">
+                                        <div class="em-dg-from">
+                                            <div class="em-dg-lbl">Tổ cũ</div>
+                                            <div class="em-dg-val">@change.OldGroupName</div>
+                                        </div>
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                        <div class="em-dg-to">
+                                            <div class="em-dg-lbl">Tổ mới</div>
+                                            <div class="em-dg-val em-dg-val-new">@change.NewGroupName</div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        else if (change.ChangeType == "ROW_ADDED" || change.ChangeType == "ROW_DELETED")
+                        {
+                            <tr class="em-detail-row" style="display:none">
+                                <td colspan="@detailColspan">
+                                    <div class="em-detail-box">
+                                        <div class="em-detail-label">@(change.ChangeType == "ROW_ADDED" ? "Dữ liệu dòng mới" : "Dữ liệu dòng bị xóa")</div>
+                                        <pre class="em-json-pre">@(change.ChangeType == "ROW_ADDED" ? change.NewValue : change.OldValue)</pre>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        @if (Model.TotalPages > 1)
+        {
+            <div class="em-pagination">
+                @{
+                    var qp = new System.Collections.Generic.List<string>();
+                    if (!string.IsNullOrEmpty(Model.SheetName))  qp.Add($"sheetName={Uri.EscapeDataString(Model.SheetName)}");
+                    if (!string.IsNullOrEmpty(Model.ChangeType)) qp.Add($"changeType={Uri.EscapeDataString(Model.ChangeType)}");
+                    if (!string.IsNullOrEmpty(Model.GroupName))  qp.Add($"groupName={Uri.EscapeDataString(Model.GroupName)}");
+                    if (!string.IsNullOrEmpty(Model.ColumnName)) qp.Add($"columnName={Uri.EscapeDataString(Model.ColumnName)}");
+                    if (Model.FromDate.HasValue) qp.Add($"fromDate={Model.FromDate.Value:yyyy-MM-dd}");
+                    if (Model.ToDate.HasValue)   qp.Add($"toDate={Model.ToDate.Value:yyyy-MM-dd}");
+                    qp.Add($"pageSize={Model.PageSize}");
+                    var queryParams = string.Join("&", qp);
+                }
+                @if (Model.Page > 1)
+                {
+                    <a href="?@queryParams&page=@(Model.Page - 1)" class="em-page-btn">← Trước</a>
+                }
+                <span class="em-page-info">Trang @Model.Page / @Model.TotalPages</span>
+                @if (Model.Page < Model.TotalPages)
+                {
+                    <a href="?@queryParams&page=@(Model.Page + 1)" class="em-page-btn">Tiếp →</a>
+                }
+            </div>
+        }
+    }
+</div>
+
+@functions {
+    string TruncateValue(string? val, int max)
+    {
+        if (string.IsNullOrEmpty(val)) return string.Empty;
+        return val.Length <= max ? val : val[..max] + "…";
+    }
+}
+
+<style>
+.em-page { padding: 24px; margin: 0 auto; }
+.em-breadcrumb { font-size: 13px; color: #718096; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+.em-breadcrumb a { color: #667eea; text-decoration: none; }
+.em-title { font-size: 22px; font-weight: 700; color: #1a202c; margin: 0 0 4px; }
+.em-history-header { margin-bottom: 16px; }
+.em-history-subtitle { font-size: 12px; color: #718096; font-family: monospace; }
+
+/* Sheet Tabs */
+.em-sheet-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 4px 0;
+    border-bottom: 2px solid #e2e8f0;
+}
+.em-sheet-tab {
+    padding: 7px 16px;
+    border-radius: 8px 8px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #718096;
+    text-decoration: none;
+    border: 1.5px solid transparent;
+    border-bottom: none;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+    background: #f7fafc;
+}
+.em-sheet-tab:hover { color: #667eea; background: #edf2ff; }
+.em-sheet-tab.active {
+    color: #667eea;
+    background: white;
+    border-color: #e2e8f0;
+    border-bottom-color: white;
+}
+
+/* Sheet badge in summary row */
+.em-sheet-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #edf2ff;
+    color: #5a67d8;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 8px;
+}
+.em-sheet-mini-badge {
+    display: inline-block;
+    background: #f0f4ff;
+    color: #667eea;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Filter Bar */
+.em-filter-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 16px;
+}
+.em-filter-group { display: flex; flex-direction: column; gap: 4px; }
+.em-filter-group label { font-size: 11px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
+.em-filter-input {
+    padding: 8px 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #1a202c;
+    min-width: 130px;
+    background: white;
+    transition: border 0.2s;
+}
+.em-filter-input:focus { outline: none; border-color: #667eea; }
+
+.em-btn-filter {
+    padding: 9px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.em-btn-reset {
+    padding: 9px 16px;
+    background: transparent;
+    color: #718096;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+}
+
+.em-result-summary {
+    font-size: 13px;
+    color: #4a5568;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.em-filter-tag {
+    background: #edf2ff;
+    color: #667eea;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE UPGRADE — Premium history table
+   ═══════════════════════════════════════════════════════════ */
+
+/* Wrapper */
+.em-table-wrap {
+    overflow-x: auto;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    border: 1px solid #e8ecf4;
+    background: white;
+}
+
+.em-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: white;
+    min-width: 900px;
+}
+
+/* Sticky header */
+.em-history-table thead { position: sticky; top: 0; z-index: 2; }
+.em-history-table th {
+    padding: 10px 13px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #5a6478;
+    background: #f4f6fb;
+    border-bottom: 2px solid #dde3f0;
+    white-space: nowrap;
+}
+.em-history-table th.col-val { min-width: 160px; }
+.em-history-table th.col-rk  { min-width: 90px;  color: #667eea; }
+.em-history-table th.col-act { width: 36px; }
+
+/* Rows */
+.em-row { cursor: pointer; transition: background 0.12s; }
+.em-row-even { background: #ffffff; }
+.em-row-odd  { background: #f9fafd; }
+.em-row:hover { background: #edf2ff !important; }
+
+.em-history-table td {
+    padding: 9px 13px;
+    border-bottom: 1px solid #edf0f7;
+    vertical-align: middle;
+}
+.em-history-table tr:last-child td { border-bottom: none; }
+
+/* Time column */
+.em-dt-date { font-size: 12px; font-weight: 700; color: #2d3748; }
+.em-dt-time { font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 1px; }
+
+/* Sheet pill */
+.em-sheet-pill {
+    display: inline-block;
+    background: #eef2ff;
+    color: #4f46e5;
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Group pill */
+.em-group-pill {
+    display: inline-block;
+    background: #f5f0ff;
+    color: #6d28d9;
+    border: 1px solid #e0d9ff;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.em-group-empty { background: #f7fafc; color: #a0aec0; border-color: #e2e8f0; }
+
+/* RowKey column values */
+.em-rk-val {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e40af;
+    background: #eff6ff;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: monospace;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.em-rk-empty { color: #cbd5e0; font-size: 11px; }
+.em-rownum { font-size: 10px; color: #94a3b8; margin-top: 3px; }
+
+/* Type badge - redesigned */
+.em-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.em-type-icon { font-size: 13px; line-height: 1; }
+.type-added   { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.type-deleted { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.type-value   { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.type-formula { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.type-group   { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+.type-other   { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; }
+
+/* Column name pill */
+.em-col-pill {
+    display: inline-block;
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+/* Value cells */
+.em-val {
+    font-size: 12.5px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 7px;
+    border-radius: 4px;
+    display: inline-block;
+}
+.em-val-old {
+    color: #b91c1c;
+    background: #fff1f2;
+    text-decoration: line-through;
+    text-decoration-color: #fca5a5;
+}
+.em-val-new {
+    color: #166534;
+    background: #f0fdf4;
+    font-weight: 600;
+}
+.em-formula {
+    font-size: 10px;
+    font-family: monospace;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    display: inline-block;
+}
+.em-formula-old { color: #b91c1c; background: #fff1f2; }
+.em-formula-new { color: #166534; background: #f0fdf4; }
+
+/* External link */
+.em-ext-link { color: #cbd5e0; display: inline-flex; transition: color 0.15s; }
+.em-ext-link:hover { color: #667eea; }
+
+/* Expand detail row */
+.em-detail-row td {
+    background: #f8f9ff;
+    padding: 0 16px 14px;
+    border-bottom: 2px solid #dde3f0;
+}
+.em-detail-box { padding: 12px 0; }
+.em-detail-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+
+.em-detail-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 8px 0;
+}
+.em-dg-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+.em-dg-val { font-size: 17px; font-weight: 800; color: #2d3748; }
+.em-dg-val-new { color: #4f46e5; }
+
+.em-json-pre {
+    font-size: 12px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    background: #f0f4ff;
+    border: 1px solid #dde3f0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #1e293b;
+    max-height: 220px;
+    overflow-y: auto;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* No data */
+.em-no-data { text-align: center; padding: 60px 20px; color: #a0aec0; }
+.em-no-data p { margin: 12px 0 0; font-size: 14px; }
+
+/* Pagination */
+.em-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+.em-page-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1.5px solid #e2e8f0;
+    color: #667eea;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    background: white;
+    transition: all 0.2s;
+}
+.em-page-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+.em-page-info { font-size: 13px; color: #718096; }
+</style>
+
+@section Scripts {
+<script>
+    function toggleDetail(row) {
+        const nextRow = row.nextElementSibling;
+        if (nextRow && nextRow.classList.contains('em-detail-row')) {
+            const isHidden = nextRow.style.display === 'none';
+            nextRow.style.display = isHidden ? 'table-row' : 'none';
+            row.style.background  = isHidden ? '#f0f4ff' : '';
+        }
+    }
+</script>
+}

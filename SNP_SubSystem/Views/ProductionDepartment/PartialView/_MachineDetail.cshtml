@@ -346,6 +346,14 @@
             <button class="btn btn-primary btn-sm" id="detailDateApply">
                 <i class="fa-solid fa-filter"></i> Lọc
             </button>
+            <button class="btn btn-sm" id="detailDateToday"
+                style="background:var(--bg-surface);border:1.5px solid var(--border);color:var(--ink-700);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;">
+                <i class="fa-solid fa-calendar-day"></i> Hôm nay
+            </button>
+            <button class="btn btn-sm" id="detailDateYesterday"
+                style="background:var(--bg-surface);border:1.5px solid var(--border);color:var(--ink-700);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;">
+                <i class="fa-solid fa-calendar-minus"></i> Hôm trước
+            </button>
             <span class="md-date-count" id="detailDateCount"></span>
         </div>
 
@@ -868,6 +876,28 @@
 
     document.getElementById('detailDateApply').addEventListener('click', function () {
         if (!currentDetailInfo) return;
+        loadDailyOutputs(currentDetailInfo.id);
+    });
+
+    document.getElementById('detailDateToday').addEventListener('click', function () {
+        if (!currentDetailInfo) return;
+        var t = new Date();
+        t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
+        var s = t.toISOString().split('T')[0];
+        document.getElementById('detailFromDate').value = s;
+        document.getElementById('detailToDate').value   = s;
+        loadDailyOutputs(currentDetailInfo.id);
+    });
+
+    document.getElementById('detailDateYesterday').addEventListener('click', function () {
+        if (!currentDetailInfo) return;
+        var curFrom = document.getElementById('detailFromDate').value;
+        var base = curFrom ? new Date(curFrom + 'T00:00:00') : new Date();
+        base.setDate(base.getDate() - 1);
+        base.setMinutes(base.getMinutes() - base.getTimezoneOffset());
+        var s = base.toISOString().split('T')[0];
+        document.getElementById('detailFromDate').value = s;
+        document.getElementById('detailToDate').value   = s;
         loadDailyOutputs(currentDetailInfo.id);
     });
 

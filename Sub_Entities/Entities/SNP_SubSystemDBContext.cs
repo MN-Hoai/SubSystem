@@ -19,6 +19,16 @@ public partial class SNP_SubSystemDBContext : DbContext
 
     public virtual DbSet<DailyOutputDetail> DailyOutputDetails { get; set; }
 
+    public virtual DbSet<ExcelChangeLog> ExcelChangeLogs { get; set; }
+
+    public virtual DbSet<ExcelFile> ExcelFiles { get; set; }
+
+    public virtual DbSet<ExcelMonitorLog> ExcelMonitorLogs { get; set; }
+
+    public virtual DbSet<ExcelSheetConfig> ExcelSheetConfigs { get; set; }
+
+    public virtual DbSet<ExcelSnapshotRow> ExcelSnapshotRows { get; set; }
+
     public virtual DbSet<Page> Pages { get; set; }
 
     public virtual DbSet<Permission> Permissions { get; set; }
@@ -155,6 +165,162 @@ public partial class SNP_SubSystemDBContext : DbContext
                 .HasForeignKey(d => d.StyleDetailId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_DailyOutputDetail_StyleDetail");
+        });
+
+        modelBuilder.Entity<ExcelChangeLog>(entity =>
+        {
+            entity.ToTable("ExcelChangeLog");
+
+            entity.HasIndex(e => e.ChangeType, "IX_ExcelChangeLog_ChangeType");
+
+            entity.HasIndex(e => e.ExcelFileId, "IX_ExcelChangeLog_File");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.ChangeDate }, "IX_ExcelChangeLog_File_Date").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.GroupName }, "IX_ExcelChangeLog_Group");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.RowKey }, "IX_ExcelChangeLog_RowKey");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.SheetName }, "IX_ExcelChangeLog_Sheet");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.ChangeDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelChangeLog_ChangeDate")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ChangeType)
+                .IsRequired()
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ColumnName).HasMaxLength(255);
+            entity.Property(e => e.ComputerName).HasMaxLength(255);
+            entity.Property(e => e.ExcelFileId).HasColumnName("ExcelFileID");
+            entity.Property(e => e.GroupName).HasMaxLength(255);
+            entity.Property(e => e.NewGroupName).HasMaxLength(255);
+            entity.Property(e => e.OldGroupName).HasMaxLength(255);
+            entity.Property(e => e.RowKey).HasMaxLength(1000);
+            entity.Property(e => e.SheetName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.UserName).HasMaxLength(255);
+
+            entity.HasOne(d => d.ExcelFile).WithMany(p => p.ExcelChangeLogs)
+                .HasForeignKey(d => d.ExcelFileId)
+                .HasConstraintName("FK_ExcelChangeLog_ExcelFile");
+        });
+
+        modelBuilder.Entity<ExcelFile>(entity =>
+        {
+            entity.ToTable("ExcelFile");
+
+            entity.HasIndex(e => e.FilePath, "IX_ExcelFile_FilePath");
+
+            entity.HasIndex(e => e.Status, "IX_ExcelFile_Status");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelFile_CreateDate")
+                .HasColumnType("datetime");
+            entity.Property(e => e.FileName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.FilePath)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.Property(e => e.FileType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.LastHash)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.LastReadDate).HasColumnType("datetime");
+            entity.Property(e => e.Status).HasDefaultValue(1, "DF_ExcelFile_Status");
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelFile_UpdateDate")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<ExcelMonitorLog>(entity =>
+        {
+            entity.ToTable("ExcelMonitorLog");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.CreateDate }, "IX_ExcelMonitorLog_File_Date").IsDescending(false, true);
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelMonitorLog_CreateDate")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EventType)
+                .IsRequired()
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ExcelFileId).HasColumnName("ExcelFileID");
+
+            entity.HasOne(d => d.ExcelFile).WithMany(p => p.ExcelMonitorLogs)
+                .HasForeignKey(d => d.ExcelFileId)
+                .HasConstraintName("FK_ExcelMonitorLog_ExcelFile");
+        });
+
+        modelBuilder.Entity<ExcelSheetConfig>(entity =>
+        {
+            entity.ToTable("ExcelSheetConfig");
+
+            entity.HasIndex(e => e.ExcelFileId, "IX_ExcelSheetConfig_ExcelFileID");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.SheetName }, "UX_ExcelSheetConfig_File_Sheet").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newid())")
+                .HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelSheetConfig_CreateDate")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ExcelFileId).HasColumnName("ExcelFileID");
+            entity.Property(e => e.GroupColumn).HasMaxLength(255);
+            entity.Property(e => e.RowKeyColumns).HasMaxLength(1000);
+            entity.Property(e => e.SheetName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Status).HasDefaultValue(1, "DF_ExcelSheetConfig_Status");
+            entity.Property(e => e.UpdateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelSheetConfig_UpdateDate")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.ExcelFile).WithMany(p => p.ExcelSheetConfigs)
+                .HasForeignKey(d => d.ExcelFileId)
+                .HasConstraintName("FK_ExcelSheetConfig_ExcelFile");
+        });
+
+        modelBuilder.Entity<ExcelSnapshotRow>(entity =>
+        {
+            entity.ToTable("ExcelSnapshotRow");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.SheetName }, "IX_ExcelSnapshotRow_File_Sheet");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.SheetName, e.GroupName }, "IX_ExcelSnapshotRow_Group");
+
+            entity.HasIndex(e => new { e.ExcelFileId, e.SheetName, e.RowKey }, "IX_ExcelSnapshotRow_RowKey");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("(getdate())", "DF_ExcelSnapshotRow_CreateDate")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ExcelFileId).HasColumnName("ExcelFileID");
+            entity.Property(e => e.GroupName).HasMaxLength(255);
+            entity.Property(e => e.RowHash)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.RowKey)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.Property(e => e.SheetName)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.HasOne(d => d.ExcelFile).WithMany(p => p.ExcelSnapshotRows)
+                .HasForeignKey(d => d.ExcelFileId)
+                .HasConstraintName("FK_ExcelSnapshotRow_ExcelFile");
         });
 
         modelBuilder.Entity<Page>(entity =>

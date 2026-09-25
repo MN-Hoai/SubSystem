@@ -31,6 +31,26 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[ExcelChangeLog]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ExcelFile]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ExcelMonitorLog]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ExcelSheetConfig]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ExcelSnapshotRow]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[Pages]",
          "ObjectType": 0
       },

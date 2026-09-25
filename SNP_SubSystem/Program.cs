@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using SNP_SubSystem.Middleware;
 using Sub_Entities.Entities;
 using Sub_Services.Execute;
+using Sub_Services.Execute.Excel;
+using Sub_Services.Execute.Background;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,19 @@ builder.Services.AddScoped<SubSystemService>();
 // Dang ky Backup service
 builder.Services.AddSingleton<SNP_SubSystem.Services.BackupService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SNP_SubSystem.Services.BackupService>());
+
+// ── Excel Monitor Services ────────────────────────────────────────────────
+builder.Services.Configure<ExcelMonitorOptions>(
+    builder.Configuration.GetSection("ExcelMonitor"));
+
+builder.Services.AddScoped<IExcelReaderService,   ExcelReaderService>();
+builder.Services.AddScoped<IExcelSnapshotService, ExcelSnapshotService>();
+builder.Services.AddScoped<IExcelCompareService,  ExcelCompareService>();
+builder.Services.AddScoped<IExcelMonitorService,  ExcelMonitorService>();
+
+// Worker là Singleton để giữ FileSystemWatcher sống suốt lifetime của app
+builder.Services.AddSingleton<ExcelMonitorWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ExcelMonitorWorker>());
 
 builder.Services.AddControllersWithViews();
 

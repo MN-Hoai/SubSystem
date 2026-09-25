@@ -1,0 +1,365 @@
+@model SNP_SubSystem.Controllers.ExcelMonitor.ExcelMonitorDetailVm
+@{
+    ViewData["Title"] = $"Chi tiết – {Model.File.FileName}";
+}
+
+<div class="em-page">
+    <!-- Breadcrumb -->
+    <div class="em-breadcrumb">
+        <a href="/excel-monitor">Excel Monitor</a>
+        <span>›</span>
+        <span>@Model.File.FileName</span>
+    </div>
+
+    <!-- File Header -->
+    <div class="em-detail-header">
+        <div class="em-detail-header-left">
+            <div class="em-file-badge em-file-type-@Model.File.FileType?.ToLower()">
+                @Model.File.FileType?.ToUpper()
+            </div>
+            <div>
+                <h1 class="em-title">@Model.File.FileName</h1>
+                <div class="em-detail-path">@Model.File.FilePath</div>
+            </div>
+        </div>
+        <div class="em-detail-actions">
+            <a href="/excel-monitor/@Model.File.Id/history" class="em-btn em-btn-outline">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                Lịch sử đầy đủ
+            </a>
+        </div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="em-info-cards">
+        <div class="em-info-card">
+            <div class="em-info-icon em-info-icon-blue">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+                <div class="em-info-label">Lần đọc cuối</div>
+                <div class="em-info-value">@(Model.File.LastReadDate?.ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa đọc")</div>
+            </div>
+        </div>
+        <div class="em-info-card">
+            <div class="em-info-icon em-info-icon-purple">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div>
+                <div class="em-info-label">Tổng thay đổi</div>
+                <div class="em-info-value">@Model.TotalChanges.ToString("N0")</div>
+            </div>
+        </div>
+        <div class="em-info-card">
+            <div class="em-info-icon @(Model.File.Status == 1 ? "em-info-icon-green" : "em-info-icon-gray")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div>
+                <div class="em-info-label">Trạng thái</div>
+                <div class="em-info-value">@(Model.File.Status == 1 ? "Đang Monitor" : "Đã tắt")</div>
+            </div>
+        </div>
+        <div class="em-info-card">
+            <div class="em-info-icon em-info-icon-orange">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>
+            </div>
+            <div>
+                <div class="em-info-label">Số Sheet monitor</div>
+                <div class="em-info-value">@Model.SheetGroups.Count</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet Tabs -->
+    @if (Model.SheetGroups.Any())
+    {
+        <div class="em-tabs">
+            @for (int i = 0; i < Model.SheetGroups.Count; i++)
+            {
+                <button class="em-tab @(i == 0 ? "em-tab-active" : "")"
+                        onclick="switchTab(@i)" id="tab_@i">
+                    @Model.SheetGroups[i].SheetName
+                </button>
+            }
+        </div>
+
+        @for (int i = 0; i < Model.SheetGroups.Count; i++)
+        {
+            var sheetVm = Model.SheetGroups[i];
+            <div class="em-tab-content @(i == 0 ? "em-tab-content-active" : "")" id="tabContent_@i">
+
+                <div class="em-section-title">
+                    Sheet: <strong>@sheetVm.SheetName</strong>
+                    — @sheetVm.Groups.Count tổ, @sheetVm.Groups.Sum(g => g.CurrentCount) dòng hiện tại
+                </div>
+
+                @if (sheetVm.Groups.Any())
+                {
+                    <div class="em-group-table-wrap">
+                        <table class="em-table">
+                            <thead>
+                                <tr>
+                                    <th>Tổ</th>
+                                    <th class="text-center">Số dòng hiện tại</th>
+                                    <th class="text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var group in sheetVm.Groups.OrderBy(g => g.GroupName))
+                                {
+                                    <tr class="em-group-row" onclick="goToGroup('@Model.File.Id', '@group.GroupName')">
+                                        <td>
+                                            <div class="em-group-name">
+                                                <div class="em-group-dot"></div>
+                                                @group.GroupName
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="em-count-badge">@group.CurrentCount</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="/excel-monitor/@Model.File.Id/history?groupName=@Uri.EscapeDataString(group.GroupName ?? "")"
+                                               class="em-link-btn" onclick="event.stopPropagation()">
+                                                Xem thay đổi →
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>Tổng cộng</strong></td>
+                                    <td class="text-center"><strong>@sheetVm.Groups.Sum(g => g.CurrentCount)</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="em-no-data">Chưa có dữ liệu snapshot cho sheet này</div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="em-empty">Chưa có Sheet nào được cấu hình</div>
+    }
+</div>
+
+<style>
+.em-breadcrumb {
+    font-size: 13px;
+    color: #718096;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.em-breadcrumb a { color: #667eea; text-decoration: none; }
+.em-breadcrumb a:hover { text-decoration: underline; }
+
+.em-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+}
+.em-detail-header-left { display: flex; align-items: center; gap: 16px; }
+.em-file-badge {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+.em-file-type-xlsx { background: #e3fcef; color: #0b7a3e; }
+.em-file-type-xlsb { background: #e8f4fd; color: #1a6fa0; }
+.em-file-type-xlsm { background: #fef3e2; color: #a05c1a; }
+
+.em-title { font-size: 22px; font-weight: 700; color: #1a202c; margin: 0 0 4px; }
+.em-detail-path { font-size: 12px; color: #718096; font-family: monospace; }
+
+.em-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1.5px solid #667eea;
+    color: #667eea;
+    text-decoration: none;
+    background: white;
+    transition: all 0.2s;
+}
+.em-btn-outline:hover { background: #667eea; color: white; }
+
+/* Info Cards */
+.em-info-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.em-info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.em-info-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.em-info-icon-blue   { background: #ebf4ff; color: #3182ce; }
+.em-info-icon-purple { background: #f3e8ff; color: #7c3aed; }
+.em-info-icon-green  { background: #f0fff4; color: #38a169; }
+.em-info-icon-gray   { background: #f7fafc; color: #718096; }
+.em-info-icon-orange { background: #fffaf0; color: #dd6b20; }
+.em-info-label { font-size: 11px; color: #a0aec0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.em-info-value { font-size: 15px; font-weight: 700; color: #1a202c; margin-top: 3px; }
+
+/* Tabs */
+.em-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0;
+}
+.em-tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #718096;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.2s;
+}
+.em-tab:hover { color: #667eea; background: #f3f4f6; }
+.em-tab-active { color: #667eea; border-bottom-color: #667eea; background: white; }
+
+.em-tab-content { display: none; }
+.em-tab-content-active { display: block; }
+
+.em-section-title {
+    font-size: 14px;
+    color: #4a5568;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: #f7fafc;
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
+}
+
+/* Table */
+.em-group-table-wrap { overflow-x: auto; }
+.em-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.em-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #718096;
+    background: #f7fafc;
+    border-bottom: 2px solid #e2e8f0;
+}
+.em-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #2d3748;
+}
+.em-table .text-center { text-align: center; }
+.em-group-row { cursor: pointer; transition: background 0.15s; }
+.em-group-row:hover { background: #f7fafc; }
+.em-table tfoot td {
+    padding: 12px 16px;
+    background: #f7fafc;
+    font-weight: 700;
+    border-top: 2px solid #e2e8f0;
+}
+
+.em-group-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+}
+.em-group-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    flex-shrink: 0;
+}
+.em-count-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    background: #edf2ff;
+    color: #667eea;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.em-link-btn {
+    font-size: 12px;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+.em-link-btn:hover { text-decoration: underline; }
+
+.em-no-data, .em-empty {
+    text-align: center;
+    padding: 40px;
+    color: #a0aec0;
+    font-size: 14px;
+}
+
+.em-page { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+@@media (max-width: 768px) {
+    .em-info-cards { grid-template-columns: 1fr 1fr; }
+    .em-detail-header { flex-direction: column; }
+}
+</style>
+
+@section Scripts {
+<script>
+    function switchTab(idx) {
+        document.querySelectorAll('.em-tab').forEach((t, i) => {
+            t.classList.toggle('em-tab-active', i === idx);
+        });
+        document.querySelectorAll('.em-tab-content').forEach((c, i) => {
+            c.classList.toggle('em-tab-content-active', i === idx);
+        });
+    }
+
+    function goToGroup(fileId, groupName) {
+        window.location.href = `/excel-monitor/${fileId}/history?groupName=${encodeURIComponent(groupName)}`;
+    }
+</script>
+}

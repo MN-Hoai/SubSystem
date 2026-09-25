@@ -1,22 +1,44 @@
 @model SNP_SubSystem.Controllers.ExcelMonitor.ChangeHistoryVm
 @{
     ViewData["Title"] = $"Lịch sử thay đổi – {Model.File.FileName}";
+    var ft    = Model.File.FileType?.ToLower() ?? "xlsx";
+    var ftCls = ft == "xlsb" ? "em-ft-xlsb" : ft == "xlsm" ? "em-ft-xlsm" : "em-ft-xlsx";
 }
 
 <div class="em-page">
+
     <!-- Breadcrumb -->
     <div class="em-breadcrumb">
-        <a href="/excel-monitor">Excel Monitor</a>
-        <span>›</span>
+        <a href="/excel-monitor"><i class="fa-solid fa-table-columns" style="font-size:11px"></i> Excel Monitor</a>
+        <span class="em-breadcrumb-sep">&#8250;</span>
         <a href="/excel-monitor/@Model.File.Id">@Model.File.FileName</a>
-        <span>›</span>
-        <span>Lịch sử thay đổi</span>
+        <span class="em-breadcrumb-sep">&#8250;</span>
+        <span class="em-breadcrumb-cur">Lịch sử thay đổi</span>
     </div>
 
-    <!-- Header -->
-    <div class="em-history-header">
-        <h1 class="em-title">Lịch sử thay đổi</h1>
-        <div class="em-history-subtitle">@Model.File.FilePath</div>
+    <!-- Page header -->
+    <div class="em-page-header" style="margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:12px">
+            <div class="em-file-icon @ftCls" style="width:38px;height:38px;font-size:11px">@(Model.File.FileType?.ToUpper() ?? "XLS")</div>
+            <div>
+                <h1 class="em-page-title">Lịch sử thay đổi</h1>
+                <div style="font-size:12px;color:var(--em-muted);font-family:monospace;margin-top:1px">@Model.File.FilePath</div>
+            </div>
+        </div>
+        <div class="em-page-actions">
+            <button id="btnForceRead" class="em-btn em-btn-success"
+                    onclick="forceRead('@Model.File.Id')"
+                    title="Đọc file ngay lập tức, lưu lịch sử dù file đang mở"
+                    style="background:#16A34A;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">
+                <i class="fa-solid fa-rotate" style="font-size:11px"></i> Cập nhật ngay
+            </button>
+            <button class="em-btn" onclick="openQuickInfo()" style="background:#3B82F6;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">
+                <i class="fa-solid fa-bolt" style="font-size:11px"></i> Thông tin nhanh
+            </button>
+            <a href="/excel-monitor/@Model.File.Id" class="em-btn em-btn-ghost">
+                <i class="fa-solid fa-arrow-left" style="font-size:11px"></i> Chi tiết file
+            </a>
+        </div>
     </div>
 
     <!-- Sheet Tabs -->
@@ -51,84 +73,93 @@
         </div>
     }
 
-    <!-- Filter Bar -->
-    <form method="get" class="em-filter-bar">
-        <input type="hidden" name="page" value="1" />
-        @if (!string.IsNullOrEmpty(Model.SheetName))
-        {
-            <input type="hidden" name="sheetName" value="@Model.SheetName" />
-        }
-        <div class="em-filter-group">
-            <label>Từ ngày</label>
-            <input type="date" name="fromDate" class="em-filter-input"
-                   value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
-        </div>
-        <div class="em-filter-group">
-            <label>Đến ngày</label>
-            <input type="date" name="toDate" class="em-filter-input"
-                   value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
-        </div>
-        <div class="em-filter-group">
-            <label>Loại thay đổi</label>
-            @{
-                var ct = Model.ChangeType ?? "";
-                var ctOptions = new[] { "ROW_ADDED", "ROW_DELETED", "VALUE_CHANGED", "FORMULA_CHANGED", "GROUP_CHANGED" };
+    <!-- Filter Card -->
+    <div class="em-card" style="margin-bottom:16px">
+        <form method="get">
+            <input type="hidden" name="page" value="1" />
+            @if (!string.IsNullOrEmpty(Model.SheetName))
+            {
+                <input type="hidden" name="sheetName" value="@Model.SheetName" />
             }
-            <select name="changeType" class="em-filter-input">
-                <option value="">Tất cả</option>
-                @foreach (var opt in ctOptions)
-                {
-                    if (ct == opt)
-                    { <option value="@opt" selected="selected">@opt</option> }
-                    else
-                    { <option value="@opt">@opt</option> }
-                }
-            </select>
-        </div>
-        <div class="em-filter-group">
-            <label>Tổ</label>
-            @{ var gn = Model.GroupName ?? ""; }
-            <select name="groupName" class="em-filter-input">
-                <option value="">Tất cả</option>
-                @foreach (var g in Model.Groups.Where(g => !string.IsNullOrEmpty(g)))
-                {
-                    if (gn == g)
-                    { <option value="@g" selected="selected">@g</option> }
-                    else
-                    { <option value="@g">@g</option> }
-                }
-            </select>
-        </div>
-        <div class="em-filter-group">
-            <label>Cột</label>
-            @{ var cn = Model.ColumnName ?? ""; }
-            <select name="columnName" class="em-filter-input">
-                <option value="">Tất cả</option>
-                @foreach (var col in Model.Columns.Where(c => !string.IsNullOrEmpty(c)))
-                {
-                    if (cn == col)
-                    { <option value="@col" selected="selected">@col</option> }
-                    else
-                    { <option value="@col">@col</option> }
-                }
-            </select>
-        </div>
-        <button type="submit" class="em-btn em-btn-filter">Lọc</button>
-        <a href="/excel-monitor/@Model.File.Id/history@(!string.IsNullOrEmpty(Model.SheetName) ? $"?sheetName={Uri.EscapeDataString(Model.SheetName)}" : "")"
-           class="em-btn em-btn-reset">Xóa bộ lọc</a>
-    </form>
+            <div class="em-filter-bar">
+                <div class="em-filter-group">
+                    <label class="em-filter-label">Từ ngày</label>
+                    <input type="date" name="fromDate" class="em-form-control em-filter-input"
+                           value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="em-filter-group">
+                    <label class="em-filter-label">Đến ngày</label>
+                    <input type="date" name="toDate" class="em-form-control em-filter-input"
+                           value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="em-filter-group">
+                    <label class="em-filter-label">Loại thay đổi</label>
+                    @{
+                        var ct = Model.ChangeType ?? "";
+                        var ctOptions = new[] { "ROW_ADDED", "ROW_DELETED", "VALUE_CHANGED", "FORMULA_CHANGED", "GROUP_CHANGED", "ROWKEY_CHANGED" };
+                    }
+                    <select name="changeType" class="em-form-control em-filter-input">
+                        <option value="">Tất cả</option>
+                        @foreach (var opt in ctOptions)
+                        {
+                            if (ct == opt)
+                            { <option value="@opt" selected="selected">@opt</option> }
+                            else
+                            { <option value="@opt">@opt</option> }
+                        }
+                    </select>
+                </div>
+                <div class="em-filter-group">
+                    <label class="em-filter-label">Tổ</label>
+                    @{ var gn = Model.GroupName ?? ""; }
+                    <select name="groupName" class="em-form-control em-filter-input">
+                        <option value="">Tất cả</option>
+                        @foreach (var g in Model.Groups.Where(g => !string.IsNullOrEmpty(g)))
+                        {
+                            if (gn == g)
+                            { <option value="@g" selected="selected">@g</option> }
+                            else
+                            { <option value="@g">@g</option> }
+                        }
+                    </select>
+                </div>
+                <div class="em-filter-group">
+                    <label class="em-filter-label">Cột</label>
+                    @{ var cn = Model.ColumnName ?? ""; }
+                    <select name="columnName" class="em-form-control em-filter-input">
+                        <option value="">Tất cả</option>
+                        @foreach (var col in Model.Columns.Where(c => !string.IsNullOrEmpty(c)))
+                        {
+                            if (cn == col)
+                            { <option value="@col" selected="selected">@col</option> }
+                            else
+                            { <option value="@col">@col</option> }
+                        }
+                    </select>
+                </div>
+                <div class="em-filter-actions">
+                    <button type="submit" class="em-btn em-btn-primary">
+                        <i class="fa-solid fa-magnifying-glass" style="font-size:11px"></i> Lọc
+                    </button>
+                    <a href="/excel-monitor/@Model.File.Id/history@(!string.IsNullOrEmpty(Model.SheetName) ? $"?sheetName={Uri.EscapeDataString(Model.SheetName)}" : "")"
+                       class="em-btn em-btn-ghost">Xóa bộ lọc</a>
+                </div>
+            </div>
+        </form>
+    </div>
 
     <!-- Result Summary -->
-    <div class="em-result-summary">
+    <div class="em-result-bar">
+        <i class="fa-solid fa-clock-rotate-left" style="font-size:12px"></i>
         @if (!string.IsNullOrEmpty(Model.SheetName))
         {
-            <span class="em-sheet-badge">📄 @Model.SheetName</span>
+            <span class="em-badge em-badge-info" style="margin-right:4px">&#128196; @Model.SheetName</span>
         }
-        Tìm thấy <strong>@Model.Total.ToString("N0")</strong> thay đổi
+        Tìm thấy <span class="em-result-count">@Model.Total.ToString("N0")</span> thay đổi
         @if (Model.FromDate.HasValue || Model.ToDate.HasValue || !string.IsNullOrEmpty(Model.ChangeType)
              || !string.IsNullOrEmpty(Model.GroupName) || !string.IsNullOrEmpty(Model.ColumnName))
         {
-            <span class="em-filter-tag">Đang lọc</span>
+            <span class="em-badge em-badge-warning" style="font-size:10px;padding:2px 8px">Đang lọc</span>
         }
     </div>
 
@@ -142,9 +173,12 @@
 
     @if (!Model.Changes.Any())
     {
-        <div class="em-no-data">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <p>Không có thay đổi nào trong khoảng thời gian đã chọn</p>
+        <div class="em-card">
+            <div class="em-empty">
+                <i class="fa-regular fa-clock"></i>
+                <div class="em-empty-title">Không có thay đổi nào</div>
+                <div class="em-empty-sub">Không có thay đổi nào trong khoảng thời gian và điều kiện đã chọn.</div>
+            </div>
         </div>
     }
     else
@@ -176,11 +210,12 @@
                     {
                         var rkParts  = (change.RowKey ?? "").Split('|');
                         var typeInfo = change.ChangeType switch {
-                            "ROW_ADDED"       => (cls: "type-added",   icon: "+",  label: "Thêm dòng"),
-                            "ROW_DELETED"     => (cls: "type-deleted",  icon: "−",  label: "Xóa dòng"),
-                            "VALUE_CHANGED"   => (cls: "type-value",    icon: "⇄",  label: "Thay đổi"),
-                            "FORMULA_CHANGED" => (cls: "type-formula",  icon: "fλ", label: "Công thức"),
+                            "ROW_ADDED"       => (cls: "type-added",   icon: "+",  label: "Thêm mã"),
+                            "ROW_DELETED"     => (cls: "type-deleted",  icon: "−",  label: "Xóa mã"),
+                            "VALUE_CHANGED"   => (cls: "type-value",    icon: "⇄",  label: "Thay đổi thông tin tổ"),
+                            "FORMULA_CHANGED" => (cls: "type-formula",  icon: "fλ", label: "Thay đổi công thức"),
                             "GROUP_CHANGED"   => (cls: "type-group",    icon: "➜",  label: "Chuyển tổ"),
+                            "ROWKEY_CHANGED"  => (cls: "type-rowkey",   icon: "↻",  label: "Thay đổi thông tin mã"),
                             _                 => (cls: "type-other",    icon: "?",  label: change.ChangeType ?? "")
                         };
                         var isEven = rowIdx++ % 2 == 0;
@@ -270,13 +305,113 @@
                                 </td>
                             </tr>
                         }
+                        else if (change.ChangeType == "ROWKEY_CHANGED")
+                        {
+                            <tr class="em-detail-row" style="display:none">
+                                <td colspan="@detailColspan">
+                                    <div class="em-detail-box">
+                                        <div class="em-detail-label">Thông tin thay đổi:</div>
+                                        <div class="em-detail-vertical" style="display:flex; flex-direction:column; gap:12px; padding:8px 0;">
+                                            <div class="em-dg-from" style="background:#FFF1F2; padding:12px 16px; border-left:4px solid #FCA5A5; border-radius:4px;">
+                                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                                   
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(change.OldValue))
+                                                {
+                                                    <div class="em-dg-lbl" style="color:#B91C1C; margin-bottom:4px;">Thông tin cũ</div>
+                                                    <div style="width:100%; overflow-x:auto; border-radius:4px; border:1px solid #FDA4AF;">
+                                                        <table class="em-data-tbl" style="margin:0; width:max-content; min-width:100%;">
+                                                            <thead style="background:#FFE4E6; color:#B91C1C;">
+                                                                <tr>
+                                                                @{
+                                                                    var oldDict = new Dictionary<string, string>();
+                                                                    try { oldDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(change.OldValue) ?? new Dictionary<string, string>(); } catch {}
+                                                                }
+                                                                @foreach(var kv in oldDict) {
+                                                                    <th style="background:#FFE4E6; color:#B91C1C; white-space:nowrap; padding:8px 12px; border-bottom:1px solid #FDA4AF; font-weight:600; width:auto;">@kv.Key</th>
+                                                                }
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr>
+                                                                @foreach(var kv in oldDict) {
+                                                                    <td style="background:#fff; color:#7F1D1D; white-space:nowrap; padding:8px 12px; border:none;">@kv.Value</td>
+                                                                }
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="em-dg-to" style="background:#F0FDF4; padding:12px 16px; border-left:4px solid #86EFAC; border-radius:4px;">
+                                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                                 
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(change.NewValue))
+                                                {
+                                                    <div class="em-dg-lbl" style="color:#166534; margin-bottom:4px;">Thông tin mới:</div>
+                                                    <div style="width:100%; overflow-x:auto; border-radius:4px; border:1px solid #86EFAC;">
+                                                        <table class="em-data-tbl" style="margin:0; width:max-content; min-width:100%;">
+                                                            <thead style="background:#DCFCE7; color:#166534;">
+                                                                <tr>
+                                                                @{
+                                                                    var newDict = new Dictionary<string, string>();
+                                                                    try { newDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(change.NewValue) ?? new Dictionary<string, string>(); } catch {}
+                                                                }
+                                                                @foreach(var kv in newDict) {
+                                                                    <th style="background:#DCFCE7; color:#166534; white-space:nowrap; padding:8px 12px; border-bottom:1px solid #86EFAC; font-weight:600; width:auto;">@kv.Key</th>
+                                                                }
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr>
+                                                                @foreach(var kv in newDict) {
+                                                                    <td style="background:#fff; color:#14532D; white-space:nowrap; padding:8px 12px; border:none;">@kv.Value</td>
+                                                                }
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
                         else if (change.ChangeType == "ROW_ADDED" || change.ChangeType == "ROW_DELETED")
                         {
                             <tr class="em-detail-row" style="display:none">
                                 <td colspan="@detailColspan">
                                     <div class="em-detail-box">
                                         <div class="em-detail-label">@(change.ChangeType == "ROW_ADDED" ? "Dữ liệu dòng mới" : "Dữ liệu dòng bị xóa")</div>
-                                        <pre class="em-json-pre">@(change.ChangeType == "ROW_ADDED" ? change.NewValue : change.OldValue)</pre>
+                                        <div style="width:100%; overflow-x:auto; border-radius:4px; border:1px solid var(--em-border);">
+                                            <table class="em-data-tbl" style="margin:0; width:max-content; min-width:100%;">
+                                                <thead style="background:var(--em-surface-2);">
+                                                    <tr>
+                                                    @{
+                                                        var dtDict = new Dictionary<string, string>();
+                                                        try {
+                                                            var jsonStr = change.ChangeType == "ROW_ADDED" ? change.NewValue : change.OldValue;
+                                                            if (!string.IsNullOrEmpty(jsonStr)) {
+                                                                dtDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr) ?? new Dictionary<string, string>();
+                                                            }
+                                                        } catch {}
+                                                    }
+                                                    @foreach(var kv in dtDict) {
+                                                        <th style="white-space:nowrap; padding:8px 12px; border-bottom:1px solid var(--em-border); color:var(--em-muted); font-weight:600; width:auto;">@kv.Key</th>
+                                                    }
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                    @foreach(var kv in dtDict) {
+                                                        <td style="white-space:nowrap; padding:8px 12px; border:none; background:#fff;">@kv.Value</td>
+                                                    }
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -315,166 +450,63 @@
     }
 </div>
 
+
 @functions {
     string TruncateValue(string? val, int max)
     {
         if (string.IsNullOrEmpty(val)) return string.Empty;
-        return val.Length <= max ? val : val[..max] + "…";
+        return val.Length <= max ? val : val[..max] + "\u2026";
     }
 }
 
 <style>
-.em-page { padding: 24px; margin: 0 auto; }
-.em-breadcrumb { font-size: 13px; color: #718096; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
-.em-breadcrumb a { color: #667eea; text-decoration: none; }
-.em-title { font-size: 22px; font-weight: 700; color: #1a202c; margin: 0 0 4px; }
-.em-history-header { margin-bottom: 16px; }
-.em-history-subtitle { font-size: 12px; color: #718096; font-family: monospace; }
-
-/* Sheet Tabs */
-.em-sheet-tabs {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    padding: 4px 0;
-    border-bottom: 2px solid #e2e8f0;
-}
-.em-sheet-tab {
-    padding: 7px 16px;
-    border-radius: 8px 8px 0 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: #718096;
-    text-decoration: none;
-    border: 1.5px solid transparent;
-    border-bottom: none;
-    transition: all 0.2s;
-    margin-bottom: -2px;
-    background: #f7fafc;
-}
-.em-sheet-tab:hover { color: #667eea; background: #edf2ff; }
-.em-sheet-tab.active {
-    color: #667eea;
-    background: white;
-    border-color: #e2e8f0;
-    border-bottom-color: white;
-}
-
-/* Sheet badge in summary row */
-.em-sheet-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: #edf2ff;
-    color: #5a67d8;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    margin-right: 8px;
-}
-.em-sheet-mini-badge {
-    display: inline-block;
-    background: #f0f4ff;
-    color: #667eea;
-    border-radius: 4px;
-    padding: 1px 7px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-/* Filter Bar */
+/* ── Page Layout ───────────────────────────────── */
 .em-filter-bar {
     display: flex;
     align-items: flex-end;
     gap: 12px;
     flex-wrap: wrap;
-    padding: 16px;
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 16px;
+    padding: 16px 20px;
 }
-.em-filter-group { display: flex; flex-direction: column; gap: 4px; }
-.em-filter-group label { font-size: 11px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
-.em-filter-input {
-    padding: 8px 12px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 13px;
-    color: #1a202c;
-    min-width: 130px;
-    background: white;
-    transition: border 0.2s;
-}
-.em-filter-input:focus { outline: none; border-color: #667eea; }
+.em-filter-group  { display: flex; flex-direction: column; gap: 5px; }
+.em-filter-label  { font-size: 11px; font-weight: 700; color: var(--em-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.em-filter-input  { min-width: 130px; }
+.em-filter-actions { display: flex; align-items: center; gap: 8px; padding-top: 20px; }
 
-.em-btn-filter {
-    padding: 9px 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-}
-.em-btn-reset {
-    padding: 9px 16px;
-    background: transparent;
-    color: #718096;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-}
-
-.em-result-summary {
-    font-size: 13px;
-    color: #4a5568;
-    margin-bottom: 14px;
+/* ── Sheet Tabs ────────────────────────────────── */
+.em-sheet-tabs {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    border-bottom: 2px solid var(--em-border);
+    padding-bottom: 0;
 }
-.em-filter-tag {
-    background: #edf2ff;
-    color: #667eea;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 20px;
+.em-sheet-tab {
+    padding: 8px 16px;
+    border-radius: 8px 8px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--em-muted);
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
+.em-sheet-tab:hover  { color: var(--em-accent); background: var(--em-surface-2); }
+.em-sheet-tab.active { color: var(--em-accent); border-bottom-color: var(--em-accent); background: var(--em-surface); }
 
-/* ═══════════════════════════════════════════════════════════
-   TABLE UPGRADE — Premium history table
-   ═══════════════════════════════════════════════════════════ */
-
-/* Wrapper */
-.em-table-wrap {
-    overflow-x: auto;
-    border-radius: 14px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-    border: 1px solid #e8ecf4;
-    background: white;
-}
-
+/* ── History Table ─────────────────────────────── */
 .em-history-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    background: white;
+    background: var(--em-surface);
     min-width: 900px;
 }
-
-/* Sticky header */
 .em-history-table thead { position: sticky; top: 0; z-index: 2; }
 .em-history-table th {
     padding: 10px 13px;
@@ -483,37 +515,35 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: #5a6478;
-    background: #f4f6fb;
-    border-bottom: 2px solid #dde3f0;
+    color: var(--em-text-md);
+    background: var(--em-surface-2);
+    border-bottom: 2px solid var(--em-border);
     white-space: nowrap;
 }
-.em-history-table th.col-val { min-width: 160px; }
-.em-history-table th.col-rk  { min-width: 90px;  color: #667eea; }
-.em-history-table th.col-act { width: 36px; }
-
-/* Rows */
-.em-row { cursor: pointer; transition: background 0.12s; }
-.em-row-even { background: #ffffff; }
-.em-row-odd  { background: #f9fafd; }
-.em-row:hover { background: #edf2ff !important; }
-
+.em-history-table th.col-val  { min-width: 160px; }
+.em-history-table th.col-rk   { min-width: 90px; color: var(--em-accent); }
+.em-history-table th.col-act  { width: 36px; }
 .em-history-table td {
     padding: 9px 13px;
-    border-bottom: 1px solid #edf0f7;
+    border-bottom: 1px solid var(--em-border-lt);
     vertical-align: middle;
 }
 .em-history-table tr:last-child td { border-bottom: none; }
 
-/* Time column */
-.em-dt-date { font-size: 12px; font-weight: 700; color: #2d3748; }
-.em-dt-time { font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 1px; }
+.em-row         { cursor: pointer; transition: background 0.12s; }
+.em-row-even    { background: var(--em-surface); }
+.em-row-odd     { background: var(--em-surface-2); }
+.em-row:hover   { background: #EFF6FF !important; }
+
+/* Time */
+.em-dt-date { font-size: 12px; font-weight: 700; color: var(--em-text); }
+.em-dt-time { font-size: 11px; color: var(--em-muted); font-family: monospace; margin-top: 1px; }
 
 /* Sheet pill */
 .em-sheet-pill {
     display: inline-block;
-    background: #eef2ff;
-    color: #4f46e5;
+    background: #EEF2FF;
+    color: #4F46E5;
     border-radius: 5px;
     padding: 2px 8px;
     font-size: 11px;
@@ -524,24 +554,24 @@
 /* Group pill */
 .em-group-pill {
     display: inline-block;
-    background: #f5f0ff;
-    color: #6d28d9;
-    border: 1px solid #e0d9ff;
+    background: #F5F0FF;
+    color: #6D28D9;
+    border: 1px solid #E0D9FF;
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
 }
-.em-group-empty { background: #f7fafc; color: #a0aec0; border-color: #e2e8f0; }
+.em-group-empty { background: var(--em-surface-2); color: var(--em-muted); border-color: var(--em-border); }
 
-/* RowKey column values */
+/* RowKey */
 .em-rk-val {
     display: inline-block;
     font-size: 12px;
     font-weight: 600;
-    color: #1e40af;
-    background: #eff6ff;
+    color: #1E40AF;
+    background: #EFF6FF;
     border-radius: 4px;
     padding: 2px 7px;
     font-family: monospace;
@@ -550,10 +580,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.em-rk-empty { color: #cbd5e0; font-size: 11px; }
-.em-rownum { font-size: 10px; color: #94a3b8; margin-top: 3px; }
+.em-rk-empty { color: var(--em-muted-lt); font-size: 11px; }
+.em-rownum   { font-size: 10px; color: var(--em-muted); margin-top: 3px; }
 
-/* Type badge - redesigned */
+/* Type badge */
 .em-type-badge {
     display: inline-flex;
     align-items: center;
@@ -564,20 +594,21 @@
     font-weight: 700;
     white-space: nowrap;
 }
-.em-type-icon { font-size: 13px; line-height: 1; }
-.type-added   { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-.type-deleted { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-.type-value   { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
-.type-formula { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-.type-group   { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
-.type-other   { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; }
+.em-type-icon  { font-size: 13px; line-height: 1; }
+.type-added    { background: #D1FAE5; color: #065F46; border: 1px solid #A7F3D0; }
+.type-deleted  { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+.type-value    { background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
+.type-formula  { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+.type-group    { background: #EDE9FE; color: #5B21B6; border: 1px solid #C4B5FD; }
+.type-rowkey   { background: #CCFBF1; color: #0F766E; border: 1px solid #5EEAD4; }
+.type-other    { background: var(--em-surface-2); color: var(--em-text-md); border: 1px solid var(--em-border); }
 
-/* Column name pill */
+/* Column pill */
 .em-col-pill {
     display: inline-block;
-    background: #f0fdf4;
+    background: #F0FDF4;
     color: #166534;
-    border: 1px solid #bbf7d0;
+    border: 1px solid #BBF7D0;
     border-radius: 4px;
     padding: 2px 8px;
     font-size: 11px;
@@ -597,70 +628,43 @@
     border-radius: 4px;
     display: inline-block;
 }
-.em-val-old {
-    color: #b91c1c;
-    background: #fff1f2;
-    text-decoration: line-through;
-    text-decoration-color: #fca5a5;
-}
-.em-val-new {
-    color: #166534;
-    background: #f0fdf4;
-    font-weight: 600;
-}
-.em-formula {
-    font-size: 10px;
-    font-family: monospace;
-    margin-top: 3px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    display: inline-block;
-}
-.em-formula-old { color: #b91c1c; background: #fff1f2; }
-.em-formula-new { color: #166534; background: #f0fdf4; }
+.em-val-old   { color: #B91C1C; background: #FFF1F2; text-decoration: line-through; text-decoration-color: #FCA5A5; }
+.em-val-new   { color: #166534; background: #F0FDF4; font-weight: 600; }
+.em-formula   { font-size: 10px; font-family: monospace; margin-top: 3px; padding: 1px 5px; border-radius: 3px; display: inline-block; }
+.em-formula-old { color: #B91C1C; background: #FFF1F2; }
+.em-formula-new { color: #166534; background: #F0FDF4; }
 
 /* External link */
-.em-ext-link { color: #cbd5e0; display: inline-flex; transition: color 0.15s; }
-.em-ext-link:hover { color: #667eea; }
+.em-ext-link { color: var(--em-border); display: inline-flex; transition: color 0.15s; }
+.em-ext-link:hover { color: var(--em-accent); }
 
-/* Expand detail row */
+/* Expand row */
 .em-detail-row td {
-    background: #f8f9ff;
+    background: #F8F9FF;
     padding: 0 16px 14px;
-    border-bottom: 2px solid #dde3f0;
+    border-bottom: 2px solid var(--em-border);
 }
-.em-detail-box { padding: 12px 0; }
-.em-detail-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-
-.em-detail-group {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 8px 0;
-}
-.em-dg-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
-.em-dg-val { font-size: 17px; font-weight: 800; color: #2d3748; }
-.em-dg-val-new { color: #4f46e5; }
-
+.em-detail-box   { padding: 12px 0; }
+.em-detail-label { font-size: 11px; font-weight: 700; color: var(--em-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.em-detail-group { display: flex; align-items: center; gap: 20px; padding: 8px 0; }
+.em-dg-lbl  { font-size: 10px; color: var(--em-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+.em-dg-val  { font-size: 17px; font-weight: 800; color: var(--em-text); }
+.em-dg-val-new { color: var(--em-accent); }
 .em-json-pre {
     font-size: 12px;
-    font-family: 'Fira Code', 'Consolas', monospace;
-    background: #f0f4ff;
-    border: 1px solid #dde3f0;
+    font-family: 'Consolas', monospace;
+    background: #F0F4FF;
+    border: 1px solid var(--em-border);
     padding: 12px 14px;
     border-radius: 8px;
     white-space: pre-wrap;
     word-break: break-all;
-    color: #1e293b;
+    color: var(--em-text);
     max-height: 220px;
     overflow-y: auto;
     margin: 0;
     line-height: 1.6;
 }
-
-/* No data */
-.em-no-data { text-align: center; padding: 60px 20px; color: #a0aec0; }
-.em-no-data p { margin: 12px 0 0; font-size: 14px; }
 
 /* Pagination */
 .em-pagination {
@@ -673,17 +677,62 @@
 .em-page-btn {
     padding: 8px 16px;
     border-radius: 8px;
-    border: 1.5px solid #e2e8f0;
-    color: #667eea;
+    border: 1.5px solid var(--em-border);
+    color: var(--em-accent);
     text-decoration: none;
     font-size: 13px;
     font-weight: 600;
-    background: white;
+    background: var(--em-surface);
     transition: all 0.2s;
 }
-.em-page-btn:hover { background: #667eea; color: white; border-color: #667eea; }
-.em-page-info { font-size: 13px; color: #718096; }
+.em-page-btn:hover { background: var(--em-accent); color: white; border-color: var(--em-accent); }
+.em-page-info { font-size: 13px; color: var(--em-muted); }
+
+/* Data Table Detail */
+.em-data-tbl {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: #fff; text-align: left;
+}
+.em-data-tbl th, .em-data-tbl td {
+    padding: 8px 12px; border-bottom: 1px solid var(--em-border);
+}
+.em-data-tbl th {
+    background: var(--em-surface-2); font-weight: 600; color: var(--em-muted); width: 35%;
+}
+.em-data-tbl td { color: var(--em-text-md); font-family: monospace; }
+.em-data-tbl tbody tr:last-child td, .em-data-tbl tbody tr:last-child th { border-bottom: none; }
+.em-data-tbl tbody tr:last-child td, .em-data-tbl tbody tr:last-child th { border-bottom: none; }
+
+/* Quick Info Modal Pills */
+.em-qi-pill {
+    display: inline-block; padding: 3px 8px; background: var(--em-surface); border: 1px solid var(--em-border);
+    border-radius: 4px; font-size: 12px; font-family: monospace; color: var(--em-text); margin: 2px;
+}
 </style>
+
+<!-- Quick Info Modal -->
+<div id="quickInfoModal" class="em-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div class="em-modal-content" style="background:#fff; border-radius:8px; width:80vw; max-width:1200px; height:85vh; max-height:850px; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+        <div class="em-modal-header" style="padding:16px 20px; border-bottom:1px solid var(--em-border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--em-text);">
+                <i class="fa-solid fa-bolt" style="color:#3B82F6; margin-right:6px;"></i> Thông tin nhanh <span id="qiSheetLabel" style="color:var(--em-muted); font-size:13px; font-weight:normal;"></span>
+            </h3>
+            <button onclick="closeQuickInfo()" style="background:none; border:none; cursor:pointer; font-size:22px; color:var(--em-muted); line-height:1;">&times;</button>
+        </div>
+        <div class="em-modal-tabs" style="display:flex; border-bottom:1px solid var(--em-border); background:var(--em-surface-2);">
+            <button id="tabBtn-added" class="qi-tab active" onclick="switchQiTab('added')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-accent); border-bottom:2px solid var(--em-accent);">Thêm mã</button>
+            <button id="tabBtn-group" class="qi-tab" onclick="switchQiTab('group')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Chuyển tổ</button>
+            <button id="tabBtn-rowkey" class="qi-tab" onclick="switchQiTab('rowkey')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Thay đổi mã</button>
+        </div>
+        <div class="em-modal-body" style="padding:20px; overflow-y:auto; flex:1; background:#F8F9FF;">
+            <div id="qiLoading" style="text-align:center; padding:40px; color:var(--em-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; display:block;"></i> Đang tải dữ liệu...</div>
+            <div id="qiTabAdded" class="qi-tab-content" style="display:none;"></div>
+            <div id="qiTabGroup" class="qi-tab-content" style="display:none;"></div>
+            <div id="qiTabRowKey" class="qi-tab-content" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
 
 @section Scripts {
 <script>
@@ -692,8 +741,240 @@
         if (nextRow && nextRow.classList.contains('em-detail-row')) {
             const isHidden = nextRow.style.display === 'none';
             nextRow.style.display = isHidden ? 'table-row' : 'none';
-            row.style.background  = isHidden ? '#f0f4ff' : '';
+            row.style.background  = isHidden ? '#EFF6FF' : '';
         }
+    }
+
+    async function forceRead(fileId) {
+        const btn = document.getElementById('btnForceRead');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin" style="font-size:11px"></i> Đang đọc...';
+        try {
+            const resp = await fetch(`/api/excel-file/${fileId}/force-read`, { method: 'POST' });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok) {
+                toastr.success(data.message || 'Cập nhật thành công!', 'Force Read');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                toastr.error(data.message || 'Lỗi cập nhật', 'Force Read');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate" style="font-size:11px"></i> Cập nhật ngay';
+            }
+        } catch(e) {
+            toastr.error('Lỗi kết nối: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate" style="font-size:11px"></i> Cập nhật ngay';
+        }
+    }
+
+    /* Quick Info Modal Logic */
+    const qiRkCols = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RowKeyColumnNames));
+    let qiDataLoaded = false;
+    
+    function buildRowKeyTable(rows) {
+        if (!rows || rows.length === 0) return '';
+        let thHtml = qiRkCols.map(col => `<th style="padding:6px 12px; border-bottom:1px solid var(--em-border); color:var(--em-text-md); font-weight:600; white-space:nowrap; border-right:1px solid var(--em-border); background:var(--em-surface);">${col}</th>`).join('');
+        
+        let trHtml = '';
+        rows.forEach(r => {
+            let parts = r.split('|');
+            let tdHtml = '';
+            for(let i = 0; i < qiRkCols.length; i++) {
+                tdHtml += `<td style="padding:6px 12px; border-bottom:1px solid var(--em-border); white-space:nowrap; border-right:1px solid var(--em-border);">${parts[i] || ''}</td>`;
+            }
+            trHtml += `<tr>${tdHtml}</tr>`;
+        });
+        
+        return `
+            <div style="overflow-x:auto; width:100%;">
+                <table class="em-data-tbl" style="margin:0; width:100%; border:none; font-family:monospace; font-size:12px;">
+                    <thead>
+                        <tr>${thHtml}</tr>
+                    </thead>
+                    <tbody>
+                        ${trHtml}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    function openQuickInfo() {
+        document.getElementById('quickInfoModal').style.display = 'flex';
+        
+        const currentSheet = '@Html.Raw(Model.SheetName ?? "")';
+        document.getElementById('qiSheetLabel').innerText = currentSheet ? `(Sheet: ${currentSheet})` : '(Tất cả sheet)';
+        
+        if (!qiDataLoaded) {
+            loadQuickInfoData();
+        }
+    }
+    
+    function closeQuickInfo() {
+        document.getElementById('quickInfoModal').style.display = 'none';
+    }
+    
+    function switchQiTab(tab) {
+        ['added', 'group', 'rowkey'].forEach(t => {
+            const btn = document.getElementById('tabBtn-' + t);
+            const content = document.getElementById('qiTab' + (t === 'added' ? 'Added' : t === 'group' ? 'Group' : 'RowKey'));
+            if (btn && content) {
+                btn.style.color = tab === t ? 'var(--em-accent)' : 'var(--em-muted)';
+                btn.style.borderBottomColor = tab === t ? 'var(--em-accent)' : 'transparent';
+                content.style.display = tab === t ? 'block' : 'none';
+            }
+        });
+    }
+    
+    async function loadQuickInfoData() {
+        document.getElementById('qiLoading').style.display = 'block';
+        ['Added', 'Group', 'RowKey'].forEach(t => document.getElementById('qiTab' + t).style.display = 'none');
+        
+        try {
+            const currentSheet = encodeURIComponent('@Html.Raw(Model.SheetName ?? "")');
+            const fileId = '@Model.File.Id';
+            const resp = await fetch(`/excel-monitor/${fileId}/quick-info?sheetName=${currentSheet}`);
+            const data = await resp.json();
+            
+            if (data.success) {
+                renderAddedData(data.added);
+                renderGroupData(data.groupChanged);
+                renderRowKeyData(data.rowkeyChanged);
+                qiDataLoaded = true;
+                
+                document.getElementById('qiLoading').style.display = 'none';
+                switchQiTab('added'); // default tab
+            } else {
+                document.getElementById('qiLoading').innerHTML = '<div style="color:red">Lỗi tải dữ liệu</div>';
+            }
+        } catch (e) {
+            document.getElementById('qiLoading').innerHTML = `<div style="color:red">Lỗi kết nối: ${e.message}</div>`;
+        }
+    }
+    
+    function renderAddedData(addedList) {
+        const container = document.getElementById('qiTabAdded');
+        if (!addedList || addedList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--em-muted); background:#fff; border-radius:8px; border:1px dashed var(--em-border);">Không có dữ liệu thêm mã</div>';
+            return;
+        }
+        
+        let html = '';
+        addedList.forEach(g => {
+            let tableHtml = buildRowKeyTable(g.rows);
+            html += `
+                <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">
+                       Mã mới tổ ${g.groupName} <span style="font-weight:normal; color:var(--em-muted); font-size:12px;">(${g.rows.length} mã)</span>
+                    </div>
+                    <div style="padding:0;">
+                        ${tableHtml}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+    
+    function renderGroupData(groupList) {
+        const container = document.getElementById('qiTabGroup');
+        if (!groupList || groupList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--em-muted); background:#fff; border-radius:8px; border:1px dashed var(--em-border);">Không có dữ liệu chuyển tổ</div>';
+            return;
+        }
+        
+        // Nhóm lại theo OldGroupName
+        const byOldGroup = {};
+        groupList.forEach(item => {
+            if (!byOldGroup[item.oldGroupName]) byOldGroup[item.oldGroupName] = [];
+            byOldGroup[item.oldGroupName].push(item);
+        });
+        
+        let html = '';
+        for (const oldGroup in byOldGroup) {
+            let rowsHtml = '';
+            byOldGroup[oldGroup].forEach(target => {
+                let tableHtml = buildRowKeyTable(target.rows);
+                rowsHtml += `
+                    <tr>
+                        <td style="font-weight:700; color:var(--em-accent); vertical-align:top; width:200px; border-right:1px solid var(--em-border); padding:12px;">
+                            <i class="fa-solid fa-arrow-turn-down fa-rotate-270" style="margin-right:4px; color:var(--em-muted); font-size:10px;"></i> ${target.newGroupName}
+                            <div style="font-size:11px; font-weight:normal; color:var(--em-muted); margin-top:4px;">${target.rows.length} mã chuyển qua</div>
+                        </td>
+                        <td style="vertical-align:top; padding:0;">${tableHtml}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:#FFF8F1; padding:12px 16px; border-bottom:1px solid #FFEDD5; font-weight:700; color:#C2410C; font-size:15px;">
+                        Tổ cũ: ${oldGroup}
+                    </div>
+                    <table class="em-data-tbl" style="margin:0; width:100%; border:none;">
+                        <thead style="background:var(--em-surface);">
+                            <tr><th style="border-right:1px solid var(--em-border); color:var(--em-text-md); padding:8px 12px; width:200px;">Tổ chuyển qua</th><th style="color:var(--em-text-md); padding:8px 12px;">Danh sách mã chi tiết</th></tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    function renderRowKeyData(rowkeyList) {
+        const container = document.getElementById('qiTabRowKey');
+        if (!rowkeyList || rowkeyList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--em-muted); background:#fff; border-radius:8px; border:1px dashed var(--em-border);">Không có dữ liệu thay đổi mã</div>';
+            return;
+        }
+        
+        let html = '';
+        rowkeyList.forEach(g => {
+            let thHtml = qiRkCols.map(col => `<th style="padding:6px 12px; border-bottom:1px solid var(--em-border); color:var(--em-text-md); font-weight:600; white-space:nowrap; border-right:1px solid var(--em-border); background:var(--em-surface);">${col}</th>`).join('');
+            
+            let trHtml = '';
+            g.rows.forEach(r => {
+                let oldParts = (r.oldKey || '').split('|');
+                let newParts = (r.newKey || '').split('|');
+                
+                let tdOldHtml = '';
+                let tdNewHtml = '';
+                
+                for(let i = 0; i < qiRkCols.length; i++) {
+                    tdOldHtml += `<td style="padding:6px 12px; border-bottom:1px dashed #FCA5A5; white-space:nowrap; border-right:1px solid #FCA5A5; color:#991B1B; background:#FEF2F2;">${oldParts[i] || ''}</td>`;
+                    tdNewHtml += `<td style="padding:6px 12px; border-bottom:1px solid #86EFAC; white-space:nowrap; border-right:1px solid #86EFAC; color:#166534; background:#F0FDF4; font-weight:600;">${newParts[i] || ''}</td>`;
+                }
+                
+                trHtml += `
+                    <tr>${tdOldHtml}</tr>
+                    <tr>${tdNewHtml}</tr>
+                `;
+            });
+            
+            html += `
+                <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">
+                       Tổ ${g.groupName} <span style="font-weight:normal; color:var(--em-muted); font-size:12px;">(${g.rows.length} mã thay đổi)</span>
+                    </div>
+                    <div style="padding:0; overflow-x:auto;">
+                        <table class="em-data-tbl" style="margin:0; width:100%; border:none; font-family:monospace; font-size:12px;">
+                            <thead>
+                                <tr>${thHtml}</tr>
+                            </thead>
+                            <tbody>
+                                ${trHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
     }
 </script>
 }
+

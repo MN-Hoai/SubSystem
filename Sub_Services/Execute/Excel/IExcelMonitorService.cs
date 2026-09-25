@@ -15,6 +15,12 @@ public interface IExcelMonitorService
     Task ProcessFileChangedAsync(Guid excelFileId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Buộc đọc file ngay lập tức và ghi ChangeLog dù hash không đổi.
+    /// Dùng khi người dùng bấm "Cập nhật ngay" — bỏ qua bước so sánh hash.
+    /// </summary>
+    Task<(bool ok, string message)> ForceReadAsync(Guid excelFileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Thực hiện Initial Load cho file mới thêm vào (không tạo ChangeLog).
     /// </summary>
     Task InitialLoadAsync(Guid excelFileId, CancellationToken cancellationToken = default);

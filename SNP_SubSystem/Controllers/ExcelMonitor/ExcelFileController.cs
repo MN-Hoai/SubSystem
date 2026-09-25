@@ -239,6 +239,24 @@ public class ExcelFileController : ControllerBase
         return NoContent();
     }
 
+    // ── POST /api/excel-file/{id}/force-read ─────────────────────────────
+    /// <summary>Buộc đọc file ngay lập tức, ghi ChangeLog dù hash không đổi</summary>
+    [HttpPost("{id:guid}/force-read")]
+    public async Task<IActionResult> ForceRead(Guid id)
+    {
+        var file = await _db.ExcelFiles.FindAsync(id);
+        if (file == null) return NotFound("Không tìm thấy file monitor");
+
+        _logger.LogInformation("Force read requested cho file {FileId} ({FileName})", id, file.FileName);
+
+        var (ok, message) = await _monitorService.ForceReadAsync(id);
+
+        if (!ok)
+            return BadRequest(message);
+
+        return Ok(new { message, lastReadDate = DateTime.Now });
+    }
+
     // ── DELETE /api/excel-file/{id}/hard-delete ───────────────────────────
     /// <summary>Xóa cứng: xóa hoàn toàn file + toàn bộ dữ liệu liên quan khỏi DB</summary>
     [HttpDelete("{id:guid}/hard-delete")]

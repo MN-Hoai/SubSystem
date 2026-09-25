@@ -96,6 +96,54 @@ public class ExcelMonitorService : IExcelMonitorService
     }
 
     // ──────────────────────────────────────────────────────────────────────
+    // FORCE READ  (bỏ qua hash check)
+    // ──────────────────────────────────────────────────────────────────────
+    public async Task<(bool ok, string message)> ForceReadAsync(
+        Guid excelFileId, CancellationToken cancellationToken = default)
+    {
+        var excelFile = await _db.ExcelFiles
+            .Include(f => f.ExcelSheetConfigs.Where(s => s.Status == 1))
+            .FirstOrDefaultAsync(f => f.Id == excelFileId, cancellationToken);
+
+        if (excelFile == null)
+            return (false, "Không tìm thấy file monitor");
+
+        if (!await _reader.CanReadAsync(excelFile.FilePath, cancellationToken))
+            return (false, $"Không thể đọc file: {excelFile.FilePath}");
+
+        var configs = excelFile.ExcelSheetConfigs.ToList();
+        if (configs.Count == 0)
+            return (false, "File chưa được cấu hình sheet nào");
+
+        // Tính hash mới
+        var newHash = await ComputeFileHashAsync(excelFile.FilePath, cancellationToken);
+        if (newHash == null)
+            return (false, "Không thể tính hash file");
+
+        // Reset LastHash → ProcessSheetAsync sẽ so sánh với snapshot và luôn ghi ChangeLog khi có diff
+        excelFile.LastHash = null;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await WriteMonitorLogAsync(excelFileId, "FORCE_READ",
+            "Người dùng yêu cầu cập nhật thủ công", null, cancellationToken);
+
+        int totalChanges = 0;
+        foreach (var config in configs)
+        {
+            await ProcessSheetAsync(excelFile, config, newHash, cancellationToken);
+        }
+
+        // Cập nhật LastHash và LastReadDate sau khi đọc xong
+        excelFile.LastHash     = newHash;
+        excelFile.LastReadDate = DateTime.Now;
+        excelFile.UpdateDate   = DateTime.Now;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Force read [{FileName}] hoàn thành", excelFile.FileName);
+        return (true, $"Đã đọc và so sánh {configs.Count} sheet thành công");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
     // INITIAL LOAD
     // ──────────────────────────────────────────────────────────────────────
     public async Task InitialLoadAsync(Guid excelFileId, CancellationToken cancellationToken = default)
@@ -266,8 +314,10 @@ public class ExcelMonitorService : IExcelMonitorService
                         NewFormula     = change.NewFormula,
                         OldGroupName   = change.OldGroupName,
                         NewGroupName   = change.NewGroupName,
+                        OldRowKey      = change.OldRowKey,
+                        NewRowKey      = change.NewRowKey,
                         ChangeDate     = now,
-                        UserName       = null,       // Không thể xác định user từ FileSystemWatcher
+                        UserName       = null,
                         ComputerName   = computerName,
                     });
                 }

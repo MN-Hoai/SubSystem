@@ -173,6 +173,48 @@ public class ExcelMonitorController : Controller
         return View("~/Views/ExcelMonitor/ChangeHistory.cshtml", vm);
     }
 
+    [HttpGet("{id}/quick-info")]
+    public async Task<IActionResult> GetQuickInfo(Guid id, [FromQuery] string? sheetName)
+    {
+        var query = _db.ExcelChangeLogs.Where(c => c.ExcelFileId == id);
+        if (!string.IsNullOrEmpty(sheetName))
+        {
+            query = query.Where(c => c.SheetName == sheetName);
+        }
+
+        // Lấy danh sách Thêm mã (ROW_ADDED), gom theo tổ
+        var added = await query.Where(c => c.ChangeType == "ROW_ADDED")
+            .GroupBy(c => c.GroupName)
+            .Select(g => new {
+                GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
+                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+            })
+            .OrderBy(x => x.GroupName)
+            .ToListAsync();
+
+        // Lấy danh sách Chuyển tổ (GROUP_CHANGED), gom theo tổ cũ và tổ mới
+        var groupChanged = await query.Where(c => c.ChangeType == "GROUP_CHANGED")
+            .GroupBy(c => new { c.OldGroupName, c.NewGroupName })
+            .Select(g => new {
+                OldGroupName = string.IsNullOrEmpty(g.Key.OldGroupName) ? "(Chưa phân tổ)" : g.Key.OldGroupName,
+                NewGroupName = string.IsNullOrEmpty(g.Key.NewGroupName) ? "(Chưa phân tổ)" : g.Key.NewGroupName,
+                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+            })
+            .OrderBy(x => x.OldGroupName)
+            .ToListAsync();
+
+        var rowkeyChanged = await query.Where(c => c.ChangeType == "ROWKEY_CHANGED")
+            .GroupBy(c => c.GroupName)
+            .Select(g => new {
+                GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
+                Rows = g.Select(c => new { OldKey = c.OldRowKey, NewKey = c.NewRowKey }).ToList()
+            })
+            .OrderBy(x => x.GroupName)
+            .ToListAsync();
+
+        return Json(new { success = true, added, groupChanged, rowkeyChanged });
+    }
+
     // ── Helper: lấy tên các cột RowKey từ SheetConfig ────────────────────
     private static List<string> GetRowKeyNames(ExcelFile file, string? sheetName)
     {

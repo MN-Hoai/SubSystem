@@ -19,6 +19,9 @@ public static class ExcelChangeType
 
     /// <summary>Cùng RowKey nhưng GroupName thay đổi (dòng chuyển tổ)</summary>
     public const string GroupChanged = "GROUP_CHANGED";
+
+    /// <summary>Giá trị của cột RowKey thay đổi (cùng số dòng Excel, khác RowKey)</summary>
+    public const string RowKeyChanged = "ROWKEY_CHANGED";
 }
 
 /// <summary>
@@ -38,6 +41,10 @@ public class ExcelChangeItem
     public string? NewFormula    { get; set; }
     public string? OldGroupName  { get; set; }
     public string? NewGroupName  { get; set; }
+    /// <summary>RowKey cũ khi ChangeType = ROWKEY_CHANGED</summary>
+    public string? OldRowKey     { get; set; }
+    /// <summary>RowKey mới khi ChangeType = ROWKEY_CHANGED</summary>
+    public string? NewRowKey     { get; set; }
 }
 
 /// <summary>

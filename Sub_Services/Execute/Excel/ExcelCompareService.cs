@@ -30,9 +30,11 @@ public class ExcelCompareService : IExcelCompareService
         var result = new ExcelCompareResult { SheetName = sheetName };
 
         // ── Bước 1: Build lookup cho newRows ──────────────────────────────
+        // Dùng GroupBy để tránh lỗi ArgumentException nếu Excel có nhiều dòng trùng RowKey
         var newDict = newRows
             .Where(r => !string.IsNullOrEmpty(r.RowKey))
-            .ToDictionary(r => r.RowKey, r => r, StringComparer.Ordinal);
+            .GroupBy(r => r.RowKey, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
 
         // ── Bước 2: Thống kê GroupStats ───────────────────────────────────
         result.GroupStats = ComputeGroupStats(oldSnapshot, newDict);
@@ -163,11 +165,59 @@ public class ExcelCompareService : IExcelCompareService
             }
         }
 
-        _logger.LogInformation("Compare [{Sheet}]: {Total} thay đổi ({Added} added, {Deleted} deleted, {Group} group, {Value} value)",
+        // ── Bước 7: Phát hiện ROWKEY_CHANGED ──────────────────────────────
+        // Nếu một dòng bị ROW_DELETED và một dòng mới ROW_ADDED có cùng ExcelRowNumber
+        // → đó là RowKey thay đổi, không phải dòng mới/xóa thật sự
+        var deletedByRow = result.Changes
+            .Where(c => c.ChangeType == ExcelChangeType.RowDeleted && c.ExcelRowNumber.HasValue)
+            .GroupBy(c => c.ExcelRowNumber!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var addedByRow = result.Changes
+            .Where(c => c.ChangeType == ExcelChangeType.RowAdded && c.ExcelRowNumber.HasValue)
+            .GroupBy(c => c.ExcelRowNumber!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var rowKeyChangedItems = new List<ExcelChangeItem>();
+        var toRemove          = new HashSet<ExcelChangeItem>(ReferenceEqualityComparer.Instance);
+
+        foreach (var (rowNum, deletedItem) in deletedByRow)
+        {
+            if (!addedByRow.TryGetValue(rowNum, out var addedItem)) continue;
+
+            // Cùng ExcelRowNumber nhưng RowKey khác → RowKey đã bị chỉnh sửa
+            if (string.Equals(deletedItem.RowKey, addedItem.RowKey, StringComparison.Ordinal)) continue;
+
+            rowKeyChangedItems.Add(new ExcelChangeItem
+            {
+                SheetName      = sheetName,
+                ExcelRowNumber = rowNum,
+                RowKey         = addedItem.RowKey,       // RowKey hiện tại (mới)
+                GroupName      = addedItem.GroupName,
+                ChangeType     = ExcelChangeType.RowKeyChanged,
+                OldRowKey      = deletedItem.RowKey,
+                NewRowKey      = addedItem.RowKey,
+                OldValue       = deletedItem.OldValue,   // giữ data cũ để tham khảo
+                NewValue       = addedItem.NewValue,
+            });
+
+            toRemove.Add(deletedItem);
+            toRemove.Add(addedItem);
+
+            _logger.LogDebug("[ROWKEY_CHANGED] Row#{Row}: {OldKey} → {NewKey}",
+                rowNum, deletedItem.RowKey, addedItem.RowKey);
+        }
+
+        // Xóa ROW_DELETED / ROW_ADDED đã được gộp, thêm ROWKEY_CHANGED
+        result.Changes.RemoveAll(c => toRemove.Contains(c));
+        result.Changes.AddRange(rowKeyChangedItems);
+
+        _logger.LogInformation("Compare [{Sheet}]: {Total} thay đổi ({Added} added, {Deleted} deleted, {RkChg} rowkey, {Group} group, {Value} value)",
             sheetName,
             result.Changes.Count,
             result.Changes.Count(c => c.ChangeType == ExcelChangeType.RowAdded),
             result.Changes.Count(c => c.ChangeType == ExcelChangeType.RowDeleted),
+            result.Changes.Count(c => c.ChangeType == ExcelChangeType.RowKeyChanged),
             result.Changes.Count(c => c.ChangeType == ExcelChangeType.GroupChanged),
             result.Changes.Count(c => c.ChangeType == ExcelChangeType.ValueChanged));
 

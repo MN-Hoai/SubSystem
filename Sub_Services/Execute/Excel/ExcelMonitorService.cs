@@ -322,9 +322,8 @@ public class ExcelMonitorService : IExcelMonitorService
                     });
                 }
 
-                // Theo yêu cầu: KHÔNG cập nhật Snapshot sau mỗi lần thay đổi.
-                // Snapshot sẽ luôn giữ nguyên là bản ghi đầu tiên (baseline).
-                // await _snapshot.ReplaceSnapshotAsync(excelFile.Id, sheetName, sheet.Rows, cancellationToken);
+                // Cập nhật Snapshot để lần so sánh tiếp theo chỉ ra sự khác biệt mới (Incremental)
+                await _snapshot.ReplaceSnapshotAsync(excelFile.Id, sheetName, sheet.Rows, cancellationToken);
 
                 // Cập nhật ExcelFile.LastHash
                 excelFile.LastHash     = newHash;

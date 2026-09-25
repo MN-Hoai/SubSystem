@@ -191,6 +191,22 @@ public class ExcelMonitorController : Controller
         return Json(new { success = true, sheets = recentSheets });
     }
 
+    class RowState
+    {
+        public string CurrentGroup { get; set; } = string.Empty;
+        public string CurrentKey { get; set; } = string.Empty;
+        
+        public bool IsAdded { get; set; }
+        public bool IsDeleted { get; set; }
+        
+        public bool HasValueChanged { get; set; }
+        public bool HasRowKeyChanged { get; set; }
+        public bool HasGroupChanged { get; set; }
+        
+        public string OriginalGroup { get; set; } = string.Empty;
+        public string OriginalKey { get; set; } = string.Empty;
+    }
+
     [HttpGet("{id}/quick-info")]
     public async Task<IActionResult> GetQuickInfo(Guid id, [FromQuery] string? sheetName)
     {
@@ -200,65 +216,141 @@ public class ExcelMonitorController : Controller
             query = query.Where(c => c.SheetName == sheetName);
         }
 
-        // Lấy đợt thay đổi mới nhất (vì backend giờ so sánh trực tiếp với bản gốc)
-        var maxDate = await query.MaxAsync(c => (DateTime?)c.ChangeDate);
-        if (maxDate == null)
+        // Lấy tất cả lịch sử thay đổi theo thứ tự thời gian để Replay
+        var logs = await query.OrderBy(c => c.ChangeDate).ThenBy(c => c.Id).ToListAsync();
+
+        var states = new Dictionary<string, RowState>(StringComparer.Ordinal);
+        string GetStateKey(string? group, string? key) => $"{group ?? ""}||{key ?? ""}";
+
+        foreach (var log in logs)
         {
-            return Json(new { success = true, added = new object[0], groupChanged = new object[0], rowkeyChanged = new object[0], valueChanged = new object[0], deleted = new object[0] });
+            if (log.ChangeType == "ROW_ADDED")
+            {
+                var k = GetStateKey(log.GroupName, log.RowKey);
+                states[k] = new RowState { 
+                    CurrentGroup = log.GroupName ?? "", CurrentKey = log.RowKey ?? "",
+                    OriginalGroup = log.GroupName ?? "", OriginalKey = log.RowKey ?? "",
+                    IsAdded = true 
+                };
+            }
+            else if (log.ChangeType == "ROW_DELETED")
+            {
+                var k = GetStateKey(log.GroupName, log.RowKey);
+                if (states.TryGetValue(k, out var state)) {
+                    state.IsDeleted = true;
+                } else {
+                    states[k] = new RowState {
+                        CurrentGroup = log.GroupName ?? "", CurrentKey = log.RowKey ?? "",
+                        OriginalGroup = log.GroupName ?? "", OriginalKey = log.RowKey ?? "",
+                        IsDeleted = true
+                    };
+                }
+            }
+            else if (log.ChangeType == "GROUP_CHANGED")
+            {
+                var oldK = GetStateKey(log.OldGroupName, log.RowKey);
+                var newK = GetStateKey(log.NewGroupName, log.RowKey);
+                
+                if (states.TryGetValue(oldK, out var state)) {
+                    states.Remove(oldK);
+                    state.CurrentGroup = log.NewGroupName ?? "";
+                    state.HasGroupChanged = (state.OriginalGroup != state.CurrentGroup);
+                    states[newK] = state;
+                } else {
+                    states[newK] = new RowState {
+                        CurrentGroup = log.NewGroupName ?? "", CurrentKey = log.RowKey ?? "",
+                        OriginalGroup = log.OldGroupName ?? "", OriginalKey = log.RowKey ?? "",
+                        HasGroupChanged = true
+                    };
+                }
+            }
+            else if (log.ChangeType == "ROWKEY_CHANGED")
+            {
+                var oldK = GetStateKey(log.GroupName, log.OldRowKey);
+                var newK = GetStateKey(log.GroupName, log.NewRowKey);
+                
+                if (states.TryGetValue(oldK, out var state)) {
+                    states.Remove(oldK);
+                    state.CurrentKey = log.NewRowKey ?? "";
+                    state.HasRowKeyChanged = (state.OriginalKey != state.CurrentKey);
+                    states[newK] = state;
+                } else {
+                    states[newK] = new RowState {
+                        CurrentGroup = log.GroupName ?? "", CurrentKey = log.NewRowKey ?? "",
+                        OriginalGroup = log.GroupName ?? "", OriginalKey = log.OldRowKey ?? "",
+                        HasRowKeyChanged = true
+                    };
+                }
+            }
+            else if (log.ChangeType == "VALUE_CHANGED" || log.ChangeType == "FORMULA_CHANGED")
+            {
+                var k = GetStateKey(log.GroupName, log.RowKey);
+                if (states.TryGetValue(k, out var state)) {
+                    state.HasValueChanged = true;
+                } else {
+                    states[k] = new RowState {
+                        CurrentGroup = log.GroupName ?? "", CurrentKey = log.RowKey ?? "",
+                        OriginalGroup = log.GroupName ?? "", OriginalKey = log.RowKey ?? "",
+                        HasValueChanged = true
+                    };
+                }
+            }
         }
 
-        // Trích xuất toàn bộ log của đợt so sánh mới nhất này
-        var finalLogs = await query.Where(c => c.ChangeDate == maxDate).ToListAsync();
+        var activeStates = states.Values.ToList();
 
-        // Lấy danh sách Thêm mã
-        // Yêu cầu: Gôm thêm dữ liệu ở tab thay đổi mã (ROWKEY_CHANGED) vào tab thêm mã
-        var addedRecords = finalLogs.Where(c => c.ChangeType == "ROW_ADDED" || c.ChangeType == "ROWKEY_CHANGED").ToList();
-        var added = addedRecords
-            .GroupBy(c => c.GroupName)
+        // Lấy danh sách Thêm mã (Gồm những mã từng được sinh ra và hiện CHƯA BỊ XÓA)
+        // Yêu cầu: Gôm thêm dữ liệu ở tab thay đổi mã (HasRowKeyChanged) vào tab thêm mã
+        var added = activeStates
+            .Where(s => !s.IsDeleted && (s.IsAdded || s.HasRowKeyChanged))
+            .GroupBy(s => s.CurrentGroup)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey)
-                        .Where(k => !string.IsNullOrEmpty(k))
-                        .Distinct().ToList()
+                Rows = g.Select(s => s.CurrentKey).Distinct().ToList()
             })
             .OrderBy(x => x.GroupName)
             .ToList();
 
         // Lấy danh sách Chuyển tổ (GROUP_CHANGED), gom theo tổ cũ và tổ mới
-        var groupChanged = finalLogs.Where(c => c.ChangeType == "GROUP_CHANGED")
-            .GroupBy(c => new { c.OldGroupName, c.NewGroupName })
+        var groupChanged = activeStates
+            .Where(s => !s.IsDeleted && !s.IsAdded && s.HasGroupChanged)
+            .GroupBy(s => new { s.OriginalGroup, s.CurrentGroup })
             .Select(g => new {
-                OldGroupName = string.IsNullOrEmpty(g.Key.OldGroupName) ? "(Chưa phân tổ)" : g.Key.OldGroupName,
-                NewGroupName = string.IsNullOrEmpty(g.Key.NewGroupName) ? "(Chưa phân tổ)" : g.Key.NewGroupName,
-                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+                OldGroupName = string.IsNullOrEmpty(g.Key.OriginalGroup) ? "(Chưa phân tổ)" : g.Key.OriginalGroup,
+                NewGroupName = string.IsNullOrEmpty(g.Key.CurrentGroup) ? "(Chưa phân tổ)" : g.Key.CurrentGroup,
+                Rows = g.Select(s => s.CurrentKey).Distinct().ToList()
             })
             .OrderBy(x => x.OldGroupName)
             .ToList();
 
-        // Tab thay đổi mã vẫn giữ nguyên
-        var rowkeyChanged = finalLogs.Where(c => c.ChangeType == "ROWKEY_CHANGED")
-            .GroupBy(c => c.GroupName)
+        // Tab thay đổi mã vẫn giữ nguyên (ROWKEY_CHANGED)
+        var rowkeyChanged = activeStates
+            .Where(s => !s.IsDeleted && !s.IsAdded && s.HasRowKeyChanged)
+            .GroupBy(s => s.CurrentGroup)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => new { OldKey = c.OldRowKey, NewKey = c.NewRowKey }).ToList()
+                Rows = g.Select(s => new { OldKey = s.OriginalKey, NewKey = s.CurrentKey }).ToList()
             })
             .OrderBy(x => x.GroupName)
             .ToList();
 
-        var valueChanged = finalLogs.Where(c => c.ChangeType == "VALUE_CHANGED" || c.ChangeType == "FORMULA_CHANGED")
-            .GroupBy(c => c.GroupName)
+        var valueChanged = activeStates
+            .Where(s => !s.IsDeleted && !s.IsAdded && s.HasValueChanged)
+            .GroupBy(s => s.CurrentGroup)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+                Rows = g.Select(s => s.CurrentKey).Distinct().ToList()
             })
             .OrderBy(x => x.GroupName)
             .ToList();
 
-        var deleted = finalLogs.Where(c => c.ChangeType == "ROW_DELETED")
-            .GroupBy(c => c.GroupName)
+        // Deleted items must not have been added during this period (ghosts)
+        var deleted = activeStates
+            .Where(s => s.IsDeleted && !s.IsAdded)
+            .GroupBy(s => s.OriginalGroup) // Group by original group because it's deleted
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+                Rows = g.Select(s => s.OriginalKey).Distinct().ToList()
             })
             .OrderBy(x => x.GroupName)
             .ToList();

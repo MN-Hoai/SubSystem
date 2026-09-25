@@ -212,7 +212,7 @@
                         var typeInfo = change.ChangeType switch {
                             "ROW_ADDED"       => (cls: "type-added",   icon: "+",  label: "Thêm mã"),
                             "ROW_DELETED"     => (cls: "type-deleted",  icon: "−",  label: "Xóa mã"),
-                            "VALUE_CHANGED"   => (cls: "type-value",    icon: "⇄",  label: "Thay đổi thông tin tổ"),
+                            "VALUE_CHANGED"   => (cls: "type-value",    icon: "⇄",  label: "Thay đổi thông tin"),
                             "FORMULA_CHANGED" => (cls: "type-formula",  icon: "fλ", label: "Thay đổi công thức"),
                             "GROUP_CHANGED"   => (cls: "type-group",    icon: "➜",  label: "Chuyển tổ"),
                             "ROWKEY_CHANGED"  => (cls: "type-rowkey",   icon: "↻",  label: "Thay đổi thông tin mã"),
@@ -721,14 +721,18 @@
         </div>
         <div class="em-modal-tabs" style="display:flex; border-bottom:1px solid var(--em-border); background:var(--em-surface-2);">
             <button id="tabBtn-added" class="qi-tab active" onclick="switchQiTab('added')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-accent); border-bottom:2px solid var(--em-accent);">Thêm mã</button>
+            <button id="tabBtn-deleted" class="qi-tab" onclick="switchQiTab('deleted')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Xóa mã</button>
             <button id="tabBtn-group" class="qi-tab" onclick="switchQiTab('group')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Chuyển tổ</button>
             <button id="tabBtn-rowkey" class="qi-tab" onclick="switchQiTab('rowkey')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Thay đổi mã</button>
+            <button id="tabBtn-value" class="qi-tab" onclick="switchQiTab('value')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Thay đổi thông tin</button>
         </div>
         <div class="em-modal-body" style="padding:20px; overflow-y:auto; flex:1; background:#F8F9FF;">
             <div id="qiLoading" style="text-align:center; padding:40px; color:var(--em-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; display:block;"></i> Đang tải dữ liệu...</div>
             <div id="qiTabAdded" class="qi-tab-content" style="display:none;"></div>
+            <div id="qiTabDeleted" class="qi-tab-content" style="display:none;"></div>
             <div id="qiTabGroup" class="qi-tab-content" style="display:none;"></div>
             <div id="qiTabRowKey" class="qi-tab-content" style="display:none;"></div>
+            <div id="qiTabValue" class="qi-tab-content" style="display:none;"></div>
         </div>
     </div>
 </div>
@@ -815,9 +819,9 @@
     }
     
     function switchQiTab(tab) {
-        ['added', 'group', 'rowkey'].forEach(t => {
+        ['added', 'deleted', 'group', 'rowkey', 'value'].forEach(t => {
             const btn = document.getElementById('tabBtn-' + t);
-            const content = document.getElementById('qiTab' + (t === 'added' ? 'Added' : t === 'group' ? 'Group' : 'RowKey'));
+            const content = document.getElementById('qiTab' + (t === 'added' ? 'Added' : t === 'deleted' ? 'Deleted' : t === 'group' ? 'Group' : t === 'rowkey' ? 'RowKey' : 'Value'));
             if (btn && content) {
                 btn.style.color = tab === t ? 'var(--em-accent)' : 'var(--em-muted)';
                 btn.style.borderBottomColor = tab === t ? 'var(--em-accent)' : 'transparent';
@@ -828,7 +832,7 @@
     
     async function loadQuickInfoData() {
         document.getElementById('qiLoading').style.display = 'block';
-        ['Added', 'Group', 'RowKey'].forEach(t => document.getElementById('qiTab' + t).style.display = 'none');
+        ['Added', 'Deleted', 'Group', 'RowKey', 'Value'].forEach(t => document.getElementById('qiTab' + t).style.display = 'none');
         
         try {
             const currentSheet = encodeURIComponent('@Html.Raw(Model.SheetName ?? "")');
@@ -838,8 +842,10 @@
             
             if (data.success) {
                 renderAddedData(data.added);
+                renderDeletedData(data.deleted);
                 renderGroupData(data.groupChanged);
                 renderRowKeyData(data.rowkeyChanged);
+                renderValueData(data.valueChanged);
                 qiDataLoaded = true;
                 
                 document.getElementById('qiLoading').style.display = 'none';
@@ -866,6 +872,30 @@
                 <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                     <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">
                        Mã mới tổ ${g.groupName} <span style="font-weight:normal; color:var(--em-muted); font-size:12px;">(${g.rows.length} mã)</span>
+                    </div>
+                    <div style="padding:0;">
+                        ${tableHtml}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function renderDeletedData(deletedList) {
+        const container = document.getElementById('qiTabDeleted');
+        if (!deletedList || deletedList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--em-muted); background:#fff; border-radius:8px; border:1px dashed var(--em-border);">Không có dữ liệu xóa mã</div>';
+            return;
+        }
+        
+        let html = '';
+        deletedList.forEach(g => {
+            let tableHtml = buildRowKeyTable(g.rows);
+            html += `
+                <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:#FFF1F2; padding:10px 16px; border-bottom:1px solid #FECDD3; font-weight:700; color:#991B1B;">
+                       Mã bị xóa tổ ${g.groupName} <span style="font-weight:normal; color:var(--em-muted); font-size:12px;">(${g.rows.length} mã)</span>
                     </div>
                     <div style="padding:0;">
                         ${tableHtml}
@@ -975,6 +1005,37 @@
         });
         container.innerHTML = html;
     }
+
+    function renderValueData(valueList) {
+        const container = document.getElementById('qiTabValue');
+        if (!valueList || valueList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--em-muted); background:#fff; border-radius:8px; border:1px dashed var(--em-border);">Không có dữ liệu thay đổi thông tin</div>';
+            return;
+        }
+        
+        let html = '';
+        valueList.forEach(g => {
+            let tableHtml = buildRowKeyTable(g.rows);
+            html += `
+                <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">
+                       Tổ ${g.groupName} <span style="font-weight:normal; color:var(--em-muted); font-size:12px;">(${g.rows.length} mã thay đổi thông tin)</span>
+                    </div>
+                    <div style="padding:0;">
+                        ${tableHtml}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('quickInfo') === '1') {
+            openQuickInfo();
+        }
+    });
 </script>
 }
 

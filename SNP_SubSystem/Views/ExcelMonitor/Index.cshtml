@@ -124,7 +124,7 @@
                             var rowCls    = rowNum % 2 == 0 ? "em-table-row-odd" : "em-table-row-even";
                             var safeSearch= (file.FileName + " " + file.FilePath).ToLower();
 
-                            <tr class="@rowCls" data-search="@safeSearch">
+                            <tr class="@rowCls" data-search="@safeSearch" oncontextmenu="showFileContextMenu(event, '@file.Id', '@file.FileName.Replace("'","\\'")')">
                                 <td style="color:var(--em-muted-lt);font-size:12px">@rowNum</td>
                                 <td>
                                     <div class="em-file-cell">
@@ -190,6 +190,12 @@
             </div>
         }
     </div>
+</div>
+
+<!-- Context Menu -->
+<div id="fileContextMenu" style="display:none; position:fixed; z-index:2147483647; background:white; border:1px solid var(--em-border); border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.15); min-width:180px; padding:8px 0; font-size:13px; font-weight:600;">
+    <div style="padding:4px 16px; font-size:11px; color:var(--em-muted); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--em-border); margin-bottom:4px;">5 Sheet có thay đổi gần nhất</div>
+    <div id="cmSheetList"></div>
 </div>
 
 <!-- ══ Modal Thêm File ══════════════════════════════════════════ -->
@@ -500,5 +506,57 @@
         } catch (e) { toastr.error('Lỗi kết nối: ' + e.message); }
         finally { btn.disabled = false; txt.style.display = 'inline'; spn.style.display = 'none'; }
     }
+
+    // ── Context Menu ────────────────────────────────────────────────
+    let currentCtxFileId = null;
+    async function showFileContextMenu(e, fileId, fileName) {
+        e.preventDefault();
+        currentCtxFileId = fileId;
+        const menu = document.getElementById('fileContextMenu');
+        const list = document.getElementById('cmSheetList');
+        
+        list.innerHTML = '<div style="padding:8px 16px; color:var(--em-muted); font-size:12px;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:6px"></i>Đang tải...</div>';
+        
+        // Position menu
+        menu.style.display = 'block';
+        let x = e.clientX;
+        let y = e.clientY;
+        
+        // Adjust if it goes out of window
+        if (x + menu.offsetWidth > window.innerWidth) x = window.innerWidth - menu.offsetWidth - 10;
+        if (y + menu.offsetHeight > window.innerHeight) y = window.innerHeight - menu.offsetHeight - 10;
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+
+        try {
+            const resp = await fetch(`/excel-monitor/${fileId}/recent-sheets`);
+            const data = await resp.json();
+            
+            if (data.success && data.sheets && data.sheets.length > 0) {
+                let html = '';
+                data.sheets.forEach(sheet => {
+                    html += `<div style="padding:8px 16px; cursor:pointer; color:var(--em-text-md); transition:background 0.2s;" onmouseover="this.style.background='var(--em-bg-secondary)'" onmouseout="this.style.background=''" onclick="openQuickInfoFromMenu('${fileId}', '${sheet.replace(/'/g,"\\'")}')"><i class="fa-regular fa-file-excel" style="color:var(--em-accent); margin-right:8px;"></i>${sheet}</div>`;
+                });
+                list.innerHTML = html;
+            } else {
+                list.innerHTML = '<div style="padding:8px 16px; color:var(--em-muted); font-size:12px; font-style:italic;">Chưa có lịch sử thay đổi</div>';
+            }
+        } catch (err) {
+            list.innerHTML = '<div style="padding:8px 16px; color:red; font-size:12px;">Lỗi tải dữ liệu</div>';
+        }
+    }
+
+    function openQuickInfoFromMenu(fileId, sheetName) {
+        document.getElementById('fileContextMenu').style.display = 'none';
+        window.location.href = `/excel-monitor/${fileId}/history?sheetName=${encodeURIComponent(sheetName)}&quickInfo=1`;
+    }
+
+    // Hide context menu when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#fileContextMenu')) {
+            document.getElementById('fileContextMenu').style.display = 'none';
+        }
+    });
 </script>
 }

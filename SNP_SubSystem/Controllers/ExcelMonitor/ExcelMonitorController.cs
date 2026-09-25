@@ -173,6 +173,24 @@ public class ExcelMonitorController : Controller
         return View("~/Views/ExcelMonitor/ChangeHistory.cshtml", vm);
     }
 
+    [HttpGet("{id}/recent-sheets")]
+    public async Task<IActionResult> GetRecentSheets(Guid id)
+    {
+        var recentSheets = await _db.ExcelChangeLogs
+            .Where(c => c.ExcelFileId == id && !string.IsNullOrEmpty(c.SheetName))
+            .GroupBy(c => c.SheetName)
+            .Select(g => new { 
+                SheetName = g.Key, 
+                LastChangeDate = g.Max(c => c.ChangeDate) 
+            })
+            .OrderByDescending(x => x.LastChangeDate)
+            .Take(5)
+            .Select(x => x.SheetName)
+            .ToListAsync();
+
+        return Json(new { success = true, sheets = recentSheets });
+    }
+
     [HttpGet("{id}/quick-info")]
     public async Task<IActionResult> GetQuickInfo(Guid id, [FromQuery] string? sheetName)
     {
@@ -182,18 +200,63 @@ public class ExcelMonitorController : Controller
             query = query.Where(c => c.SheetName == sheetName);
         }
 
-        // Lấy danh sách Thêm mã (ROW_ADDED), gom theo tổ
-        var added = await query.Where(c => c.ChangeType == "ROW_ADDED")
+        // Lấy tất cả lịch sử thay đổi theo thứ tự thời gian
+        var logs = await query.OrderBy(c => c.ChangeDate).ThenBy(c => c.Id).ToListAsync();
+
+        // Mô phỏng lại quá trình để tìm ra trạng thái CUỐI CÙNG của từng mã
+        var finalStates = new Dictionary<string, Sub_Entities.Entities.ExcelChangeLog>(StringComparer.Ordinal);
+        var everAdded = new HashSet<string>(StringComparer.Ordinal);
+        
+        foreach (var log in logs)
+        {
+            if (log.ChangeType == "ROW_ADDED" && !string.IsNullOrEmpty(log.RowKey))
+            {
+                everAdded.Add(log.RowKey);
+                finalStates[log.RowKey] = log;
+            }
+            else if (log.ChangeType == "ROWKEY_CHANGED")
+            {
+                // Nếu mã cũ từng được thêm, thì mã mới cũng được coi là mã thêm
+                if (!string.IsNullOrEmpty(log.OldRowKey) && everAdded.Contains(log.OldRowKey))
+                {
+                    everAdded.Remove(log.OldRowKey);
+                    if (!string.IsNullOrEmpty(log.NewRowKey))
+                        everAdded.Add(log.NewRowKey);
+                }
+
+                if (!string.IsNullOrEmpty(log.OldRowKey))
+                    finalStates.Remove(log.OldRowKey);
+                
+                if (!string.IsNullOrEmpty(log.NewRowKey))
+                    finalStates[log.NewRowKey] = log;
+            }
+            else if (!string.IsNullOrEmpty(log.RowKey))
+            {
+                // Các thao tác khác: ROW_DELETED, VALUE_CHANGED, GROUP_CHANGED, FORMULA_CHANGED
+                // Ghi đè trạng thái cuối cùng của RowKey này
+                finalStates[log.RowKey] = log;
+            }
+        }
+
+        var finalLogs = finalStates.Values;
+
+        // Lấy danh sách Thêm mã (Gồm những mã từng được sinh ra và hiện CHƯA BỊ XÓA)
+        // Những mã này nếu có bị thay đổi thông tin (VALUE_CHANGED) hay đổi tên (ROWKEY_CHANGED) thì VẪN sẽ xuất hiện ở tab Thêm mã
+        var added = finalLogs
+            .Where(c => {
+                var currentKey = c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey;
+                return !string.IsNullOrEmpty(currentKey) && everAdded.Contains(currentKey) && c.ChangeType != "ROW_DELETED";
+            })
             .GroupBy(c => c.GroupName)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
-                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+                Rows = g.Select(c => c.ChangeType == "ROWKEY_CHANGED" ? c.NewRowKey : c.RowKey).Distinct().ToList()
             })
             .OrderBy(x => x.GroupName)
-            .ToListAsync();
+            .ToList();
 
         // Lấy danh sách Chuyển tổ (GROUP_CHANGED), gom theo tổ cũ và tổ mới
-        var groupChanged = await query.Where(c => c.ChangeType == "GROUP_CHANGED")
+        var groupChanged = finalLogs.Where(c => c.ChangeType == "GROUP_CHANGED")
             .GroupBy(c => new { c.OldGroupName, c.NewGroupName })
             .Select(g => new {
                 OldGroupName = string.IsNullOrEmpty(g.Key.OldGroupName) ? "(Chưa phân tổ)" : g.Key.OldGroupName,
@@ -201,18 +264,36 @@ public class ExcelMonitorController : Controller
                 Rows = g.Select(c => c.RowKey).Distinct().ToList()
             })
             .OrderBy(x => x.OldGroupName)
-            .ToListAsync();
+            .ToList();
 
-        var rowkeyChanged = await query.Where(c => c.ChangeType == "ROWKEY_CHANGED")
+        var rowkeyChanged = finalLogs.Where(c => c.ChangeType == "ROWKEY_CHANGED")
             .GroupBy(c => c.GroupName)
             .Select(g => new {
                 GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
                 Rows = g.Select(c => new { OldKey = c.OldRowKey, NewKey = c.NewRowKey }).ToList()
             })
             .OrderBy(x => x.GroupName)
-            .ToListAsync();
+            .ToList();
 
-        return Json(new { success = true, added, groupChanged, rowkeyChanged });
+        var valueChanged = finalLogs.Where(c => c.ChangeType == "VALUE_CHANGED" || c.ChangeType == "FORMULA_CHANGED")
+            .GroupBy(c => c.GroupName)
+            .Select(g => new {
+                GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
+                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+            })
+            .OrderBy(x => x.GroupName)
+            .ToList();
+
+        var deleted = finalLogs.Where(c => c.ChangeType == "ROW_DELETED")
+            .GroupBy(c => c.GroupName)
+            .Select(g => new {
+                GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
+                Rows = g.Select(c => c.RowKey).Distinct().ToList()
+            })
+            .OrderBy(x => x.GroupName)
+            .ToList();
+
+        return Json(new { success = true, added, groupChanged, rowkeyChanged, valueChanged, deleted });
     }
 
     // ── Helper: lấy tên các cột RowKey từ SheetConfig ────────────────────

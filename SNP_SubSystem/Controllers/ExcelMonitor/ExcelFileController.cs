@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sub_Entities.Entities;
+using Sub_Services.Execute;
 using Sub_Services.Execute.Background;
 using Sub_Services.Execute.Excel;
 
@@ -25,17 +27,20 @@ public class ExcelFileController : ControllerBase
     private readonly SNP_SubSystemDBContext _db;
     private readonly IExcelMonitorService  _monitorService;
     private readonly ExcelMonitorWorker    _worker;
+    private readonly SubSystemService      _subService;
     private readonly ILogger<ExcelFileController> _logger;
 
     public ExcelFileController(
         SNP_SubSystemDBContext db,
         IExcelMonitorService monitorService,
         ExcelMonitorWorker worker,
+        SubSystemService subService,
         ILogger<ExcelFileController> logger)
     {
         _db             = db;
         _monitorService = monitorService;
         _worker         = worker;
+        _subService     = subService;
         _logger         = logger;
     }
 
@@ -108,6 +113,11 @@ public class ExcelFileController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateExcelFileRequest req)
     {
+        // Chỉ Admin (Role tên "Admin" trong DB) mới được thêm file monitor
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdStr, out var callerId) || !await _subService.IsAdminByUserIdAsync(callerId))
+            return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+
         if (string.IsNullOrWhiteSpace(req.FilePath))
             return BadRequest("FilePath là bắt buộc");
 

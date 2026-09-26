@@ -279,6 +279,21 @@ namespace Sub_Services.Execute
         public async Task<int> GetTotalActivePagesCount()
             => await _context.Pages.CountAsync(p => p.Status == 1 && p.Path != null && p.Path != "");
 
+        /// <summary>
+        /// Kiểm tra user có thuộc Role tên "Admin" không.
+        /// Truy vấn: UserRoles (status=1) → Roles (status=1, Name="Admin").
+        /// </summary>
+        public async Task<bool> IsAdminByUserIdAsync(Guid userId)
+        {
+            return await _context.UserRoles
+                .Where(ur => ur.UserId == userId && ur.Status == 1)
+                .Join(_context.Roles.Where(r => r.Status == 1),
+                      ur => ur.RoleId,
+                      r  => r.Id,
+                      (ur, r) => r.Name)
+                .AnyAsync(name => name.ToLower() == "admin");
+        }
+
         /// <summary>Lấy tất cả Path của trang mà user được phép truy cập (qua Role).</summary>
         public async Task<HashSet<string>> GetUserAllowedPaths(Guid userId)
         {

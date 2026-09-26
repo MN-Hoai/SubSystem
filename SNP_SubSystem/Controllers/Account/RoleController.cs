@@ -24,14 +24,14 @@ namespace SNP_SubSystem.Controllers.Account
         [HttpGet]
         public async Task<IActionResult> MyPermissions()
         {
-            // Admin bypass - trả về "*" ký hiệu được vào tất cả
-            var username = User.Identity?.Name ?? "";
-            if (string.Equals(username, "admin", StringComparison.OrdinalIgnoreCase))
-                return Ok(new { isAdmin = true, paths = (List<string>)null });
-
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Ok(new { isAdmin = false, paths = new List<string>() });
+
+            // Kiểm tra user có role tên "Admin" trong DB không
+            var isAdmin = await _service.IsAdminByUserIdAsync(userId);
+            if (isAdmin)
+                return Ok(new { isAdmin = true, paths = (List<string>)null });
 
             var totalPages = await _service.GetTotalActivePagesCount();
             if (totalPages == 0)

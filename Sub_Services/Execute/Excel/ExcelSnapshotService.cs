@@ -61,40 +61,40 @@ public class ExcelSnapshotService : IExcelSnapshotService
         List<ExcelRowData> newRows,
         CancellationToken cancellationToken = default)
     {
-        // Xóa toàn bộ snapshot cũ của file+sheet này
-        var oldRows = await _db.ExcelSnapshotRows
+        // Xóa thẳng xuống DB bằng SQL DELETE — không qua EF tracker
+        // Tránh EF tracker tích lũy rows cũ gây nhân đôi khi nhiều sheet cùng pending
+        var deletedCount = await _db.ExcelSnapshotRows
             .Where(r => r.ExcelFileId == excelFileId && r.SheetName == sheetName)
-            .ToListAsync(cancellationToken);
-
-        if (oldRows.Count > 0)
-            _db.ExcelSnapshotRows.RemoveRange(oldRows);
+            .ExecuteDeleteAsync(cancellationToken);
 
         // Insert snapshot mới
         var now     = DateTime.Now;
         var options = new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-        foreach (var row in newRows)
+        var entities = newRows.Select(row => new ExcelSnapshotRow
         {
-            _db.ExcelSnapshotRows.Add(new ExcelSnapshotRow
-            {
-                ExcelFileId    = excelFileId,
-                SheetName      = sheetName,
-                ExcelRowNumber = row.ExcelRowNumber,
-                RowKey         = row.RowKey,
-                GroupName      = row.GroupName,
-                RowHash        = row.RowHash,
-                DataJson       = JsonSerializer.Serialize(row.Values, options),
-                FormulaJson    = row.Formulas.Count > 0
-                    ? JsonSerializer.Serialize(row.Formulas, options)
-                    : null,
-                CreateDate     = now,
-            });
-        }
+            ExcelFileId    = excelFileId,
+            SheetName      = sheetName,
+            ExcelRowNumber = row.ExcelRowNumber,
+            RowKey         = row.RowKey,
+            GroupName      = row.GroupName,
+            RowHash        = row.RowHash,
+            DataJson       = JsonSerializer.Serialize(row.Values, options),
+            FormulaJson    = row.Formulas.Count > 0
+                ? JsonSerializer.Serialize(row.Formulas, options)
+                : null,
+            CreateDate     = now,
+        }).ToList();
 
-        // Không gọi SaveChanges ở đây — caller sẽ gọi trong transaction
-        _logger.LogDebug("Chuẩn bị replace snapshot {FileId}/{Sheet}: {OldCount} old → {NewCount} new",
-            excelFileId, sheetName, oldRows.Count, newRows.Count);
+        _db.ExcelSnapshotRows.AddRange(entities);
+
+        // Commit ngay — atomic per-sheet, không để caller tích lũy nhiều sheet chung 1 SaveChanges
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogDebug("Replace snapshot {FileId}/{Sheet}: xóa {OldCount} → insert {NewCount}",
+            excelFileId, sheetName, deletedCount, newRows.Count);
     }
+
 
     /// <summary>
     /// Parse DataJson từ ExcelSnapshotRow thành Dictionary

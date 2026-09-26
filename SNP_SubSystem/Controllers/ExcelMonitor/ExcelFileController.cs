@@ -113,10 +113,8 @@ public class ExcelFileController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateExcelFileRequest req)
     {
-        // Chỉ Admin (Role tên "Admin" trong DB) mới được thêm file monitor
-        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdStr, out var callerId) || !await _subService.IsAdminByUserIdAsync(callerId))
-            return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+        // Chỉ Admin (Role tên "Admin" trong DB) mới được thao tác
+        if (!await IsAdminAsync()) return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
 
         if (string.IsNullOrWhiteSpace(req.FilePath))
             return BadRequest("FilePath là bắt buộc");
@@ -184,6 +182,8 @@ public class ExcelFileController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateExcelFileRequest req)
     {
+        if (!await IsAdminAsync()) return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+
         var file = await _db.ExcelFiles
             .Include(f => f.ExcelSheetConfigs)
             .FirstOrDefaultAsync(f => f.Id == id);
@@ -261,6 +261,8 @@ public class ExcelFileController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!await IsAdminAsync()) return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+
         var file = await _db.ExcelFiles.FindAsync(id);
         if (file == null) return NotFound();
 
@@ -278,6 +280,8 @@ public class ExcelFileController : ControllerBase
     [HttpPost("{id:guid}/force-read")]
     public async Task<IActionResult> ForceRead(Guid id)
     {
+        if (!await IsAdminAsync()) return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+
         var file = await _db.ExcelFiles.FindAsync(id);
         if (file == null) return NotFound("Không tìm thấy file monitor");
 
@@ -296,6 +300,8 @@ public class ExcelFileController : ControllerBase
     [HttpDelete("{id:guid}/hard-delete")]
     public async Task<IActionResult> HardDelete(Guid id)
     {
+        if (!await IsAdminAsync()) return StatusCode(403, "Bạn không có quyền thực hiện thao tác này.");
+
         var file = await _db.ExcelFiles.FindAsync(id);
         if (file == null) return NotFound();
 
@@ -420,6 +426,13 @@ public class ExcelFileController : ControllerBase
             return json.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                        .ToList();
         }
+    }
+
+    // ── Private helper ────────────────────────────────────────────────────
+    private async Task<bool> IsAdminAsync()
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(userIdStr, out var uid) && await _subService.IsAdminByUserIdAsync(uid);
     }
 }
 

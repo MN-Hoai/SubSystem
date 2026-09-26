@@ -15,9 +15,9 @@
     <div class="em-page-header">
         <div>
             <h1 class="em-page-title">
-                <i class="fa-solid fa-table-columns" style="font-size:17px;margin-right:8px;opacity:.7"></i>Excel Monitor
+                <i class="fa-solid fa-table-columns" style="font-size:17px;margin-right:8px;opacity:.7"></i>Theo dõi kế hoạch
             </h1>
-            <p class="em-page-subtitle">Theo dõi thay đổi file Excel theo thời gian thực</p>
+            <p class="em-page-subtitle">Theo dõi thay đổi kế hoạch theo thời gian</p>
         </div>
         <div class="em-page-actions">
             <span class="em-badge em-badge-success" style="padding:5px 12px">
@@ -240,7 +240,7 @@
                 </button>
             </div>
             <div class="em-sheet-row-hdr" style="grid-template-columns:1fr 80px 1fr 60px 28px">
-                <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey</span><span title="Số dòng bỏ qua trước header. 0=Row1 là header, 1=bỏ qua Row1 title">Header Row</span><span></span>
+                <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey</span><span title="Số dòng bỏ qua trước header. 0=Row1 là header, 1=bỏ qua Row1 title">Header</span><span></span>
             </div>
             <div class="em-sheet-rows" id="sheetConfigs"></div>
         </div>
@@ -354,9 +354,32 @@
         rows.forEach(r => { r.style.display = r.dataset.search.includes(q) ? '' : 'none'; });
     }
 
+    // ── Admin check helper (dùng chung cho mọi thao tác ghi) ─────────
+    let _isAdminCache = null;
+    async function checkAdmin() {
+        if (_isAdminCache === null) {
+            try {
+                const r = await fetch('/Role/MyPermissions');
+                const d = await r.json();
+                _isAdminCache = d.isAdmin === true;
+            } catch { _isAdminCache = false; }
+        }
+        if (!_isAdminCache) {
+            Swal.fire({
+                icon             : 'warning',
+                title            : 'Không có quyền thao tác',
+                html             : 'Tính năng này yêu cầu quyền <strong>Admin</strong>.<br><span style="font-size:13px;color:#6B7280">Liên hệ quản trị viên để được cấp quyền.</span>',
+                confirmButtonText: 'Đã hiểu',
+                confirmButtonColor: '#1E3A5F',
+            });
+        }
+        return _isAdminCache;
+    }
+
     // ── Add modal ─────────────────────────────────────────────────
     let sheetConfigCount = 0;
-    function showAddModal() {
+    async function showAddModal() {
+        if (!await checkAdmin()) return;
         document.getElementById('addModal').style.display = 'flex';
         sheetConfigCount = 0;
         document.getElementById('sheetConfigs').innerHTML = '';
@@ -364,6 +387,7 @@
         addSheetConfig();
     }
     function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
     function addSheetConfig() {
         const idx = sheetConfigCount++;
         document.getElementById('sheetConfigs').insertAdjacentHTML('beforeend', `

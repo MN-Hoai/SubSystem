@@ -174,11 +174,8 @@ public class ExcelMonitorService : IExcelMonitorService
                 if (sheet == null) continue;
 
                 // Initial Load: chỉ tạo Snapshot, KHÔNG tạo ChangeLog
+                // ReplaceSnapshotAsync tự ExecuteDelete + AddRange + SaveChanges bên trong
                 await _snapshot.ReplaceSnapshotAsync(excelFile.Id, config.SheetName, sheet.Rows, cancellationToken);
-
-                // SaveChanges ngay sau từng sheet để tránh race condition nhân đôi snapshot
-                // khi nhiều InitialLoad chạy đồng thời (ReplaceSnapshotAsync đọc oldRows từ DB)
-                await _db.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Initial Load [{Sheet}]: {Count} dòng", config.SheetName, sheet.Rows.Count);
             }
@@ -329,10 +326,10 @@ public class ExcelMonitorService : IExcelMonitorService
                     });
                 }
 
-                // Cập nhật Snapshot để lần so sánh tiếp theo chỉ ra sự khác biệt mới (Incremental)
+                // Cập nhật Snapshot (tự SaveChanges ngay bên trong)
                 await _snapshot.ReplaceSnapshotAsync(excelFile.Id, sheetName, sheet.Rows, cancellationToken);
 
-                // Cập nhật ExcelFile.LastHash
+                // Cập nhật ExcelFile.LastHash + ChangeLog trong cùng transaction
                 excelFile.LastHash     = newHash;
                 excelFile.LastReadDate = now;
                 excelFile.UpdateDate   = now;

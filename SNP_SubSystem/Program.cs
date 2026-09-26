@@ -35,6 +35,15 @@ builder.Services.AddScoped<IExcelMonitorService,  ExcelMonitorService>();
 builder.Services.AddSingleton<ExcelMonitorWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ExcelMonitorWorker>());
 
+// ── Xlsb Monitor Worker (Polling) ────────────────────────────────────────
+// Worker riêng dùng polling cho file .xlsb vì FileSystemWatcher không đáng
+// tin cậy với định dạng này (Excel save qua cơ chế rename temp file).
+// Hoàn toàn độc lập, không ảnh hưởng ExcelMonitorWorker.
+builder.Services.Configure<XlsbMonitorOptions>(
+    builder.Configuration.GetSection("XlsbMonitor"));
+builder.Services.AddSingleton<XlsbMonitorWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<XlsbMonitorWorker>());
+
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)

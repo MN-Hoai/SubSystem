@@ -101,9 +101,15 @@ public class ExcelReaderService : IExcelReaderService
         {
             return ext switch
             {
-                ".xlsb" => ExcelReaderFactory.CreateBinaryReader(stream),
+                // .xls  → BIFF8 (Office 97-2003), dùng CreateBinaryReader
                 ".xls"  => ExcelReaderFactory.CreateBinaryReader(stream),
-                _       => ExcelReaderFactory.CreateOpenXmlReader(stream),  // .xlsx, .xlsm
+
+                // .xlsb → BIFF12 / OOXML Binary (Office 2007+), KHÔNG dùng CreateBinaryReader.
+                //         CreateReader() tự động nhận diện định dạng, hỗ trợ cả xlsb.
+                ".xlsb" => ExcelReaderFactory.CreateReader(stream),
+
+                // .xlsx, .xlsm → OOXML (zip-based XML)
+                _       => ExcelReaderFactory.CreateOpenXmlReader(stream),
             };
         }
         catch (Exception ex)

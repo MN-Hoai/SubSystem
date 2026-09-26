@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using ExcelDataReader;
 using Microsoft.Extensions.Logging;
 using Sub_Services.Execute.Excel.Models;
@@ -10,7 +9,9 @@ namespace Sub_Services.Execute.Excel;
 /// <summary>
 /// Implementation của IExcelReaderService dùng ExcelDataReader.
 /// Hỗ trợ: .xlsx, .xlsm, .xlsb (binary Excel).
-/// ExcelDataReader là thư viện duy nhất hỗ trợ cả 3 định dạng trên.
+///
+/// Đọc theo cơ chế raw reader.Read() — KHÔNG dùng AsDataSet/FilterRow —
+/// để kiểm soát chính xác dòng nào là header khi file có title row phía trên.
 /// </summary>
 public class ExcelReaderService : IExcelReaderService
 {
@@ -28,9 +29,12 @@ public class ExcelReaderService : IExcelReaderService
         string? sheetName,
         string groupColumn,
         List<string> rowKeyColumns,
+        int headerRowIndex = 0,
         CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() => ReadInternal(filePath, sheetName, groupColumn, rowKeyColumns), cancellationToken);
+        return await Task.Run(
+            () => ReadInternal(filePath, sheetName, groupColumn, rowKeyColumns, headerRowIndex),
+            cancellationToken);
     }
 
     public async Task<bool> CanReadAsync(string filePath, CancellationToken cancellationToken = default)
@@ -40,26 +44,25 @@ public class ExcelReaderService : IExcelReaderService
             try
             {
                 if (!File.Exists(filePath)) return false;
-                // Thử mở với FileShare.ReadWrite để không bị lỗi khi Excel đang mở
                 using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 return stream.Length > 0;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }, cancellationToken);
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Core: duyệt từng sheet bằng raw reader.Read()
+    // ──────────────────────────────────────────────────────────────────────
     private List<ExcelSheetData> ReadInternal(
         string filePath,
         string? targetSheetName,
         string groupColumn,
-        List<string> rowKeyColumns)
+        List<string> rowKeyColumns,
+        int headerRowIndex = 0)
     {
         var result = new List<ExcelSheetData>();
 
-        // Mở file với FileShare.ReadWrite để đọc kể cả khi Excel đang mở
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = CreateReader(filePath, stream);
 
@@ -69,31 +72,119 @@ public class ExcelReaderService : IExcelReaderService
             return result;
         }
 
-        // Đọc toàn bộ file vào DataSet
-        var config = new ExcelDataSetConfiguration
+        // Duyệt qua từng sheet
+        do
         {
-            ConfigureDataTable = _ => new ExcelDataTableConfiguration
-            {
-                UseHeaderRow = true,
-            }
-        };
+            var sheetName = reader.Name;
 
-        var dataSet = reader.AsDataSet(config);
-
-        foreach (System.Data.DataTable table in dataSet.Tables)
-        {
-            // Lọc theo SheetName nếu được chỉ định
             if (targetSheetName != null &&
-                !string.Equals(table.TableName, targetSheetName, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(sheetName, targetSheetName, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var sheetData = BuildSheetData(table, table.TableName, groupColumn, rowKeyColumns);
+            var sheetData = ReadSheet(reader, sheetName, groupColumn, rowKeyColumns, headerRowIndex);
             result.Add(sheetData);
-        }
+
+        } while (reader.NextResult());
 
         return result;
     }
 
+    /// <summary>
+    /// Đọc một sheet bằng raw reader.Read().
+    ///
+    /// Logic dòng (rowIndex là 0-based, đếm MỌI dòng thô):
+    ///   rowIndex  &lt; headerRowIndex  → bỏ qua (title/tiêu đề phụ)
+    ///   rowIndex == headerRowIndex  → đọc làm tên cột (header)
+    ///   rowIndex  &gt; headerRowIndex  → dữ liệu
+    ///
+    /// ExcelRowNumber (1-based) = rowIndex + 1
+    /// </summary>
+    private ExcelSheetData ReadSheet(
+        IExcelDataReader reader,
+        string sheetName,
+        string groupColumn,
+        List<string> rowKeyColumns,
+        int headerRowIndex)
+    {
+        var sheet   = new ExcelSheetData { SheetName = sheetName };
+        var headers = new List<string>();
+        int rowIndex = 0; // 0-based, đếm MỌI dòng thô trong sheet
+
+        while (reader.Read())
+        {
+            // ── Bỏ qua các dòng title trước header ──────────────────────
+            if (rowIndex < headerRowIndex)
+            {
+                rowIndex++;
+                continue;
+            }
+
+            // ── Dòng header: đọc tên cột ─────────────────────────────────
+            if (rowIndex == headerRowIndex)
+            {
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    var val     = reader.GetValue(i);
+                    var colName = val?.ToString()?.Trim();
+                    // Ô header rỗng → đặt placeholder để không mất cột
+                    headers.Add(string.IsNullOrWhiteSpace(colName) ? $"_Col{i}" : colName);
+                }
+                sheet.Headers.AddRange(headers);
+                rowIndex++;
+                continue;
+            }
+
+            // ── Dòng dữ liệu (rowIndex > headerRowIndex) ─────────────────
+            if (headers.Count == 0) { rowIndex++; continue; }
+
+            // Đọc giá trị từng ô
+            var values  = new Dictionary<string, string>(headers.Count, StringComparer.OrdinalIgnoreCase);
+            bool isEmpty = true;
+            for (int i = 0; i < headers.Count; i++)
+            {
+                var val = i < reader.FieldCount ? reader.GetValue(i) : null;
+                var str = val is null or DBNull ? string.Empty : val.ToString()?.Trim() ?? string.Empty;
+                values[headers[i]] = str;
+                if (!string.IsNullOrWhiteSpace(str)) isEmpty = false;
+            }
+
+            // Bỏ qua dòng hoàn toàn trống
+            if (isEmpty) { rowIndex++; continue; }
+
+            // ExcelRowNumber: rowIndex 0-based → Excel row 1-based = rowIndex + 1
+            var excelRowNumber = rowIndex + 1;
+
+            // GroupName
+            var groupName = values.TryGetValue(groupColumn, out var gv) ? gv : string.Empty;
+
+            // RowKey — ghép các cột theo thứ tự cấu hình
+            var rowKeyParts = rowKeyColumns
+                .Select(c => values.TryGetValue(c, out var rv) ? rv : string.Empty)
+                .ToList();
+            var rowKey = string.Join("|", rowKeyParts);
+
+            // Bỏ qua dòng không có RowKey (dòng tên tổ gộp, dòng tổng, v.v.)
+            if (string.IsNullOrWhiteSpace(rowKey.Replace("|", ""))) { rowIndex++; continue; }
+
+            sheet.Rows.Add(new ExcelRowData
+            {
+                ExcelRowNumber = excelRowNumber,
+                RowKey         = rowKey,
+                GroupName      = groupName,
+                Values         = values,
+                Formulas       = new Dictionary<string, string>(), // ExcelDataReader không expose formula
+                RowHash        = ComputeRowHash(values),
+            });
+
+            rowIndex++;
+        }
+
+        return sheet;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Tạo reader phù hợp theo định dạng file
+    // ──────────────────────────────────────────────────────────────────────
     private IExcelDataReader? CreateReader(string filePath, Stream stream)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -101,11 +192,11 @@ public class ExcelReaderService : IExcelReaderService
         {
             return ext switch
             {
-                // .xls  → BIFF8 (Office 97-2003), dùng CreateBinaryReader
+                // .xls  → BIFF8 (Office 97-2003)
                 ".xls"  => ExcelReaderFactory.CreateBinaryReader(stream),
 
-                // .xlsb → BIFF12 / OOXML Binary (Office 2007+), KHÔNG dùng CreateBinaryReader.
-                //         CreateReader() tự động nhận diện định dạng, hỗ trợ cả xlsb.
+                // .xlsb → BIFF12 / OOXML Binary (Office 2007+)
+                //         CreateReader() auto-detect, hỗ trợ xlsb
                 ".xlsb" => ExcelReaderFactory.CreateReader(stream),
 
                 // .xlsx, .xlsm → OOXML (zip-based XML)
@@ -119,108 +210,11 @@ public class ExcelReaderService : IExcelReaderService
         }
     }
 
-    private ExcelSheetData BuildSheetData(
-        System.Data.DataTable table,
-        string sheetName,
-        string groupColumn,
-        List<string> rowKeyColumns)
-    {
-        var sheet = new ExcelSheetData { SheetName = sheetName };
-
-        // Lấy headers
-        foreach (System.Data.DataColumn col in table.Columns)
-            sheet.Headers.Add(col.ColumnName);
-
-        // Xác định index của GroupColumn và RowKeyColumns
-        var groupColIndex   = FindColumnIndex(table, groupColumn);
-        var rowKeyIndices   = rowKeyColumns
-            .Select(c => (Name: c, Index: FindColumnIndex(table, c)))
-            .ToList();
-
-        // Đọc từng dòng (ExcelDataReader UseHeaderRow nên row index bắt đầu từ 2 trong Excel)
-        // DataTable row index = 0-based, Excel row = index + 2 (header ở row 1)
-        for (int rowIdx = 0; rowIdx < table.Rows.Count; rowIdx++)
-        {
-            var dataRow = table.Rows[rowIdx];
-
-            // Bỏ qua dòng trống hoàn toàn
-            if (IsEmptyRow(dataRow)) continue;
-
-            var excelRowNumber = rowIdx + 2; // Header ở row 1, data từ row 2
-
-            // Lấy GroupName
-            var groupName = groupColIndex >= 0
-                ? GetCellValue(dataRow, groupColIndex)
-                : string.Empty;
-
-            // Xây dựng RowKey
-            var rowKeyParts = rowKeyIndices
-                .Select(rk => rk.Index >= 0 ? GetCellValue(dataRow, rk.Index) : string.Empty)
-                .ToList();
-            var rowKey = string.Join("|", rowKeyParts);
-
-            // Nếu RowKey rỗng hoàn toàn thì bỏ qua dòng
-            if (string.IsNullOrWhiteSpace(rowKey.Replace("|", ""))) continue;
-
-            // Thu thập Values
-            var values = new Dictionary<string, string>();
-            for (int colIdx = 0; colIdx < table.Columns.Count; colIdx++)
-            {
-                var colName = table.Columns[colIdx].ColumnName;
-                values[colName] = GetCellValue(dataRow, colIdx);
-            }
-
-            // ExcelDataReader không expose công thức khi dùng AsDataSet với UseHeaderRow
-            // Formulas sẽ rỗng (feature limitation của ExcelDataReader)
-            var formulas = new Dictionary<string, string>();
-
-            // Tính RowHash từ Values
-            var rowHash = ComputeRowHash(values);
-
-            sheet.Rows.Add(new ExcelRowData
-            {
-                ExcelRowNumber = excelRowNumber,
-                RowKey         = rowKey,
-                GroupName      = groupName,
-                Values         = values,
-                Formulas       = formulas,
-                RowHash        = rowHash,
-            });
-        }
-
-        return sheet;
-    }
-
-    private static int FindColumnIndex(System.Data.DataTable table, string columnName)
-    {
-        if (string.IsNullOrWhiteSpace(columnName)) return -1;
-        for (int i = 0; i < table.Columns.Count; i++)
-        {
-            if (string.Equals(table.Columns[i].ColumnName, columnName, StringComparison.OrdinalIgnoreCase))
-                return i;
-        }
-        return -1;
-    }
-
-    private static string GetCellValue(System.Data.DataRow row, int colIndex)
-    {
-        var val = row[colIndex];
-        return val == null || val == DBNull.Value ? string.Empty : val.ToString()?.Trim() ?? string.Empty;
-    }
-
-    private static bool IsEmptyRow(System.Data.DataRow row)
-    {
-        foreach (var item in row.ItemArray)
-        {
-            if (item != null && item != DBNull.Value && !string.IsNullOrWhiteSpace(item.ToString()))
-                return false;
-        }
-        return true;
-    }
-
+    // ──────────────────────────────────────────────────────────────────────
+    // Hash row để so sánh snapshot
+    // ──────────────────────────────────────────────────────────────────────
     private static string ComputeRowHash(Dictionary<string, string> values)
     {
-        // Serialize theo thứ tự key cố định để hash nhất quán
         var ordered = values.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}");
         var raw     = string.Join(";", ordered);
         var bytes   = SHA256.HashData(Encoding.UTF8.GetBytes(raw));

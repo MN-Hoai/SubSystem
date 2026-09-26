@@ -289,7 +289,7 @@
         btnOpenExcel.addEventListener('click', () => { modalExcel.classList.add('open'); excelFile = null; excelInput.value = ''; excelNameEl.innerHTML = ''; excelResult.style.display = 'none'; btnDoExcel.disabled = true; });
         document.getElementById('btnCloseExcel').addEventListener('click', () => modalExcel.classList.remove('open'));
         document.getElementById('btnCancelExcel').addEventListener('click', () => modalExcel.classList.remove('open'));
-        modalExcel.addEventListener('click', e => { if (e.target === modalExcel) modalExcel.classList.remove('open'); });
+        // Click outside không đóng modalExcel (disabled)
         excelDrop.addEventListener('click', () => excelInput.click());
         excelDrop.addEventListener('dragover', e => { e.preventDefault(); excelDrop.style.borderColor = 'var(--primary)'; });
         excelDrop.addEventListener('dragleave', () => { excelDrop.style.borderColor = 'var(--border,#d1d5e0)'; });

@@ -736,7 +736,7 @@
         confirmAction = null;
     });
 
-    confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeConfirm(); });
+    // Click outside không đóng confirm modal (disabled)
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeConfirm(); });
 
     // ─── Toast (dùng toastr nếu có, fallback nội bộ) ─────────────────────────

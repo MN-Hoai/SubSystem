@@ -285,7 +285,7 @@
     function openModal(id)  { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
     function onBkd(id) {
-        document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
+        // Click outside không đóng modal (disabled)
     }
     ['modalSiForm','modalSiExcel','modalSiDetail'].forEach(id => {
         onBkd(id);

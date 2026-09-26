@@ -750,24 +750,30 @@
     }
 
     async function forceRead(fileId) {
-        const btn = document.getElementById('btnForceRead');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin" style="font-size:11px"></i> Đang đọc...';
+        Swal.fire({
+            title: 'Đang cập nhật...',
+            html: '<span style="font-size:13px;color:#6B7280">Vui lòng chờ trong giây lát.</span>',
+            allowOutsideClick : false,
+            allowEscapeKey    : false,
+            allowEnterKey     : false,
+            showConfirmButton : false,
+            didOpen           : () => Swal.showLoading(),
+        });
         try {
             const resp = await fetch(`/api/excel-file/${fileId}/force-read`, { method: 'POST' });
             const data = await resp.json().catch(() => ({}));
             if (resp.ok) {
-                toastr.success(data.message || 'Cập nhật thành công!', 'Force Read');
-                setTimeout(() => location.reload(), 900);
+                await Swal.fire({
+                    icon: 'success', title: 'Cập nhật thành công',
+                    html: data.message || 'Dữ liệu đã được đọc lại.',
+                    timer: 1500, showConfirmButton: false, allowOutsideClick: false,
+                });
+                location.reload();
             } else {
-                toastr.error(data.message || 'Lỗi cập nhật', 'Force Read');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-rotate" style="font-size:11px"></i> Cập nhật ngay';
+                Swal.fire({ icon: 'error', title: 'Lỗi cập nhật', text: data.message || 'Không thể đọc file.', confirmButtonColor: '#1E3A5F' });
             }
         } catch(e) {
-            toastr.error('Lỗi kết nối: ' + e.message);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-rotate" style="font-size:11px"></i> Cập nhật ngay';
+            Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: e.message, confirmButtonColor: '#1E3A5F' });
         }
     }
 

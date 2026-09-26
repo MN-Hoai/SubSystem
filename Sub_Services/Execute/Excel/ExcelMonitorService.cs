@@ -165,7 +165,8 @@ public class ExcelMonitorService : IExcelMonitorService
             try
             {
                 var sheets = await _reader.ReadAsync(
-                    excelFile.FilePath, config.SheetName, groupColumn, rowKeyColumns, cancellationToken);
+                    excelFile.FilePath, config.SheetName, groupColumn, rowKeyColumns,
+                    config.HeaderRowIndex, cancellationToken);
 
                 var sheet = sheets.FirstOrDefault(s =>
                     string.Equals(s.SheetName, config.SheetName, StringComparison.OrdinalIgnoreCase));
@@ -174,6 +175,10 @@ public class ExcelMonitorService : IExcelMonitorService
 
                 // Initial Load: chỉ tạo Snapshot, KHÔNG tạo ChangeLog
                 await _snapshot.ReplaceSnapshotAsync(excelFile.Id, config.SheetName, sheet.Rows, cancellationToken);
+
+                // SaveChanges ngay sau từng sheet để tránh race condition nhân đôi snapshot
+                // khi nhiều InitialLoad chạy đồng thời (ReplaceSnapshotAsync đọc oldRows từ DB)
+                await _db.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Initial Load [{Sheet}]: {Count} dòng", config.SheetName, sheet.Rows.Count);
             }
@@ -184,15 +189,16 @@ public class ExcelMonitorService : IExcelMonitorService
         }
 
         // Cập nhật LastHash và LastReadDate
-        excelFile.LastHash    = newHash;
+        excelFile.LastHash     = newHash;
         excelFile.LastReadDate = DateTime.Now;
-        excelFile.UpdateDate  = DateTime.Now;
+        excelFile.UpdateDate   = DateTime.Now;
 
         await _db.SaveChangesAsync(cancellationToken);
 
         await WriteMonitorLogAsync(excelFileId, "INITIAL_LOAD",
             $"Initial Load hoàn thành. Hash: {newHash}", null, cancellationToken);
     }
+
 
     // ──────────────────────────────────────────────────────────────────────
     // HASH
@@ -235,7 +241,8 @@ public class ExcelMonitorService : IExcelMonitorService
             try
             {
                 sheets = await _reader.ReadAsync(
-                    excelFile.FilePath, sheetName, groupColumn, rowKeyColumns, cancellationToken);
+                    excelFile.FilePath, sheetName, groupColumn, rowKeyColumns,
+                    config.HeaderRowIndex, cancellationToken);
             }
             catch (Exception ex)
             {

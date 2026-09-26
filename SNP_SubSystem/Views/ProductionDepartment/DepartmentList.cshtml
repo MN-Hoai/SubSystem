@@ -270,7 +270,7 @@
     function closeModal(id) { document.getElementById(id).classList.remove('show'); }
     function onClose(id, btnId) {
         document.getElementById(btnId).addEventListener('click', () => closeModal(id));
-        document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
+        // Click outside không đóng modal (disabled)
     }
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;

@@ -22,6 +22,7 @@ public interface IExcelReaderService
         string? sheetName,
         string groupColumn,
         List<string> rowKeyColumns,
+        int headerRowIndex = 0,
         CancellationToken cancellationToken = default);
 
     /// <summary>

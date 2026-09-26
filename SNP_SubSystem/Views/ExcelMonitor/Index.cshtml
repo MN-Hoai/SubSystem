@@ -177,8 +177,26 @@
                                                 onclick="forceReadFile('@file.Id','@file.FileName.Replace("'","\\'")')"><i class="fa-solid fa-rotate"></i></button>
                                         <button class="em-tbl-btn" title="Cấu hình"
                                                 onclick="showEditModal('@file.Id','@file.FileName.Replace("'","\\'"))')"><i class="fa-solid fa-gear"></i></button>
-                                        <button class="em-tbl-btn em-tbl-btn-warn" title="Tạm ngưng"
-                                                onclick="pauseFile('@file.Id','@file.FileName.Replace("'","\\'"))')"><i class="fa-solid fa-pause"></i></button>
+                                        @if (isActive)
+                                        {
+                                            <button class="em-tbl-btn em-tbl-btn-warn"
+                                                    id="toggleBtn-@file.Id"
+                                                    data-status="1"
+                                                    title="Tạm ngưng monitor"
+                                                    onclick="toggleMonitor('@file.Id','@file.FileName.Replace("'","\\'")')">
+                                                <i class="fa-solid fa-pause"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="em-tbl-btn em-tbl-btn-success"
+                                                    id="toggleBtn-@file.Id"
+                                                    data-status="0"
+                                                    title="Mở lại monitor"
+                                                    onclick="toggleMonitor('@file.Id','@file.FileName.Replace("'","\\'")')">
+                                                <i class="fa-solid fa-play"></i>
+                                            </button>
+                                        }
                                         <button class="em-tbl-btn em-tbl-btn-danger" title="Xóa cứng"
                                                 onclick="hardDeleteFile('@file.Id','@file.FileName.Replace("'","\\'"))')"><i class="fa-solid fa-trash"></i></button>
                                     </div>
@@ -221,8 +239,8 @@
                     <i class="fa-solid fa-plus" style="font-size:10px"></i> Thêm sheet
                 </button>
             </div>
-            <div class="em-sheet-row-hdr">
-                <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey (phân cách phẩy)</span><span></span>
+            <div class="em-sheet-row-hdr" style="grid-template-columns:1fr 80px 1fr 60px 28px">
+                <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey (phân cách phẩy)</span><span title="Số dòng bỏ qua trước header. 0=Row1 là header, 1=bỏ qua Row1 title">Header Row</span><span></span>
             </div>
             <div class="em-sheet-rows" id="sheetConfigs"></div>
         </div>
@@ -266,8 +284,8 @@
                         <i class="fa-solid fa-plus" style="font-size:10px"></i> Thêm sheet
                     </button>
                 </div>
-                <div class="em-sheet-row-hdr" style="grid-template-columns:1fr 80px 1fr 28px 40px">
-                    <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey</span><span>Bật</span><span></span>
+                <div class="em-sheet-row-hdr" style="grid-template-columns:1fr 80px 1fr 60px 28px 40px">
+                    <span>Tên Sheet</span><span>Cột Tổ</span><span>RowKey</span><span title="Số dòng bỏ qua trước header. 0=Row1 là header, 1=bỏ qua Row1 title">Header row</span><span>Bật</span><span></span>
                 </div>
                 <div class="em-sheet-rows" id="editSheetList"></div>
             </div>
@@ -286,22 +304,46 @@
 <script>
     // ── Force read ────────────────────────────────────────────
     async function forceReadFile(id, name) {
-        const btn = document.querySelector(`button[onclick*="forceReadFile('${id}"]`);
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>'; }
+        // Hiển thị Swal2 loading — khoá toàn bộ tương tác
+        Swal.fire({
+            title: 'Đang cập nhật...',
+            html: `<span style="font-size:13px;color:#6B7280">Đang đọc file <strong>${name}</strong><br>Vui lòng chờ trong giây lát.</span>`,
+            allowOutsideClick : false,
+            allowEscapeKey    : false,
+            allowEnterKey     : false,
+            showConfirmButton : false,
+            didOpen           : () => Swal.showLoading(),
+        });
 
         try {
             const resp = await fetch(`/api/excel-file/${id}/force-read`, { method: 'POST' });
             const data = await resp.json().catch(() => ({}));
+
             if (resp.ok) {
-                toastr.success(`Đã cập nhật: ${name}`, 'Cập nhật thành công');
-                setTimeout(() => location.reload(), 800);
+                await Swal.fire({
+                    icon             : 'success',
+                    title            : 'Cập nhật thành công',
+                    html             : `File <strong>${name}</strong> đã được đọc lại.`,
+                    timer            : 1500,
+                    showConfirmButton: false,
+                    allowOutsideClick: false,
+                });
+                location.reload();
             } else {
-                toastr.error(data.message || data || 'Lỗi cập nhật', name);
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i>'; }
+                Swal.fire({
+                    icon : 'error',
+                    title: 'Lỗi cập nhật',
+                    text : data.message || 'Không thể đọc file. Vui lòng thử lại.',
+                    confirmButtonColor: '#1E3A5F',
+                });
             }
         } catch (e) {
-            toastr.error('Lỗi kết nối: ' + e.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i>'; }
+            Swal.fire({
+                icon : 'error',
+                title: 'Lỗi kết nối',
+                text : e.message,
+                confirmButtonColor: '#1E3A5F',
+            });
         }
     }
 
@@ -325,10 +367,11 @@
     function addSheetConfig() {
         const idx = sheetConfigCount++;
         document.getElementById('sheetConfigs').insertAdjacentHTML('beforeend', `
-            <div class="em-sheet-row" id="sc_${idx}">
-                <input type="text" class="em-form-control" id="sc_sheet_${idx}" placeholder="09.09" />
-                <input type="text" class="em-form-control" id="sc_group_${idx}" placeholder="TỔ" value="TỔ" />
-                <input type="text" class="em-form-control" id="sc_rowkey_${idx}" placeholder="STYLE,SP,COLOR" value="STYLE,SP,COLOR" />
+            <div class="em-sheet-row" id="sc_${idx}" style="grid-template-columns:1fr 80px 1fr 60px 28px">
+                <input type="text"   class="em-form-control" id="sc_sheet_${idx}"  placeholder="09.09" />
+                <input type="text"   class="em-form-control" id="sc_group_${idx}"  placeholder="TỔ" value="TỔ" />
+                <input type="text"   class="em-form-control" id="sc_rowkey_${idx}" placeholder="STYLE,SP,COLOR" value="STYLE,SP,COLOR" />
+                <input type="number" class="em-form-control" id="sc_hdr_${idx}"    value="0" min="0" max="10" style="text-align:center" title="Số dòng bỏ qua trước header (0=Row1, 1=bỏ qua Row1 title)" />
                 <button type="button" class="em-sheet-remove" onclick="removeSheet(${idx})"><i class="fa-solid fa-xmark"></i></button>
             </div>`);
     }
@@ -343,10 +386,11 @@
             if (!el) continue;
             const sheetName = document.getElementById('sc_sheet_' + i)?.value?.trim();
             if (!sheetName) continue;
-            const groupCol  = document.getElementById('sc_group_' + i)?.value?.trim() || 'TỔ';
-            const rowKeyRaw = document.getElementById('sc_rowkey_' + i)?.value?.trim() || '';
-            const rowKeys   = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
-            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys });
+            const groupCol      = document.getElementById('sc_group_' + i)?.value?.trim() || 'TỔ';
+            const rowKeyRaw     = document.getElementById('sc_rowkey_' + i)?.value?.trim() || '';
+            const rowKeys       = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const headerRowIndex = parseInt(document.getElementById('sc_hdr_' + i)?.value || '0', 10);
+            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys, headerRowIndex });
         }
         const btn = document.getElementById('submitBtn');
         const txt = document.getElementById('submitText');
@@ -363,33 +407,81 @@
         finally { btn.disabled = false; txt.style.display = 'inline'; spn.style.display = 'none'; }
     }
 
-    // ── Pause ────────────────────────────────────────────────────
-    async function pauseFile(id, name) {
+    // ── Toggle pause / resume ────────────────────────────────────────────
+    async function toggleMonitor(id, name) {
+        const btn     = document.getElementById(`toggleBtn-${id}`);
+        const status  = parseInt(btn.dataset.status); // 1=active, 0=paused
+        const isPause = status === 1;
+
         const r = await Swal.fire({
-            title: 'Tạm ngừng monitor?',
-            html: `File <strong>${name}</strong> sẽ bị tạm dừng.<br><span style="font-size:12px;color:#6B7280">Lịch sử thay đổi vẫn được giữ lại.</span>`,
-            icon: 'warning', iconColor: '#F59E0B', showCancelButton: true, reverseButtons: true,
-            confirmButtonText: 'Tạm ngừng', cancelButtonText: 'Hủy',
-            confirmButtonColor: '#F59E0B', cancelButtonColor: '#9CA3AF',
+            title    : isPause ? 'Tạm ngừng monitor?' : 'Mở lại monitor?',
+            html     : isPause
+                ? `File <strong>${name}</strong> sẽ bị tạm dừng.<br><span style="font-size:12px;color:#6B7280">Lịch sử thay đổi vẫn được giữ lại.</span>`
+                : `File <strong>${name}</strong> sẽ được kích hoạt lại.<br><span style="font-size:12px;color:#6B7280">Hệ thống sẽ tiếp tục theo dõi file.</span>`,
+            icon             : isPause ? 'warning' : 'question',
+            iconColor        : isPause ? '#F59E0B' : '#3B82F6',
+            showCancelButton : true,
+            reverseButtons   : true,
+            confirmButtonText: isPause ? 'Tạm ngừng' : 'Mở lại',
+            cancelButtonText : 'Hủy',
+            confirmButtonColor: isPause ? '#F59E0B' : '#16A34A',
+            cancelButtonColor: '#9CA3AF',
         });
         if (!r.isConfirmed) return;
-        const resp = await fetch(`/api/excel-file/${id}`, { method: 'DELETE' });
-        if (resp.ok) { Swal.fire({ title: 'Đã tạm ngừng', icon: 'success', timer: 1500, showConfirmButton: false }); setTimeout(() => location.reload(), 1500); }
-        else { Swal.fire('Lỗi', 'Không thể tạm ngừng', 'error'); }
-    }
-    async function deleteFile(id, name) { await pauseFile(id, name); }
 
-    // ── Hard delete ───────────────────────────────────────────────
+        Swal.fire({
+            title: 'Đang xử lý...',
+            html: `<span style="font-size:13px;color:#6B7280">${isPause ? 'Tạm ngừng' : 'Kích hoạt'} file <strong>${name}</strong></span>`,
+            allowOutsideClick: false, allowEscapeKey: false, allowEnterKey: false,
+            showConfirmButton: false,
+            didOpen: () => Swal.showLoading(),
+        });
+
+        let resp;
+        if (isPause) {
+            resp = await fetch(`/api/excel-file/${id}`, { method: 'DELETE' });
+        } else {
+            resp = await fetch(`/api/excel-file/${id}`, {
+                method : 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body   : JSON.stringify({ status: 1, sheetConfigs: null }),
+            });
+        }
+
+        if (resp.ok || resp.status === 204) {
+            Swal.close();
+            const row        = btn.closest('tr');
+            const statusCell = row.querySelector('td:nth-child(2)');
+            if (isPause) {
+                btn.dataset.status = '0';
+                btn.className      = 'em-tbl-btn em-tbl-btn-success';
+                btn.title          = 'Mở lại monitor';
+                btn.innerHTML      = '<i class="fa-solid fa-play"></i>';
+                statusCell.innerHTML = '<span class="em-status em-status-paused"><span class="em-status-dot"></span>Paused</span>';
+            } else {
+                btn.dataset.status = '1';
+                btn.className      = 'em-tbl-btn em-tbl-btn-warn';
+                btn.title          = 'Tạm ngừng monitor';
+                btn.innerHTML      = '<i class="fa-solid fa-pause"></i>';
+                statusCell.innerHTML = '<span class="em-status em-status-active"><span class="em-status-dot"></span>Monitoring</span>';
+            }
+        } else {
+            Swal.fire('Lỗi', 'Không thể thay đổi trạng thái.', 'error');
+        }
+    }
+    async function pauseFile(id, name) { await toggleMonitor(id, name); }
+    async function deleteFile(id, name) { await toggleMonitor(id, name); }
+
+
+    // ── Hard delete (soft-delete) ─────────────────────────────────
     async function hardDeleteFile(id, name) {
         const s1 = await Swal.fire({
-            title: '<span style="color:#DC2626">⚠️ Xóa cứng file</span>',
-            html: `<p style="margin:0 0 12px">Thao tác này sẽ <strong>xóa vĩnh viễn</strong> toàn bộ:</p>
-                   <ul style="text-align:left;font-size:13px;color:#374151;margin:0 0 14px;padding-left:20px">
-                       <li>File monitor: <strong>${name}</strong></li>
-                       <li>Toàn bộ lịch sử thay đổi (ChangeLog)</li>
-                       <li>Snapshot dữ liệu hiện tại</li><li>Cấu hình Sheet</li>
-                   </ul>
-                   <p style="color:#DC2626;font-size:13px;font-weight:700;margin:0">Dữ liệu KHÔNG thể khôi phục!</p>`,
+            title: '<span style="color:#DC2626">⚠️ Xóa file khỏi hệ thống</span>',
+            html: `<p style="margin:0 0 12px">File <strong>${name}</strong> sẽ bị ẩn khỏi danh sách monitor.</p>
+                   <div style="background:#FEF3C7;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;text-align:left">
+                     <i class="fa-solid fa-circle-info" style="margin-right:6px"></i>
+                     Dữ liệu lịch sử thay đổi <strong>vẫn được giữ lại</strong> trong database.
+                   </div>`,
             icon: 'warning', iconColor: '#DC2626', showCancelButton: true, reverseButtons: true,
             confirmButtonText: 'Tiếp tục →', cancelButtonText: 'Hủy',
             confirmButtonColor: '#DC2626', cancelButtonColor: '#9CA3AF',
@@ -397,7 +489,7 @@
         if (!s1.isConfirmed) return;
         const s2 = await Swal.fire({
             title: 'Nhập mật khẩu xác nhận',
-            html: `<p style="font-size:13px;color:#6B7280;margin:0 0 12px">Nhập mật khẩu để xác nhận xóa cứng:</p>
+            html: `<p style="font-size:13px;color:#6B7280;margin:0 0 12px">Nhập mật khẩu để xác nhận:</p>
                    <input id="swal-pwd" type="password" class="swal2-input" placeholder="Mật khẩu xác nhận" style="font-size:15px;letter-spacing:2px" autofocus>`,
             icon: 'warning', iconColor: '#DC2626', showCancelButton: true, reverseButtons: true,
             confirmButtonText: 'Xác nhận xóa', cancelButtonText: 'Hủy',
@@ -411,10 +503,19 @@
             didOpen: () => { document.getElementById('swal-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') Swal.clickConfirm(); }); }
         });
         if (!s2.isConfirmed) return;
-        Swal.fire({ title: 'Đang xóa dữ liệu...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        Swal.fire({
+            title: 'Đang xử lý...',
+            allowOutsideClick : false,
+            allowEscapeKey    : false,
+            allowEnterKey     : false,
+            showConfirmButton : false,
+            didOpen           : () => Swal.showLoading(),
+        });
+
         const resp = await fetch(`/api/excel-file/${id}/hard-delete`, { method: 'DELETE' });
         if (resp.ok) {
-            await Swal.fire({ title: 'Đã xóa thành công', text: `File "${name}" và toàn bộ dữ liệu liên quan đã bị xóa.`, icon: 'success', confirmButtonColor: '#1E3A5F' });
+            await Swal.fire({ title: 'Đã xóa', text: `File "${name}" đã được xóa khỏi danh sách monitor.`, icon: 'success', confirmButtonColor: '#1E3A5F' });
             location.reload();
         } else {
             const err = await resp.text(); Swal.fire('Lỗi', `Không thể xóa: ${err}`, 'error');
@@ -422,8 +523,6 @@
     }
 
     // ── Close overlay on click ────────────────────────────────────
-    document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeAddModal(); });
-    document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
 
     // ── Edit modal ────────────────────────────────────────────────
     let currentEditId = null, editSheetCount = 0;
@@ -443,7 +542,7 @@
             const toggle = document.getElementById('editStatusToggle');
             toggle.checked = data.status === 1;
             updateStatusLabel(toggle.checked);
-            (data.sheetConfigs || []).forEach(sc => addEditSheetRow(sc.sheetName, sc.groupColumn, parseRowKeys(sc.rowKeyColumns), sc.status));
+            (data.sheetConfigs || []).forEach(sc => addEditSheetRow(sc.sheetName, sc.groupColumn, parseRowKeys(sc.rowKeyColumns), sc.status, sc.headerRowIndex ?? 0));
             document.getElementById('editLoading').style.display     = 'none';
             document.getElementById('editFormContent').style.display = 'block';
         } catch (e) { toastr.error('Lỗi tải cấu hình: ' + e.message); closeEditModal(); }
@@ -455,13 +554,14 @@
         lbl.textContent = isActive ? 'Đang Monitor' : 'Tạm dừng';
         lbl.style.color = isActive ? 'var(--em-success)' : 'var(--em-muted)';
     }
-    function addEditSheetRow(sheetName = '', groupCol = 'TỔ', rowKeys = 'STYLE,SP,COLOR', status = 1) {
+    function addEditSheetRow(sheetName = '', groupCol = 'TỔ', rowKeys = 'STYLE,SP,COLOR', status = 1, headerRowIndex = 0) {
         const idx = editSheetCount++;
         document.getElementById('editSheetList').insertAdjacentHTML('beforeend', `
-            <div class="em-sheet-row" id="esr_${idx}" style="grid-template-columns:1fr 80px 1fr 28px 40px">
-                <input type="text" class="em-form-control" id="esr_sheet_${idx}" value="${escHtml(sheetName)}" placeholder="09.09" />
-                <input type="text" class="em-form-control" id="esr_group_${idx}" value="${escHtml(groupCol)}" placeholder="TỔ" />
-                <input type="text" class="em-form-control" id="esr_rowkey_${idx}" value="${escHtml(rowKeys)}" placeholder="STYLE,SP,COLOR" />
+            <div class="em-sheet-row" id="esr_${idx}" style="grid-template-columns:1fr 80px 1fr 60px 28px 40px">
+                <input type="text"   class="em-form-control" id="esr_sheet_${idx}"  value="${escHtml(sheetName)}" placeholder="09.09" />
+                <input type="text"   class="em-form-control" id="esr_group_${idx}"  value="${escHtml(groupCol)}" placeholder="TỔ" />
+                <input type="text"   class="em-form-control" id="esr_rowkey_${idx}" value="${escHtml(rowKeys)}" placeholder="STYLE,SP,COLOR" />
+                <input type="number" class="em-form-control" id="esr_hdr_${idx}"    value="${headerRowIndex}" min="0" max="10" style="text-align:center" title="Số dòng bỏ qua trước header (0=Row1, 1=bỏ qua Row1)" />
                 <label style="display:flex;align-items:center;justify-content:center;cursor:pointer">
                     <input type="checkbox" id="esr_active_${idx}" ${status===1?'checked':''} style="width:14px;height:14px;accent-color:var(--em-success)">
                 </label>
@@ -486,11 +586,12 @@
             if (!el) continue;
             const sheetName = document.getElementById('esr_sheet_' + i)?.value?.trim();
             if (!sheetName) continue;
-            const groupCol  = document.getElementById('esr_group_' + i)?.value?.trim()  || 'TỔ';
-            const rowKeyRaw = document.getElementById('esr_rowkey_' + i)?.value?.trim() || '';
-            const rowKeys   = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
-            const isActive  = document.getElementById('esr_active_' + i)?.checked ? 1 : 0;
-            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys, status: isActive });
+            const groupCol       = document.getElementById('esr_group_' + i)?.value?.trim()  || 'TỔ';
+            const rowKeyRaw      = document.getElementById('esr_rowkey_' + i)?.value?.trim() || '';
+            const rowKeys        = rowKeyRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const isActive       = document.getElementById('esr_active_' + i)?.checked ? 1 : 0;
+            const headerRowIndex = parseInt(document.getElementById('esr_hdr_' + i)?.value || '0', 10);
+            sheetConfigs.push({ sheetName, groupColumn: groupCol, rowKeyColumns: rowKeys, status: isActive, headerRowIndex });
         }
         const btn = document.getElementById('editSubmitBtn');
         const txt = document.getElementById('editSubmitText');

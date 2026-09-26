@@ -44,6 +44,7 @@ public class ExcelFileController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var files = await _db.ExcelFiles
+            .Where(f => f.Status != -2)            // bỏ qua file đã soft-delete
             .OrderByDescending(f => f.CreateDate)
             .Select(f => new
             {
@@ -97,6 +98,7 @@ public class ExcelFileController : ControllerBase
                 s.SheetName,
                 s.GroupColumn,
                 RowKeyColumns = TryParseJsonArray(s.RowKeyColumns),
+                s.HeaderRowIndex,
                 s.Status
             })
         });
@@ -112,8 +114,8 @@ public class ExcelFileController : ControllerBase
         if (!System.IO.File.Exists(req.FilePath))
             return BadRequest($"File không tồn tại: {req.FilePath}");
 
-        // Kiểm tra trùng
-        if (await _db.ExcelFiles.AnyAsync(f => f.FilePath == req.FilePath))
+        // Kiểm tra trùng: chỉ conflict nếu file đang active hoặc paused (status != -2)
+        if (await _db.ExcelFiles.AnyAsync(f => f.FilePath == req.FilePath && f.Status != -2))
             return Conflict("File này đã được thêm vào monitor");
 
         var ext = Path.GetExtension(req.FilePath).TrimStart('.').ToLower();
@@ -145,6 +147,7 @@ public class ExcelFileController : ControllerBase
                     RowKeyColumns = sc.RowKeyColumns != null
                         ? JsonSerializer.Serialize(sc.RowKeyColumns)
                         : null,
+                    HeaderRowIndex = sc.HeaderRowIndex,
                     Status        = 1,
                     CreateDate    = now,
                     UpdateDate    = now,
@@ -155,9 +158,11 @@ public class ExcelFileController : ControllerBase
         await _db.SaveChangesAsync();
 
         // Initial Load (tạo snapshot, không tạo ChangeLog)
-        _ = Task.Run(() => _monitorService.InitialLoadAsync(excelFile.Id));
+        // QUAN TRỌNG: await trước khi RegisterFile để tránh race condition
+        // (worker có thể ProcessFileChanged trước khi snapshot được tạo → nhân đôi)
+        await _monitorService.InitialLoadAsync(excelFile.Id);
 
-        // Đăng ký FileSystemWatcher ngay lập tức
+        // Đăng ký FileSystemWatcher sau khi snapshot đã sẵn sàng
         _worker.RegisterFile(excelFile.Id, excelFile.FilePath, excelFile.FileName);
 
         _logger.LogInformation("Đã thêm file monitor: {FilePath}", req.FilePath);
@@ -178,9 +183,25 @@ public class ExcelFileController : ControllerBase
         file.Status     = req.Status;
         file.UpdateDate = DateTime.Now;
 
-        // Cập nhật hoặc thêm SheetConfigs
+        // Cập nhật SheetConfigs với soft-delete
         if (req.SheetConfigs != null)
         {
+            var now           = DateTime.Now;
+            var incomingNames = req.SheetConfigs
+                .Select(s => s.SheetName.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // 1. Soft-delete: sheet có trong DB nhưng KHÔNG có trong request
+            foreach (var dbSheet in file.ExcelSheetConfigs)
+            {
+                if (!incomingNames.Contains(dbSheet.SheetName))
+                {
+                    dbSheet.Status     = -1;  // xóa mềm
+                    dbSheet.UpdateDate = now;
+                }
+            }
+
+            // 2. Upsert mỗi sheet trong request
             foreach (var sc in req.SheetConfigs)
             {
                 var existing = file.ExcelSheetConfigs
@@ -188,25 +209,28 @@ public class ExcelFileController : ControllerBase
 
                 if (existing != null)
                 {
-                    existing.GroupColumn   = sc.GroupColumn;
-                    existing.RowKeyColumns = sc.RowKeyColumns != null
+                    // Update (kể cả restore nếu đang soft-deleted)
+                    existing.GroupColumn    = sc.GroupColumn;
+                    existing.RowKeyColumns  = sc.RowKeyColumns != null
                         ? JsonSerializer.Serialize(sc.RowKeyColumns) : existing.RowKeyColumns;
-                    existing.Status        = sc.Status;
-                    existing.UpdateDate    = DateTime.Now;
+                    existing.HeaderRowIndex = sc.HeaderRowIndex;
+                    existing.Status         = sc.Status;  // 1 = active
+                    existing.UpdateDate     = now;
                 }
                 else
                 {
                     _db.ExcelSheetConfigs.Add(new ExcelSheetConfig
                     {
-                        Id            = Guid.NewGuid(),
-                        ExcelFileId   = id,
-                        SheetName     = sc.SheetName,
-                        GroupColumn   = sc.GroupColumn,
-                        RowKeyColumns = sc.RowKeyColumns != null
+                        Id             = Guid.NewGuid(),
+                        ExcelFileId    = id,
+                        SheetName      = sc.SheetName.Trim(),
+                        GroupColumn    = sc.GroupColumn,
+                        RowKeyColumns  = sc.RowKeyColumns != null
                             ? JsonSerializer.Serialize(sc.RowKeyColumns) : null,
-                        Status        = sc.Status,
-                        CreateDate    = DateTime.Now,
-                        UpdateDate    = DateTime.Now,
+                        HeaderRowIndex = sc.HeaderRowIndex,
+                        Status         = sc.Status,
+                        CreateDate     = now,
+                        UpdateDate     = now,
                     });
                 }
             }
@@ -258,38 +282,24 @@ public class ExcelFileController : ControllerBase
     }
 
     // ── DELETE /api/excel-file/{id}/hard-delete ───────────────────────────
-    /// <summary>Xóa cứng: xóa hoàn toàn file + toàn bộ dữ liệu liên quan khỏi DB</summary>
+    /// <summary>Xóa mềm: set Status=-2, giữ nguyên toàn bộ data (ChangeLog, Snapshot, SheetConfig)</summary>
     [HttpDelete("{id:guid}/hard-delete")]
     public async Task<IActionResult> HardDelete(Guid id)
     {
         var file = await _db.ExcelFiles.FindAsync(id);
         if (file == null) return NotFound();
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            // Dừng watcher trước
-            _worker.UnregisterFile(id);
+        // Dừng watcher trước
+        _worker.UnregisterFile(id);
 
-            // Xóa các bảng phụ thuộc trước, sau đó xóa file
-            _db.ExcelMonitorLogs .RemoveRange(_db.ExcelMonitorLogs .Where(x => x.ExcelFileId == id));
-            _db.ExcelChangeLogs  .RemoveRange(_db.ExcelChangeLogs  .Where(x => x.ExcelFileId == id));
-            _db.ExcelSnapshotRows.RemoveRange(_db.ExcelSnapshotRows.Where(x => x.ExcelFileId == id));
-            _db.ExcelSheetConfigs.RemoveRange(_db.ExcelSheetConfigs.Where(x => x.ExcelFileId == id));
-            _db.ExcelFiles       .Remove(file);
+        // Xóa mềm: Status = -2 (deleted), giữ toàn bộ data
+        file.Status     = -2;
+        file.UpdateDate = DateTime.Now;
 
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+        await _db.SaveChangesAsync();
 
-            _logger.LogInformation("Hard delete file [{FileName}] thành công", file.FileName);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync();
-            _logger.LogError(ex, "Lỗi hard delete file {FileId}", id);
-            return StatusCode(500, "Lỗi xóa dữ liệu");
-        }
+        _logger.LogInformation("Soft-delete file [{FileName}] (Status=-2)", file.FileName);
+        return NoContent();
     }
 
 
@@ -409,6 +419,7 @@ public class SheetConfigRequest
     public string SheetName    { get; set; } = string.Empty;
     public string? GroupColumn { get; set; }
     public List<string>? RowKeyColumns { get; set; }
+    public int HeaderRowIndex  { get; set; } = 0;
     public int Status          { get; set; } = 1;
 }
 

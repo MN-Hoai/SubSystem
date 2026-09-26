@@ -23,6 +23,7 @@ public class ExcelMonitorController : Controller
     public async Task<IActionResult> Index()
     {
         var files = await _db.ExcelFiles
+            .Where(f => f.Status != -2)            // bỏ qua file đã soft-delete
             .OrderByDescending(f => f.CreateDate)
             .Select(f => new ExcelMonitorIndexVm
             {
@@ -49,7 +50,7 @@ public class ExcelMonitorController : Controller
     {
         var file = await _db.ExcelFiles
             .Include(f => f.ExcelSheetConfigs)
-            .FirstOrDefaultAsync(f => f.Id == id);
+            .FirstOrDefaultAsync(f => f.Id == id && f.Status != -2);
 
         if (file == null) return NotFound();
 
@@ -96,7 +97,7 @@ public class ExcelMonitorController : Controller
     {
         var file = await _db.ExcelFiles
             .Include(f => f.ExcelSheetConfigs)
-            .FirstOrDefaultAsync(f => f.Id == id);
+            .FirstOrDefaultAsync(f => f.Id == id && f.Status != -2);
         if (file == null) return NotFound();
 
         var query = _db.ExcelChangeLogs.Where(c => c.ExcelFileId == id).AsQueryable();

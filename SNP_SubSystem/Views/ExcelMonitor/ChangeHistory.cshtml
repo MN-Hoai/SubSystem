@@ -717,8 +717,16 @@
             <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--em-text);">
                 <i class="fa-solid fa-bolt" style="color:#3B82F6; margin-right:6px;"></i> Thông tin nhanh <span id="qiSheetLabel" style="color:var(--em-muted); font-size:13px; font-weight:normal;"></span>
             </h3>
-            <button onclick="closeQuickInfo()" style="background:none; border:none; cursor:pointer; font-size:22px; color:var(--em-muted); line-height:1;">&times;</button>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <button id="btnExportQiExcel" onclick="exportQuickInfoExcel()"
+                        style="display:none; background:#16A34A; color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; align-items:center; gap:6px; transition:background 0.15s;"
+                        title="Xuất danh sách mã mới thêm ra file Excel">
+                    <i class="fa-solid fa-file-excel" style="font-size:12px;"></i> Xuất Excel
+                </button>
+                <button onclick="closeQuickInfo()" style="background:none; border:none; cursor:pointer; font-size:22px; color:var(--em-muted); line-height:1;">&times;</button>
+            </div>
         </div>
+
         <div class="em-modal-tabs" style="display:flex; border-bottom:1px solid var(--em-border); background:var(--em-surface-2);">
             <button id="tabBtn-added" class="qi-tab active" onclick="switchQiTab('added')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-accent); border-bottom:2px solid var(--em-accent);">Mã mới thêm vào tổ</button>
             <button id="tabBtn-deleted" class="qi-tab" onclick="switchQiTab('deleted')" style="padding:12px 24px; border:none; background:none; font-weight:600; cursor:pointer; color:var(--em-muted); border-bottom:2px solid transparent;">Mã đã xóa</button>
@@ -824,7 +832,24 @@
         document.getElementById('quickInfoModal').style.display = 'none';
     }
     
+    function exportQuickInfoExcel() {
+        const fileId = '@Model.File.Id';
+        const currentSheet = encodeURIComponent('@Html.Raw(Model.SheetName ?? "")');
+        const url = `/excel-monitor/${fileId}/export-quick-info?sheetName=${currentSheet}`;
+        // Trigger download bằng cách tạo <a> ẩn
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
     function switchQiTab(tab) {
+        // Show/hide nút xuất Excel — chỉ hiện ở tab "added"
+        const btnExport = document.getElementById('btnExportQiExcel');
+        if (btnExport) btnExport.style.display = tab === 'added' ? 'inline-flex' : 'none';
+
         ['added', 'deleted', 'group', 'rowkey', 'value'].forEach(t => {
             const btn = document.getElementById('tabBtn-' + t);
             const content = document.getElementById('qiTab' + (t === 'added' ? 'Added' : t === 'deleted' ? 'Deleted' : t === 'group' ? 'Group' : t === 'rowkey' ? 'RowKey' : 'Value'));
@@ -855,7 +880,7 @@
                 qiDataLoaded = true;
                 
                 document.getElementById('qiLoading').style.display = 'none';
-                switchQiTab('added'); // default tab
+                switchQiTab('added'); // default tab — switchQiTab sẽ tự show nút xuất Excel
             } else {
                 document.getElementById('qiLoading').innerHTML = '<div style="color:red">Lỗi tải dữ liệu</div>';
             }

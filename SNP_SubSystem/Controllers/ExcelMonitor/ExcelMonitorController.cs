@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sub_Entities.Entities;
@@ -191,6 +192,255 @@ public class ExcelMonitorController : Controller
 
         return Json(new { success = true, sheets = recentSheets });
     }
+
+    // ── ExportQuickInfoExcel: Xuất Excel "Mã mới thêm" từ Quick Info ────
+    [HttpGet("{id}/export-quick-info")]
+    public async Task<IActionResult> ExportQuickInfoExcel(Guid id, [FromQuery] string? sheetName)
+    {
+        var file = await _db.ExcelFiles.FirstOrDefaultAsync(f => f.Id == id && f.Status != -2);
+        if (file == null) return NotFound();
+
+        // Lấy RowKey columns từ SheetConfig
+        var configs = await _db.ExcelSheetConfigs
+            .Where(s => s.ExcelFileId == id && s.Status == 1)
+            .ToListAsync();
+
+        var query = _db.ExcelChangeLogs.Where(c => c.ExcelFileId == id);
+        if (!string.IsNullOrEmpty(sheetName))
+            query = query.Where(c => c.SheetName == sheetName);
+
+        var logs = await query.OrderBy(c => c.ChangeDate).ThenBy(c => c.Id).ToListAsync();
+
+        // ── Replay logic (giống GetQuickInfo) ──────────────────────────
+        var states = new Dictionary<string, RowState>(StringComparer.Ordinal);
+        string GetStateKey(string? group, string? key) => $"{group ?? ""}||{key ?? ""}";
+
+        foreach (var log in logs)
+        {
+            if (log.ChangeType == "ROW_ADDED")
+            {
+                var k = GetStateKey(log.GroupName, log.RowKey);
+                states[k] = new RowState
+                {
+                    CurrentGroup = log.GroupName ?? "", CurrentKey = log.RowKey ?? "",
+                    OriginalGroup = log.GroupName ?? "", OriginalKey = log.RowKey ?? "",
+                    IsAdded = true
+                };
+            }
+            else if (log.ChangeType == "ROW_DELETED")
+            {
+                var k = GetStateKey(log.GroupName, log.RowKey);
+                if (states.TryGetValue(k, out var st)) st.IsDeleted = true;
+                else states[k] = new RowState
+                {
+                    CurrentGroup = log.GroupName ?? "", CurrentKey = log.RowKey ?? "",
+                    OriginalGroup = log.GroupName ?? "", OriginalKey = log.RowKey ?? "",
+                    IsDeleted = true
+                };
+            }
+            else if (log.ChangeType == "GROUP_CHANGED")
+            {
+                var oldK = GetStateKey(log.OldGroupName, log.RowKey);
+                var newK = GetStateKey(log.NewGroupName, log.RowKey);
+                if (states.TryGetValue(oldK, out var st))
+                {
+                    states.Remove(oldK);
+                    st.CurrentGroup = log.NewGroupName ?? "";
+                    st.HasGroupChanged = (st.OriginalGroup != st.CurrentGroup);
+                    states[newK] = st;
+                }
+                else states[newK] = new RowState
+                {
+                    CurrentGroup = log.NewGroupName ?? "", CurrentKey = log.RowKey ?? "",
+                    OriginalGroup = log.OldGroupName ?? "", OriginalKey = log.RowKey ?? "",
+                    HasGroupChanged = true
+                };
+            }
+            else if (log.ChangeType == "ROWKEY_CHANGED")
+            {
+                var oldK = GetStateKey(log.GroupName, log.OldRowKey);
+                var newK = GetStateKey(log.GroupName, log.NewRowKey);
+                if (states.TryGetValue(oldK, out var st))
+                {
+                    states.Remove(oldK);
+                    st.CurrentKey = log.NewRowKey ?? "";
+                    st.HasRowKeyChanged = (st.OriginalKey != st.CurrentKey);
+                    states[newK] = st;
+                }
+                else states[newK] = new RowState
+                {
+                    CurrentGroup = log.GroupName ?? "", CurrentKey = log.NewRowKey ?? "",
+                    OriginalGroup = log.GroupName ?? "", OriginalKey = log.OldRowKey ?? "",
+                    HasRowKeyChanged = true
+                };
+            }
+        }
+
+        // Mã mới thêm: chưa bị xóa, từng là ROW_ADDED hoặc thay đổi mã/tổ
+        var added = states.Values
+            .Where(s => !s.IsDeleted && (s.IsAdded || s.HasRowKeyChanged || s.HasGroupChanged))
+            .GroupBy(s => s.CurrentGroup)
+            .Select(g => new
+            {
+                GroupName = string.IsNullOrEmpty(g.Key) ? "(Chưa phân tổ)" : g.Key,
+                Rows = g.Select(s => s.CurrentKey).Distinct().OrderBy(r => r).ToList()
+            })
+            .OrderBy(x => x.GroupName)
+            .ToList();
+
+        // ── Lấy RowKey column names ─────────────────────────────────────
+        // Dùng sheetName filter nếu có, ngược lại dùng config đầu tiên
+        var matchConfig = configs.FirstOrDefault(c =>
+            string.IsNullOrEmpty(sheetName) || c.SheetName == sheetName)
+            ?? configs.FirstOrDefault();
+
+        List<string> rkCols;
+        if (matchConfig?.RowKeyColumns == null)
+        {
+            rkCols = new List<string> { "RowKey" };
+        }
+        else
+        {
+            try
+            {
+                var parsed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(matchConfig.RowKeyColumns);
+                rkCols = parsed != null && parsed.Count > 0 ? parsed : new List<string> { "RowKey" };
+            }
+            catch
+            {
+                var parts = matchConfig.RowKeyColumns.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                rkCols = parts.Length > 0 ? parts.ToList() : new List<string> { "RowKey" };
+            }
+        }
+
+        // ── Tạo file Excel bằng ClosedXML ─────────────────────────────
+        using var wb = new XLWorkbook();
+
+        if (added.Count == 0)
+        {
+            // Sheet trống thông báo không có dữ liệu
+            var wsEmpty = wb.Worksheets.Add("Không có dữ liệu");
+            wsEmpty.Cell(1, 1).Value = "Không có mã mới nào trong khoảng thời gian đã chọn.";
+            wsEmpty.Cell(1, 1).Style.Font.Italic = true;
+            wsEmpty.Cell(1, 1).Style.Font.FontColor = XLColor.Gray;
+        }
+        else
+        {
+            // Tên worksheet: tên sheet được filter (nếu có), hoặc tên file
+            string wsBaseName = !string.IsNullOrEmpty(sheetName)
+                ? sheetName
+                : (file.FileName?.Length > 28 ? file.FileName[..28] : file.FileName ?? "QuickInfo");
+
+            // Giới hạn độ dài tên worksheet của Excel là 31 ký tự, bỏ ký tự không hợp lệ
+            static string SafeSheetName(string name)
+            {
+                var invalid = new[] { '\\', '/', '*', '[', ']', ':', '?' };
+                foreach (var c in invalid) name = name.Replace(c, '_');
+                return name.Length > 31 ? name[..31] : name;
+            }
+
+            var ws = wb.Worksheets.Add(SafeSheetName(wsBaseName));
+
+            // ── Tiêu đề file ────────────────────────────────────────────
+            int totalCols = rkCols.Count + 1; // cột Tổ + các cột RowKey
+
+            ws.Cell(1, 1).Value = $"Mã mới thêm – {(!string.IsNullOrEmpty(sheetName) ? $"Sheet: {sheetName}" : file.FileName)}";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontSize = 13;
+            ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml("#1E3A5F");
+            ws.Range(1, 1, 1, totalCols).Merge();
+
+            ws.Cell(2, 1).Value = $"Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm:ss}  |  Tổng: {added.Sum(g => g.Rows.Count)} mã";
+            ws.Cell(2, 1).Style.Font.Italic = true;
+            ws.Cell(2, 1).Style.Font.FontSize = 10;
+            ws.Cell(2, 1).Style.Font.FontColor = XLColor.Gray;
+            ws.Range(2, 1, 2, totalCols).Merge();
+
+            // ── Header bảng (row 4) ─────────────────────────────────────
+            int headerRow = 4;
+
+            // Cột 1: Tổ
+            var hToCel = ws.Cell(headerRow, 1);
+            hToCel.Value = "Tổ";
+            hToCel.Style.Fill.BackgroundColor = XLColor.FromHtml("#1E3A5F");
+            hToCel.Style.Font.FontColor = XLColor.White;
+            hToCel.Style.Font.Bold = true;
+            hToCel.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            hToCel.Style.Border.OutsideBorderColor = XLColor.FromHtml("#93C5FD");
+            hToCel.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Cột 2..n: các cột RowKey
+            for (int ci = 0; ci < rkCols.Count; ci++)
+            {
+                var hCell = ws.Cell(headerRow, ci + 2);
+                hCell.Value = rkCols[ci];
+                hCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1E3A5F");
+                hCell.Style.Font.FontColor = XLColor.White;
+                hCell.Style.Font.Bold = true;
+                hCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                hCell.Style.Border.OutsideBorderColor = XLColor.FromHtml("#93C5FD");
+                hCell.Style.Alignment.WrapText = false;
+            }
+            ws.Row(headerRow).Height = 20;
+
+            // ── Dữ liệu: tất cả nhóm → một bảng duy nhất ───────────────
+            int currentRow = headerRow + 1;
+            bool isEven = false;
+
+            foreach (var group in added)
+            {
+                foreach (var rowKey in group.Rows)
+                {
+                    var parts = rowKey.Split('|');
+                    var rowBg = isEven ? XLColor.FromHtml("#EFF6FF") : XLColor.White;
+
+                    // Cột Tổ
+                    var toCell = ws.Cell(currentRow, 1);
+                    toCell.Value = group.GroupName;
+                    toCell.Style.Fill.BackgroundColor = rowBg;
+                    toCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                    toCell.Style.Border.OutsideBorderColor = XLColor.FromHtml("#BFDBFE");
+                    toCell.Style.Font.Bold = false;
+
+                    // Các cột RowKey
+                    for (int ci = 0; ci < rkCols.Count; ci++)
+                    {
+                        var dCell = ws.Cell(currentRow, ci + 2);
+                        dCell.Value = ci < parts.Length ? parts[ci] : "";
+                        dCell.Style.Fill.BackgroundColor = rowBg;
+                        dCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                        dCell.Style.Border.OutsideBorderColor = XLColor.FromHtml("#BFDBFE");
+                    }
+
+                    isEven = !isEven;
+                    currentRow++;
+                }
+            }
+
+            // ── Freeze header row, Auto-fit tất cả cột ──────────────────
+            ws.SheetView.FreezeRows(headerRow);
+            for (int ci = 1; ci <= totalCols; ci++)
+                ws.Column(ci).AdjustToContents(headerRow, currentRow - 1);
+
+            // Đảm bảo cột Tổ không quá hẹp
+            if (ws.Column(1).Width < 15) ws.Column(1).Width = 15;
+        }
+
+
+        using var ms = new System.IO.MemoryStream();
+        wb.SaveAs(ms);
+        ms.Position = 0;
+
+        var safeSheet = !string.IsNullOrEmpty(sheetName)
+            ? $"_{sheetName.Replace(" ", "_")}"
+            : "";
+        var exportFileName = $"MaMoiThem{safeSheet}_{DateTime.Today:yyyyMMdd}.xlsx";
+
+        return File(ms.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            exportFileName);
+    }
+
 
     class RowState
     {

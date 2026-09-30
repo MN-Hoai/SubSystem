@@ -36,6 +36,10 @@ namespace Sub_Services.Execute
             public string Color         { get; set; }   // cột 8
             public string DetailName    { get; set; }   // cột 9
             public int    OutputNumber  { get; set; }   // cột 10
+            // Cột 11-13: tùy chọn, dùng khi AutoCreateProductionInfo = true
+            public int?   Target        { get; set; }   // cột 11 — mục tiêu sản lượng ngày
+            public string InlineLine    { get; set; }   // cột 12 — ngày inline line (yyyy-MM-dd hoặc null)
+            public string InlineDepartment { get; set; } // cột 13 — ngày inline dept (yyyy-MM-dd hoặc null)
             public int    RowIndex      { get; set; }   // for error reporting
         }
 

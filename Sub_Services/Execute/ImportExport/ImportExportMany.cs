@@ -27,9 +27,10 @@ namespace Sub_Services.Execute
             var ws = wb.AddWorksheet("NhapSanLuong");
             ws.SheetView.FreezeRows(2);
 
-            // Total columns: 10
-            // Col: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng
-            const int TOTAL_COLS = 10;
+            // Total columns: 13
+            // Col 1-10: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng
+            // Col 11-13 (tùy chọn — chỉ dùng khi AutoCreateProductionInfo bật): Target | InlineLine | InlineDepartment
+            const int TOTAL_COLS = 13;
 
             // Title row
             var titleRow = ws.Range(1, 1, 1, TOTAL_COLS);
@@ -42,46 +43,51 @@ namespace Sub_Services.Execute
             titleRow.Style.Fill.BackgroundColor = XLColor.FromArgb(0xE8, 0xED, 0xF5);
 
             // Header row (row 2)
-            // (*) = bắt buộc
+            // (*) = bắt buộc; [opt] = tùy chọn, dùng khi bật "Tự động tạo mã hàng"
             var colHeaders = new[]
             {
-                ("Ngày (*)",         "dd/MM/yyyy",                         false),
-                ("Giờ nhập",         "HH:mm (mặc định 08:00)",             false),
-                ("Tên máy (*)",      "Mã số máy chính xác trong hệ thống", false),
-                ("Line (*)",         "VD: 01, 02, AT-04",                  true),
-                ("Style (*)",        "Tên style chính xác",                true),
-                ("Mã SP (*)",        "VD: 26090783TB",                     false),
-                ("Order Qty",        "Số lượng đơn hàng (tùy chọn)",        false),
-                ("Màu (*)",          "VD: 010, RED, BLK",                  true),
-                ("Tên công đoạn (*)","Tên công đoạn chính xác",            false),
-                ("Số lượng (*)",     "Số nguyên dương",                    false),
+                ("Ngày (*)",              "dd/MM/yyyy",                                    false, false),
+                ("Giờ nhập",              "HH:mm (mặc định 08:00)",                        false, false),
+                ("Tên máy (*)",           "Mã số máy chính xác trong hệ thống",            false, false),
+                ("Line (*)",              "VD: 01, 02, AT-04",                             true,  false),
+                ("Style (*)",             "Tên style chính xác",                           true,  false),
+                ("Mã SP (*)",             "VD: 26090783TB",                                false, false),
+                ("Order Qty",             "Số lượng đơn hàng (tùy chọn)",                 false, false),
+                ("Màu (*)",               "VD: 010, RED, BLK",                             true,  false),
+                ("Tên công đoạn (*)",     "Tên công đoạn chính xác",                       false, false),
+                ("Số lượng (*)",          "Số nguyên dương",                               false, false),
+                ("Target [opt]",          "Mục tiêu SL/ngày — dùng khi tự tạo mã hàng",   false, true),
+                ("InlineLine [opt]",      "dd/MM/yyyy — ngày inline line",                 false, true),
+                ("InlineDepartment [opt]","dd/MM/yyyy — ngày inline bộ phận",              false, true),
             };
 
-            // Màu highlight cho cột mới (Line/Style/Màu)
-            var headerColorNew = XLColor.FromArgb(0x14, 0x5C, 0x3B);  // green-dark
-            var headerColorBase = XLColor.FromArgb(0x1F, 0x3A, 0x67); // navy
+            // Màu highlight cho cột (isNew=green-dark, isOpt=orange, base=navy)
+            var headerColorNew  = XLColor.FromArgb(0x14, 0x5C, 0x3B);  // green-dark (Line/Style/Màu)
+            var headerColorOpt  = XLColor.FromArgb(0x7B, 0x4F, 0x12);  // amber-dark (cột tùy chọn 11-13)
+            var headerColorBase = XLColor.FromArgb(0x1F, 0x3A, 0x67);  // navy
 
             for (int i = 0; i < colHeaders.Length; i++)
             {
+                var (label, _, isNew, isOpt) = colHeaders[i];
                 var cell = ws.Cell(2, i + 1);
-                cell.Value = colHeaders[i].Item1;
+                cell.Value = label;
                 cell.Style.Font.Bold = true;
                 cell.Style.Font.FontColor = XLColor.White;
-                cell.Style.Fill.BackgroundColor = colHeaders[i].Item3 ? headerColorNew : headerColorBase;
+                cell.Style.Fill.BackgroundColor = isOpt ? headerColorOpt : (isNew ? headerColorNew : headerColorBase);
                 cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-                if (colHeaders[i].Item3)
-                    cell.Style.Font.Italic = true; // đánh dấu cột mới
+                if (isNew || isOpt)
+                    cell.Style.Font.Italic = true;
             }
 
-            // Sample data rows (10 cột)
+            // Sample data rows (13 cột; cột 11-13 để trống vì là tùy chọn)
             var today = DateTime.Today.ToString("dd/MM/yyyy");
-            var sampleData = new[]
+            var sampleData = new (string ngay, string gio, string may, string line, string style, string sp, int orderQty, string mau, string congdoan, int sl, string target, string inlineLine, string inlineDept)[]
             {
-                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân trước", 100),
-                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân sau",   95),
-                (today, "13:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Tay áo",     80),
-                (today, "08:00", "AT-05", "02", "VN2025", "26090784SP", 300, "BLK", "Thân trước", 120),
+                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân trước", 100, "", "", ""),
+                (today, "08:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Thân sau",   95,  "", "", ""),
+                (today, "13:00", "AT-04", "01", "IM2024", "26090783TB", 500, "010", "Tay áo",     80,  "", "", ""),
+                (today, "08:00", "AT-05", "02", "VN2025", "26090784SP", 300, "BLK", "Thân trước", 120, "", "", ""),
             };
 
             int dataStartRow = 2;
@@ -89,16 +95,20 @@ namespace Sub_Services.Execute
             {
                 var rowEl = ws.Row(dataStartRow + r);
                 var d = sampleData[r];
-                ws.Cell(dataStartRow + r, 1).Value = d.Item1;
-                ws.Cell(dataStartRow + r, 2).Value = d.Item2;
-                ws.Cell(dataStartRow + r, 3).Value = d.Item3;
-                ws.Cell(dataStartRow + r, 4).Value = d.Item4;
-                ws.Cell(dataStartRow + r, 5).Value = d.Item5;
-                ws.Cell(dataStartRow + r, 6).Value = d.Item6;
-                ws.Cell(dataStartRow + r, 7).Value = d.Item7;  // Order Qty
-                ws.Cell(dataStartRow + r, 8).Value = d.Item8;  // Màu
-                ws.Cell(dataStartRow + r, 9).Value = d.Item9;  // Công đoạn
-                ws.Cell(dataStartRow + r, 10).Value = d.Item10; // Số lượng
+                ws.Cell(dataStartRow + r, 1).Value  = d.ngay;
+                ws.Cell(dataStartRow + r, 2).Value  = d.gio;
+                ws.Cell(dataStartRow + r, 3).Value  = d.may;
+                ws.Cell(dataStartRow + r, 4).Value  = d.line;
+                ws.Cell(dataStartRow + r, 5).Value  = d.style;
+                ws.Cell(dataStartRow + r, 6).Value  = d.sp;
+                ws.Cell(dataStartRow + r, 7).Value  = d.orderQty;   // Order Qty
+                ws.Cell(dataStartRow + r, 8).Value  = d.mau;        // Màu
+                ws.Cell(dataStartRow + r, 9).Value  = d.congdoan;   // Công đoạn
+                ws.Cell(dataStartRow + r, 10).Value = d.sl;         // Số lượng
+                // Cột 11-13 để trống trong sample (tùy chọn)
+                ws.Cell(dataStartRow + r, 11).Value = d.target;
+                ws.Cell(dataStartRow + r, 12).Value = d.inlineLine;
+                ws.Cell(dataStartRow + r, 13).Value = d.inlineDept;
 
                 if (r % 2 == 0)
                     rowEl.Cells(1, TOTAL_COLS).Style.Fill.BackgroundColor = XLColor.FromArgb(0xF7, 0xF8, 0xFC);
@@ -114,20 +124,23 @@ namespace Sub_Services.Execute
                     ws.Cell(blankStart + r, c).Style.Border.OutsideBorder = XLBorderStyleValues.Hair;
 
             // Column widths
-            ws.Column(1).Width = 16;  // Ngày
-            ws.Column(2).Width = 12;  // Giờ
-            ws.Column(3).Width = 14;  // Tên máy
-            ws.Column(4).Width = 12;  // Line  ← mới
-            ws.Column(5).Width = 18;  // Style ← mới
-            ws.Column(6).Width = 18;  // Mã SP
-            ws.Column(7).Width = 14;  // Order Qty ← mới
-            ws.Column(8).Width = 12;  // Màu   ← mới
-            ws.Column(9).Width = 24;  // Công đoạn
-            ws.Column(10).Width = 14; // Số lượng
+            ws.Column(1).Width  = 16;  // Ngày
+            ws.Column(2).Width  = 12;  // Giờ
+            ws.Column(3).Width  = 14;  // Tên máy
+            ws.Column(4).Width  = 12;  // Line
+            ws.Column(5).Width  = 18;  // Style
+            ws.Column(6).Width  = 18;  // Mã SP
+            ws.Column(7).Width  = 14;  // Order Qty
+            ws.Column(8).Width  = 12;  // Màu
+            ws.Column(9).Width  = 24;  // Công đoạn
+            ws.Column(10).Width = 14;  // Số lượng
+            ws.Column(11).Width = 14;  // Target [opt]
+            ws.Column(12).Width = 22;  // InlineLine [opt]
+            ws.Column(13).Width = 22;  // InlineDepartment [opt]
 
             // Note below table
             int noteRow = blankStart + 50 + 1;
-            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Cột nền xanh lá (Line, Style, Màu) giúp hệ thống tìm đúng mã hàng. Cột Order Qty (tùy chọn): ghi số lượng đơn hàng khi mã cần tự tạo mới. Dữ liệu sản lượng sẽ được CỘNG DỒN, không ghi đè.";
+            ws.Cell(noteRow, 1).Value = "(*) = Bắt buộc. Cột nền xanh lá (Line, Style, Màu) giúp hệ thống tìm đúng mã hàng. Cột Order Qty (tùy chọn): số lượng đơn hàng. Cột 11-13 [opt] màu cam: Target, InlineLine, InlineDepartment — chỉ dùng khi bật 'Tự động tạo mã hàng', để trống nếu không cần. Dữ liệu sản lượng CỘNG DỒN, không ghi đè.";
             ws.Cell(noteRow, 1).Style.Font.Italic = true;
             ws.Cell(noteRow, 1).Style.Font.FontColor = XLColor.FromArgb(0x64, 0x69, 0x7F);
             ws.Range(noteRow, 1, noteRow, TOTAL_COLS).Merge();
@@ -218,22 +231,26 @@ namespace Sub_Services.Execute
                 return new ImportOutput_Result { Success = false, Message = "Không tìm thấy sheet 'NhapSanLuong' trong file." };
 
             // Parse rows starting from row 3 (skip title + header)
-            // Format 10 cột: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng
+            // Format 13 cột: Ngày | Giờ | Tên máy | Line | Style | Mã SP | Order Qty | Màu | Công đoạn | Số lượng | Target [opt] | InlineLine [opt] | InlineDepartment [opt]
             var rows = new List<ImportOutput_Row>();
             int lastRow = ws.LastRowUsed()?.RowNumber() ?? 2;
 
             for (int r = 3; r <= lastRow; r++)
             {
-                var dateCell   = ws.Cell(r, 1).GetString().Trim();
-                var timeCell   = ws.Cell(r, 2).GetString().Trim();
-                var machineVal = ws.Cell(r, 3).GetString().Trim();
-                var lineVal    = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
-                var styleVal   = ws.Cell(r, 5).GetString().Trim().ToUpperInvariant();
-                var spVal      = ws.Cell(r, 6).GetString().Trim().ToUpperInvariant();
-                var orderQtyCell = ws.Cell(r, 7).GetString().Trim();  // cột 7: Order Qty (tùy chọn)
-                var colorVal   = ws.Cell(r, 8).GetString().Trim().ToUpperInvariant(); // cột 8
-                var detailVal  = ws.Cell(r, 9).GetString().Trim();                    // cột 9
-                var qtyCell    = ws.Cell(r, 10).GetString().Trim();                   // cột 10
+                var dateCell       = ws.Cell(r, 1).GetString().Trim();
+                var timeCell       = ws.Cell(r, 2).GetString().Trim();
+                var machineVal     = ws.Cell(r, 3).GetString().Trim();
+                var lineVal        = ws.Cell(r, 4).GetString().Trim().ToUpperInvariant();
+                var styleVal       = ws.Cell(r, 5).GetString().Trim().ToUpperInvariant();
+                var spVal          = ws.Cell(r, 6).GetString().Trim().ToUpperInvariant();
+                var orderQtyCell   = ws.Cell(r, 7).GetString().Trim();  // cột 7: Order Qty (tùy chọn)
+                var colorVal       = ws.Cell(r, 8).GetString().Trim().ToUpperInvariant(); // cột 8
+                var detailVal      = ws.Cell(r, 9).GetString().Trim();                    // cột 9
+                var qtyCell        = ws.Cell(r, 10).GetString().Trim();                   // cột 10
+                // Cột 11-13: tùy chọn, chỉ có ý nghĩa khi AutoCreateProductionInfo = true
+                var targetCell     = ws.Cell(r, 11).GetString().Trim();  // cột 11: Target
+                var inlineLineCell = ws.Cell(r, 12).GetString().Trim();  // cột 12: InlineLine (dd/MM/yyyy)
+                var inlineDeptCell = ws.Cell(r, 13).GetString().Trim();  // cột 13: InlineDepartment (dd/MM/yyyy)
 
                 // Skip dòng không có dữ liệu thực tế:
                 // — dòng hoàn toàn trống
@@ -286,24 +303,42 @@ namespace Sub_Services.Execute
                     continue;
                 }
 
-                // Parse Order Qty (tùy chọn, không bắt buộc)
+                // Parse Order Qty (tùy chọn)
                 int? orderQty = null;
                 if (int.TryParse(orderQtyCell, out var oq) && oq > 0)
                     orderQty = oq;
 
+                // Parse Target cột 11 (tùy chọn — số nguyên >= 0)
+                int? target = null;
+                if (!string.IsNullOrEmpty(targetCell) && int.TryParse(targetCell, out var tgt) && tgt >= 0)
+                    target = tgt;
+
+                // Parse InlineLine cột 12 (tùy chọn — dd/MM/yyyy)
+                string inlineLineParsed = null;
+                if (!string.IsNullOrEmpty(inlineLineCell) && TryParseDate(inlineLineCell, out var ilp))
+                    inlineLineParsed = ilp;
+
+                // Parse InlineDepartment cột 13 (tùy chọn — dd/MM/yyyy)
+                string inlineDeptParsed = null;
+                if (!string.IsNullOrEmpty(inlineDeptCell) && TryParseDate(inlineDeptCell, out var idp))
+                    inlineDeptParsed = idp;
+
                 rows.Add(new ImportOutput_Row
                 {
-                    Date         = date,
-                    Time         = time.ToString("HH:mm"),
-                    MachineName  = machineVal,
-                    Line         = lineVal,
-                    Style        = styleVal,
-                    Spmain       = spVal,
-                    OrderQty     = orderQty,
-                    Color        = colorVal,
-                    DetailName   = detailVal,
-                    OutputNumber = qty,
-                    RowIndex     = r
+                    Date               = date,
+                    Time               = time.ToString("HH:mm"),
+                    MachineName        = machineVal,
+                    Line               = lineVal,
+                    Style              = styleVal,
+                    Spmain             = spVal,
+                    OrderQty           = orderQty,
+                    Color              = colorVal,
+                    DetailName         = detailVal,
+                    OutputNumber       = qty,
+                    Target             = target,
+                    InlineLine         = inlineLineParsed,
+                    InlineDepartment   = inlineDeptParsed,
+                    RowIndex           = r
                 });
             }
 
@@ -412,16 +447,23 @@ namespace Sub_Services.Execute
                                 // Tự tạo ProductionInfo mới
                                 var newInfo = new Sub_Entities.Entities.ProductionInfo
                                 {
-                                    Id = Guid.NewGuid(),
+                                    Id                     = Guid.NewGuid(),
                                     ProductionDepartmentId = deptId,
-                                    Line = row.Line,
-                                    Style = row.Style,
-                                    Spmain = row.Spmain,
-                                    Color = row.Color ?? "",
-                                    TotalQty = row.OrderQty,
-                                    Status = 0, // Option 2 sẽ bật sau SaveOutputRecord (áp dụng đồng nhất cả mã mới lẫn có sẵn)
-                                    CreateDate = DateTime.Now,
-                                    UpdateDate = DateTime.Now,
+                                    Line                   = row.Line,
+                                    Style                  = row.Style,
+                                    Spmain                 = row.Spmain,
+                                    Color                  = row.Color ?? "",
+                                    TotalQty               = row.OrderQty,
+                                    Target                 = row.Target,
+                                    InlineLine             = row.InlineLine != null
+                                        ? DateOnly.ParseExact(row.InlineLine, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                                        : (DateOnly?)null,
+                                    InlineDepartment       = row.InlineDepartment != null
+                                        ? DateOnly.ParseExact(row.InlineDepartment, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                                        : (DateOnly?)null,
+                                    Status                 = 0, // Option 2 sẽ bật sau SaveOutputRecord
+                                    CreateDate             = DateTime.Now,
+                                    UpdateDate             = DateTime.Now,
                                 };
                                 _context.ProductionInfos.Add(newInfo);
                                 await _context.SaveChangesAsync();
@@ -483,6 +525,13 @@ namespace Sub_Services.Execute
                                         Spmain                 = row.Spmain,
                                         Color                  = row.Color ?? "",
                                         TotalQty               = row.OrderQty,
+                                        Target                 = row.Target,
+                                        InlineLine             = row.InlineLine != null
+                                            ? DateOnly.ParseExact(row.InlineLine, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                                            : (DateOnly?)null,
+                                        InlineDepartment       = row.InlineDepartment != null
+                                            ? DateOnly.ParseExact(row.InlineDepartment, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                                            : (DateOnly?)null,
                                         Status                 = 0,
                                         CreateDate             = DateTime.Now,
                                         UpdateDate             = DateTime.Now,
@@ -501,6 +550,35 @@ namespace Sub_Services.Execute
                                     result.SkippedRows++;
                                     continue;
                                 }
+                            }
+                        }
+                        // 2b. Ghi Target / InlineLine / InlineDepartment vào mã hàng nếu được nhập
+                        //     Chỉ update field nào có giá trị từ Excel — không ghi đè bằng null
+                        bool needUpdateInfo =
+                            (row.Target          != null && row.Target          != productionInfo.Target) ||
+                            (row.InlineLine      != null && (!productionInfo.InlineLine.HasValue ||
+                                productionInfo.InlineLine.Value != DateOnly.ParseExact(row.InlineLine, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))) ||
+                            (row.InlineDepartment != null && (!productionInfo.InlineDepartment.HasValue ||
+                                productionInfo.InlineDepartment.Value != DateOnly.ParseExact(row.InlineDepartment, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+
+                        if (needUpdateInfo)
+                        {
+                            var infoToUpdate = await _context.ProductionInfos.FindAsync(productionInfo.Id);
+                            if (infoToUpdate != null)
+                            {
+                                if (row.Target != null)
+                                    infoToUpdate.Target = row.Target;
+                                if (row.InlineLine != null)
+                                    infoToUpdate.InlineLine = DateOnly.ParseExact(row.InlineLine, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                if (row.InlineDepartment != null)
+                                    infoToUpdate.InlineDepartment = DateOnly.ParseExact(row.InlineDepartment, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                infoToUpdate.UpdateDate = DateTime.Now;
+                                await _context.SaveChangesAsync();
+
+                                // Đồng bộ cache object
+                                productionInfo.Target           = infoToUpdate.Target;
+                                productionInfo.InlineLine       = infoToUpdate.InlineLine;
+                                productionInfo.InlineDepartment = infoToUpdate.InlineDepartment;
                             }
                         }
 
@@ -705,7 +783,12 @@ namespace Sub_Services.Execute
                 }
                 catch (Exception ex)
                 {
-                    result.Errors.Add($"Dòng {row.RowIndex}: Lỗi hệ thống — {ex.Message}");
+                    // Log cả InnerException để debug lỗi EF Core SaveChanges
+                    var innerMsg = ex.InnerException?.Message ?? "";
+                    var inner2Msg = ex.InnerException?.InnerException?.Message ?? "";
+                    var detail = string.IsNullOrEmpty(innerMsg) ? ""
+                        : (string.IsNullOrEmpty(inner2Msg) ? $" | {innerMsg}" : $" | {innerMsg} | {inner2Msg}");
+                    result.Errors.Add($"Dòng {row.RowIndex}: Lỗi hệ thống — {ex.Message}{detail}");
                     result.SkippedRows++;
                 }
             }

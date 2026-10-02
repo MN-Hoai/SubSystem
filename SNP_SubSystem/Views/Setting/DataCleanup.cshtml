@@ -87,6 +87,73 @@
     </div>
     <!-- ── END SNAPSHOT SECTION ─────────────────────────────────────── -->
 
+    <!-- ── EXCEL CHANGE LOG CLEANUP SECTION ──────────────────────────── -->
+    <div class="snp-section chl-section">
+        <div class="snp-section-head">
+            <div class="snp-section-icon chl-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+            <div>
+                <div class="snp-section-title">Xóa lịch sử thay đổi theo sheet</div>
+                <div class="snp-section-sub">Chọn file và sheet để xóa vĩnh viễn toàn bộ lịch sử thay đổi (<code>ExcelChangeLog</code>) của sheet đó</div>
+            </div>
+            <button class="snp-refresh-btn" onclick="chlLoad()" title="Tải lại danh sách">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="snp-filter-bar">
+            <div class="snp-filter-group">
+                <label class="snp-filter-label"><i class="fa-solid fa-file-excel"></i> File config</label>
+                <select id="chlFileSelect" class="snp-select" onchange="chlOnFileChange()">
+                    <option value="">-- Chọn file --</option>
+                </select>
+            </div>
+            <div class="snp-filter-group">
+                <label class="snp-filter-label"><i class="fa-solid fa-table-cells"></i> Sheet name</label>
+                <select id="chlSheetSelect" class="snp-select" onchange="chlOnSheetChange()">
+                    <option value="">-- Chọn sheet --</option>
+                </select>
+            </div>
+            <button id="chlPurgeBtn" class="snp-purge-all-btn chl-purge-btn" onclick="chlConfirmPurge()" disabled>
+                <i class="fa-solid fa-skull-crossbones"></i> Xóa cứng lịch sử sheet này
+            </button>
+        </div>
+
+        <!-- Stats + warn -->
+        <div id="chlContent">
+            <div id="chlPlaceholder" class="snp-placeholder">
+                <i class="fa-solid fa-filter" style="font-size:36px;color:var(--ink-300);"></i>
+                <div style="margin-top:12px;font-size:14px;color:var(--ink-400);font-weight:600;">Chọn file và sheet để xem thống kê lịch sử thay đổi</div>
+            </div>
+            <div id="chlLoading" style="display:none;text-align:center;padding:32px;color:var(--ink-400);">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i>
+                <div style="margin-top:8px;">Đang tải...</div>
+            </div>
+            <div id="chlStats" style="display:none;">
+                <div class="snp-stats-bar">
+                    <div class="snp-stat-card chl-stat-count">
+                        <div class="snp-stat-label">Tổng bản ghi lịch sử</div>
+                        <div class="snp-stat-val" id="chlStatCount">0</div>
+                    </div>
+                    <div class="snp-stat-card snp-stat-file">
+                        <div class="snp-stat-label">File config</div>
+                        <div class="snp-stat-val" id="chlStatFile" style="font-size:13px;word-break:break-all;"></div>
+                    </div>
+                    <div class="snp-stat-card chl-stat-sheet">
+                        <div class="snp-stat-label">Sheet name</div>
+                        <div class="snp-stat-val" id="chlStatSheet"></div>
+                    </div>
+                </div>
+                <div class="snp-warn-box">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Thao tác <strong>xóa cứng</strong> sẽ xóa vĩnh viễn tất cả <strong id="chlWarnCount">0</strong> bản ghi lịch sử thay đổi của sheet này.
+                    Dữ liệu <strong>KHÔNG THỂ khôi phục</strong> sau khi xóa!
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ── END CHANGE LOG SECTION ──────────────────────────────────── -->
+
     <div class="dc-layout">
 
         <!-- ── LEFT: Danh sách bảng ────────────────────────────────── -->
@@ -529,6 +596,16 @@
     line-height:1.5;
 }
 .snp-warn-box i { font-size:16px; flex-shrink:0; color:#dc2626; }
+
+/* ─── ChangeLog Cleanup Section ─────────────────────────────────────────────────────────── */
+.chl-section  { background:#fffbeb; border-bottom-color:#fde68a; }
+.chl-icon     { background: linear-gradient(135deg,#f59e0b,#d97706); }
+.chl-purge-btn { border-color:#d97706 !important; background:#fffbeb !important; color:#b45309 !important; }
+.chl-purge-btn:hover:not(:disabled) { background:#d97706 !important; color:#fff !important; }
+.chl-stat-count { border-color:#fde68a; background:#fffde7; }
+.chl-stat-count .snp-stat-val { color:#b45309; }
+.chl-stat-sheet { border-color:#fed7aa; background:#fff7ed; }
+.chl-stat-sheet .snp-stat-val { color:#c2410c; font-size:15px; }
 </style>
 
 <script>
@@ -1067,6 +1144,148 @@
 
     // Auto-load khi trang mở
     snpLoad();
+
+}());
+</script>
+
+<script>
+// ─── EXCEL CHANGE LOG CLEANUP ──────────────────────────────────────────────────────────
+(function () {
+    'use strict';
+
+    let chlData      = [];   // SnapshotFileSummary[]
+    let chlFileId    = '';
+    let chlSheetName = '';
+    let chlRowCount  = 0;
+
+    const fileSelect  = document.getElementById('chlFileSelect');
+    const sheetSelect = document.getElementById('chlSheetSelect');
+    const purgeBtn    = document.getElementById('chlPurgeBtn');
+    const placeholder = document.getElementById('chlPlaceholder');
+    const loading     = document.getElementById('chlLoading');
+    const statsEl     = document.getElementById('chlStats');
+    const statCount   = document.getElementById('chlStatCount');
+    const statFile    = document.getElementById('chlStatFile');
+    const statSheet   = document.getElementById('chlStatSheet');
+    const warnCount   = document.getElementById('chlWarnCount');
+
+    window.chlLoad = function () {
+        loading.style.display     = 'block';
+        placeholder.style.display = 'none';
+        statsEl.style.display     = 'none';
+        purgeBtn.disabled         = true;
+
+        fetch('/Settings/GetChangeLogSummaries')
+            .then(r => r.json())
+            .then(data => {
+                chlData = data;
+                loading.style.display = 'none';
+
+                const prevFileId = fileSelect.value;
+                fileSelect.innerHTML = '<option value="">-- Chọn file --</option>';
+                data.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value       = f.excelFileId;
+                    opt.textContent = f.fileName;
+                    if (f.excelFileId === prevFileId) opt.selected = true;
+                    fileSelect.appendChild(opt);
+                });
+
+                chlOnFileChange();
+                placeholder.style.display = fileSelect.value ? 'none' : 'block';
+            })
+            .catch(e => {
+                loading.style.display     = 'none';
+                placeholder.style.display = 'block';
+                console.error('chlLoad error', e);
+            });
+    };
+
+    window.chlOnFileChange = function () {
+        chlFileId    = fileSelect.value;
+        chlSheetName = '';
+        sheetSelect.innerHTML = '<option value="">-- Chọn sheet --</option>';
+        statsEl.style.display  = 'none';
+        purgeBtn.disabled      = true;
+
+        if (!chlFileId) { placeholder.style.display = 'block'; return; }
+        placeholder.style.display = 'none';
+
+        const file = chlData.find(f => f.excelFileId === chlFileId);
+        if (!file) return;
+
+        file.sheets.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value       = s.sheetName;
+            opt.textContent = `${s.sheetName}  (${s.rowCount.toLocaleString()} records)`;
+            sheetSelect.appendChild(opt);
+        });
+    };
+
+    window.chlOnSheetChange = function () {
+        chlSheetName = sheetSelect.value;
+        if (!chlSheetName || !chlFileId) {
+            statsEl.style.display  = 'none';
+            purgeBtn.disabled      = true;
+            placeholder.style.display = chlFileId ? 'none' : 'block';
+            return;
+        }
+
+        const file  = chlData.find(f => f.excelFileId === chlFileId);
+        const sheet = file?.sheets.find(s => s.sheetName === chlSheetName);
+        if (!sheet) return;
+
+        chlRowCount           = sheet.rowCount;
+        statCount.textContent = chlRowCount.toLocaleString();
+        statFile.textContent  = file.fileName;
+        statSheet.textContent = chlSheetName;
+        warnCount.textContent = chlRowCount.toLocaleString();
+
+        statsEl.style.display     = 'block';
+        purgeBtn.disabled         = chlRowCount === 0;
+        placeholder.style.display = 'none';
+    };
+
+    window.chlConfirmPurge = function () {
+        if (!chlFileId || !chlSheetName) return;
+        const file = chlData.find(f => f.excelFileId === chlFileId);
+
+        document.getElementById('dcConfirmIcon').textContent  = '🗑️';
+        document.getElementById('dcConfirmTitle').textContent = `Xóa lịch sử: ${chlSheetName}`;
+        document.getElementById('dcConfirmSub').textContent   = `File: ${file?.fileName ?? chlFileId}`;
+        document.getElementById('dcConfirmWarn').textContent  =
+            `⚠️ Sẽ xóa vĩnh viễn TẤT CẢ ${chlRowCount.toLocaleString()} bản ghi lịch sử của sheet [${chlSheetName}]. KHÔNG THỂ hoàn tác!`;
+        document.getElementById('dcConfirmOk').textContent = 'Xóa cứng';
+
+        window.__chlPendingConfirm = true;
+        document.getElementById('dcConfirmModal').classList.add('open');
+    };
+
+    // Hook vào confirm modal OK
+    document.getElementById('dcConfirmOk').addEventListener('click', async () => {
+        if (!window.__chlPendingConfirm) return;
+        window.__chlPendingConfirm = false;
+
+        try {
+            const r = await fetch('/Settings/PurgeChangeLogSheet', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ excelFileId: chlFileId, sheetName: chlSheetName })
+            });
+            const d = await r.json();
+            if (d.success) {
+                if (window.toastr) toastr.success(d.message); else alert(d.message);
+                chlLoad(); // reload để cập nhật số liệu
+            } else {
+                if (window.toastr) toastr.error(d.message || 'Lỗi'); else alert(d.message || 'Lỗi');
+            }
+        } catch (e) {
+            if (window.toastr) toastr.error('Lỗi kết nối: ' + e.message); else alert('Lỗi: ' + e.message);
+        }
+    });
+
+    // Auto-load khi trang mở
+    chlLoad();
 
 }());
 </script>

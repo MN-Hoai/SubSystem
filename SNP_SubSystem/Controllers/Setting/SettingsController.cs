@@ -156,6 +156,25 @@ namespace SNP_SubSystem.Controllers.Setting
             var (deleted, msg) = await _subSystemService.PurgeSnapshotSheetAsync(req.ExcelFileId, req.SheetName);
             return Ok(new { success = true, deleted, message = msg });
         }
+
+        /// <summary>API: Lấy danh sách ExcelFile + Sheet kèm số lượng ChangeLog.</summary>
+        [HttpGet]
+        public async Task<IActionResult> GetChangeLogSummaries()
+        {
+            var result = await _subSystemService.GetChangeLogSummariesAsync();
+            return Ok(result);
+        }
+
+        /// <summary>API: Xóa cứng toàn bộ ExcelChangeLog của một file + sheet.</summary>
+        [HttpPost]
+        public async Task<IActionResult> PurgeChangeLogSheet([FromBody] PurgeSnapshotRequest req)
+        {
+            if (req == null || req.ExcelFileId == Guid.Empty || string.IsNullOrWhiteSpace(req.SheetName))
+                return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+
+            var (deleted, msg) = await _subSystemService.PurgeChangeLogSheetAsync(req.ExcelFileId, req.SheetName);
+            return Ok(new { success = true, deleted, message = msg });
+        }
     }
 
     // ─── Request DTOs ────────────────────────────────────────────────────────

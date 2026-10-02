@@ -116,22 +116,11 @@ public class ExcelMonitorController : Controller
             .Take(pageSize)
             .ToListAsync();
 
-        // Lấy danh sách sheet từ config (và từ changelog để đảm bảo không bỏ sót)
-        var sheetsFromConfig = file.ExcelSheetConfigs
-            .Select(s => s.SheetName)
-            .Where(s => !string.IsNullOrEmpty(s))
+        // Lấy danh sách sheet từ config — chỉ hiển thị sheet có Status == 1
+        var allSheets = file.ExcelSheetConfigs
+            .Where(s => s.Status == 1 && !string.IsNullOrEmpty(s.SheetName))
+            .Select(s => s.SheetName!)
             .Distinct()
-            .OrderBy(s => s)
-            .ToList();
-
-        var sheetsFromLog = await _db.ExcelChangeLogs
-            .Where(c => c.ExcelFileId == id && c.SheetName != null)
-            .Select(c => c.SheetName!)
-            .Distinct()
-            .ToListAsync();
-
-        var allSheets = sheetsFromConfig
-            .Union(sheetsFromLog)
             .OrderBy(s => s)
             .ToList();
 

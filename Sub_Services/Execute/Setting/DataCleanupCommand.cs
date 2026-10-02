@@ -24,6 +24,34 @@ namespace Sub_Services.Execute
             new("ProductionDepartment",       "Bộ phận sản xuất",           "fa-building",        8),
             new("Users",                      "Người dùng",                 "fa-users",           9),
             new("Roles",                      "Vai trò",                    "fa-shield-halved",   10),
+            new("ExcelFile",                  "File Excel monitor",         "fa-file-excel",      11),
+            new("ExcelSheetConfig",           "Cấu hình sheet Excel",       "fa-table-columns",   12),
+        };
+
+        /// <summary>
+        /// Map cascade: khi xóa cứng một bảng parent, tự động xóa các bảng con liên kết trước.
+        /// Hỗ trợ 2 kiểu rule:
+        ///   - FkColumn : DELETE child bằng FK đơn (ExcelFileId IN inClause)
+        ///   - JoinOn   : DELETE child bằng JOIN với parent theo composite key
+        /// </summary>
+        private static readonly Dictionary<string, List<CascadeRule>> _cascadeMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            // Khi xóa ExcelFile → xóa toàn bộ dữ liệu con theo ExcelFileId
+            ["ExcelFile"] = new()
+            {
+                new CascadeRule("ExcelChangeLog",   FkColumn: "ExcelFileId"),
+                new CascadeRule("ExcelSheetConfig", FkColumn: "ExcelFileId"),
+                new CascadeRule("ExcelSnapshotRow", FkColumn: "ExcelFileId"),
+                new CascadeRule("ExcelMonitorLog",  FkColumn: "ExcelFileId"),
+            },
+            // Khi xóa ExcelSheetConfig → xóa ChangeLog và Snapshot khớp (ExcelFileId, SheetName)
+            ["ExcelSheetConfig"] = new()
+            {
+                new CascadeRule("ExcelChangeLog",
+                    JoinOn: "p.[ExcelFileId] = c.[ExcelFileId] AND p.[SheetName] = c.[SheetName]"),
+                new CascadeRule("ExcelSnapshotRow",
+                    JoinOn: "p.[ExcelFileId] = c.[ExcelFileId] AND p.[SheetName] = c.[SheetName]"),
+            },
         };
 
         /// <summary>Trả về danh sách bảng kèm số lượng soft-deleted (Status = -2).</summary>
@@ -165,7 +193,7 @@ namespace Sub_Services.Execute
             return (affected, $"Đã khôi phục {affected} bản ghi.");
         }
 
-        /// <summary>Xóa cứng các row (DELETE thực sự).</summary>
+        /// <summary>Xóa cứng các row (DELETE thực sự), tự động xóa cascade bảng con nếu có.</summary>
         public async Task<(int Deleted, string Message)> HardDeleteRowsAsync(string tableName, List<string> ids)
         {
             var allowed = _cleanupTables.Select(t => t.TableName).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -176,31 +204,105 @@ namespace Sub_Services.Execute
             if (guids.Count == 0) return (0, "ID không hợp lệ.");
 
             var inClause = string.Join(",", guids.Select(id => $"'{id}'"));
-            var sql = $"DELETE FROM [{tableName}] WHERE [ID] IN ({inClause}) AND [Status]=-2";
 
             var conn = _context.Database.GetConnectionString();
             await using var sqlConn = new SqlConnection(conn);
             await sqlConn.OpenAsync();
-            await using var cmd = new SqlCommand(sql, sqlConn);
-            int affected = await cmd.ExecuteNonQueryAsync();
-            return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi.");
+            await using var tx = sqlConn.BeginTransaction();
+            try
+            {
+                // Xóa cascade các bảng con trước (nếu có map)
+                if (_cascadeMap.TryGetValue(tableName, out var children))
+                {
+                    foreach (var rule in children)
+                    {
+                        string childSql;
+                        if (rule.FkColumn is not null)
+                        {
+                            // Kiểu đơn: DELETE child WHERE FkColumn IN (parentIds)
+                            childSql = $"DELETE FROM [{rule.ChildTable}] WHERE [{rule.FkColumn}] IN ({inClause})";
+                        }
+                        else
+                        {
+                            // Kiểu JOIN composite key: DELETE child bằng join vào parent
+                            childSql = $@"
+                                DELETE c FROM [{rule.ChildTable}] c
+                                INNER JOIN [{tableName}] p ON {rule.JoinOn}
+                                WHERE p.[ID] IN ({inClause})";
+                        }
+                        await using var childCmd = new SqlCommand(childSql, sqlConn, tx);
+                        await childCmd.ExecuteNonQueryAsync();
+                    }
+                }
+
+                // Xóa parent
+                var sql = $"DELETE FROM [{tableName}] WHERE [ID] IN ({inClause}) AND [Status]=-2";
+                await using var cmd = new SqlCommand(sql, sqlConn, tx);
+                int affected = await cmd.ExecuteNonQueryAsync();
+
+                await tx.CommitAsync();
+                return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi (kèm dữ liệu liên quan).");
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
-        /// <summary>Xóa cứng toàn bộ soft-deleted của một bảng.</summary>
+        /// <summary>Xóa cứng toàn bộ soft-deleted của một bảng, tự động xóa cascade bảng con nếu có.</summary>
         public async Task<(int Deleted, string Message)> PurgeTableAsync(string tableName)
         {
             var allowed = _cleanupTables.Select(t => t.TableName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!allowed.Contains(tableName))
                 return (0, "Bảng không hợp lệ.");
 
-            var sql = $"DELETE FROM [{tableName}] WHERE [Status] = -2";
-
             var conn = _context.Database.GetConnectionString();
             await using var sqlConn = new SqlConnection(conn);
             await sqlConn.OpenAsync();
-            await using var cmd = new SqlCommand(sql, sqlConn);
-            int affected = await cmd.ExecuteNonQueryAsync();
-            return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi khỏi [{tableName}].");
+            await using var tx = sqlConn.BeginTransaction();
+            try
+            {
+                // Xóa cascade bảng con trước: chỉ xóa child của các parent đang bị soft-deleted
+                if (_cascadeMap.TryGetValue(tableName, out var children))
+                {
+                    foreach (var rule in children)
+                    {
+                        string childSql;
+                        if (rule.FkColumn is not null)
+                        {
+                            // Kiểu đơn: join qua ID
+                            childSql = $@"
+                                DELETE c FROM [{rule.ChildTable}] c
+                                INNER JOIN [{tableName}] p ON p.[ID] = c.[{rule.FkColumn}]
+                                WHERE p.[Status] = -2";
+                        }
+                        else
+                        {
+                            // Kiểu JOIN composite key
+                            childSql = $@"
+                                DELETE c FROM [{rule.ChildTable}] c
+                                INNER JOIN [{tableName}] p ON {rule.JoinOn}
+                                WHERE p.[Status] = -2";
+                        }
+                        await using var childCmd = new SqlCommand(childSql, sqlConn, tx);
+                        await childCmd.ExecuteNonQueryAsync();
+                    }
+                }
+
+                // Xóa parent
+                var sql = $"DELETE FROM [{tableName}] WHERE [Status] = -2";
+                await using var cmd = new SqlCommand(sql, sqlConn, tx);
+                int affected = await cmd.ExecuteNonQueryAsync();
+
+                await tx.CommitAsync();
+                return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi khỏi [{tableName}] (kèm dữ liệu liên quan).");
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -267,11 +369,86 @@ namespace Sub_Services.Execute
 
             return (rows.Count, $"Đã xóa vĩnh viễn {rows.Count} snapshot row của sheet [{sheetName}].");
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  EXCEL CHANGE LOG CLEANUP (theo file + sheet)
+        // ═══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Trả về danh sách ExcelFile kèm các sheet và số lượng ChangeLog tương ứng.
+        /// </summary>
+        public async Task<List<SnapshotFileSummary>> GetChangeLogSummariesAsync()
+        {
+            var files = await _context.ExcelFiles
+                .Where(f => f.Status != -2)
+                .OrderBy(f => f.FileName)
+                .Select(f => new { f.Id, f.FileName })
+                .ToListAsync();
+
+            var result = new List<SnapshotFileSummary>();
+
+            foreach (var file in files)
+            {
+                var sheets = await _context.ExcelChangeLogs
+                    .Where(c => c.ExcelFileId == file.Id && c.SheetName != null)
+                    .GroupBy(c => c.SheetName)
+                    .Select(g => new SnapshotSheetSummary
+                    {
+                        SheetName = g.Key,
+                        RowCount  = g.Count()
+                    })
+                    .OrderBy(s => s.SheetName)
+                    .ToListAsync();
+
+                if (sheets.Any())
+                {
+                    result.Add(new SnapshotFileSummary
+                    {
+                        ExcelFileId = file.Id,
+                        FileName    = file.FileName,
+                        Sheets      = sheets
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Xóa cứng toàn bộ ExcelChangeLog của một ExcelFile + SheetName.
+        /// </summary>
+        public async Task<(int Deleted, string Message)> PurgeChangeLogSheetAsync(Guid excelFileId, string sheetName)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                return (0, "Tên sheet không hợp lệ.");
+
+            var conn = _context.Database.GetConnectionString();
+            await using var sqlConn = new SqlConnection(conn);
+            await sqlConn.OpenAsync();
+
+            var sql = @"DELETE FROM [ExcelChangeLog]
+                        WHERE [ExcelFileId] = @fileId AND [SheetName] = @sheetName";
+            await using var cmd = new SqlCommand(sql, sqlConn);
+            cmd.Parameters.AddWithValue("@fileId",    excelFileId);
+            cmd.Parameters.AddWithValue("@sheetName", sheetName);
+            int affected = await cmd.ExecuteNonQueryAsync();
+
+            return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi lịch sử của sheet [{sheetName}].");
+        }
     }
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
 
     public record CleanupTableInfo(string TableName, string DisplayName, string Icon, int Order);
+
+    /// <summary>
+    /// Mô tả một rule cascade khi xóa bảng parent.
+    /// - FkColumn : xóa child bằng FK đơn (WHERE [FkColumn] IN parentIds)
+    /// - JoinOn   : xóa child bằng JOIN composite key (VD: ExcelFileId + SheetName)
+    /// Chỉ được set một trong hai.
+    /// </summary>
+    public record CascadeRule(string ChildTable, string? FkColumn = null, string? JoinOn = null);
+
 
     public class CleanupTableSummary
     {

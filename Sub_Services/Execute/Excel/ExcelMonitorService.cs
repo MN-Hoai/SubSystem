@@ -67,6 +67,41 @@ public class ExcelMonitorService : IExcelMonitorService
             return;
         }
 
+        // ── Bước 2.5: Phát hiện sheet mới chưa có snapshot ───────────────
+        // SheetConfig có thể được tạo SAU khi file đã monitor (LastHash đã có giá trị)
+        // → hash sẽ không bao giờ thay đổi → sheet mới không bao giờ được Initial Load.
+        // Xử lý ngay các sheet chưa có snapshot TRƯỚC khi hash check.
+        var configs = excelFile.ExcelSheetConfigs.ToList();
+        if (configs.Count == 0)
+        {
+            _logger.LogWarning("File {FileName} không có SheetConfig nào được cấu hình", excelFile.FileName);
+            return;
+        }
+
+        var newSheetConfigs = new List<ExcelSheetConfig>();
+        foreach (var cfg in configs)
+        {
+            var has = await _snapshot.HasSnapshotAsync(excelFile.Id, cfg.SheetName, cancellationToken);
+            if (!has)
+                newSheetConfigs.Add(cfg);
+        }
+
+        if (newSheetConfigs.Count > 0)
+        {
+            _logger.LogInformation(
+                "Phát hiện {Count} sheet mới chưa có snapshot trong file [{FileName}] — thực hiện Initial Load ngay",
+                newSheetConfigs.Count, excelFile.FileName);
+
+            await WriteMonitorLogAsync(excelFileId, "NEW_SHEET_DETECTED",
+                $"Phát hiện {newSheetConfigs.Count} sheet mới: {string.Join(", ", newSheetConfigs.Select(c => c.SheetName))}",
+                null, cancellationToken);
+
+            foreach (var cfg in newSheetConfigs)
+            {
+                await ProcessSheetAsync(excelFile, cfg, newHash, cancellationToken);
+            }
+        }
+
         if (string.Equals(excelFile.LastHash, newHash, StringComparison.Ordinal))
         {
             _logger.LogDebug("Hash không đổi → bỏ qua file {FileName}", excelFile.FileName);
@@ -81,15 +116,12 @@ public class ExcelMonitorService : IExcelMonitorService
         await WriteMonitorLogAsync(excelFileId, "HASH_MISMATCH",
             $"Hash thay đổi → bắt đầu đọc Excel", null, cancellationToken);
 
-        // ── Bước 3: Xử lý từng SheetConfig ───────────────────────────────
-        var configs = excelFile.ExcelSheetConfigs.ToList();
-        if (configs.Count == 0)
-        {
-            _logger.LogWarning("File {FileName} không có SheetConfig nào được cấu hình", excelFile.FileName);
-            return;
-        }
+        // ── Bước 3: Xử lý các sheet ĐÃ có snapshot (đã loại các sheet mới ở trên) ──
+        var existingConfigs = configs
+            .Where(c => newSheetConfigs.All(n => n.SheetName != c.SheetName))
+            .ToList();
 
-        foreach (var config in configs)
+        foreach (var config in existingConfigs)
         {
             await ProcessSheetAsync(excelFile, config, newHash, cancellationToken);
         }

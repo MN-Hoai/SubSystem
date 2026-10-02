@@ -20,6 +20,73 @@
         </div>
     </div>
 
+    <!-- ── EXCEL SNAPSHOT CLEANUP SECTION ────────────────────────────── -->
+    <div class="snp-section">
+        <div class="snp-section-head">
+            <div class="snp-section-icon"><i class="fa-solid fa-camera-retro"></i></div>
+            <div>
+                <div class="snp-section-title">Xóa cứng ExcelSnapshotRow</div>
+                <div class="snp-section-sub">Chọn file config và sheet để xóa vĩnh viễn toàn bộ dữ liệu snapshot của sheet đó</div>
+            </div>
+            <button class="snp-refresh-btn" onclick="snpLoad()" title="Tải lại danh sách">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="snp-filter-bar">
+            <div class="snp-filter-group">
+                <label class="snp-filter-label"><i class="fa-solid fa-file-excel"></i> File config</label>
+                <select id="snpFileSelect" class="snp-select" onchange="snpOnFileChange()">
+                    <option value="">-- Chọn file --</option>
+                </select>
+            </div>
+            <div class="snp-filter-group">
+                <label class="snp-filter-label"><i class="fa-solid fa-table-cells"></i> Sheet name</label>
+                <select id="snpSheetSelect" class="snp-select" onchange="snpOnSheetChange()">
+                    <option value="">-- Chọn sheet --</option>
+                </select>
+            </div>
+            <button id="snpPurgeBtn" class="snp-purge-all-btn" onclick="snpConfirmPurge()" disabled>
+                <i class="fa-solid fa-skull-crossbones"></i> Xóa cứng toàn bộ sheet này
+            </button>
+        </div>
+
+        <!-- Stats + table -->
+        <div id="snpContent">
+            <div id="snpPlaceholder" class="snp-placeholder">
+                <i class="fa-solid fa-filter" style="font-size:36px;color:var(--ink-300);"></i>
+                <div style="margin-top:12px;font-size:14px;color:var(--ink-400);font-weight:600;">Chọn file và sheet để xem thống kê snapshot</div>
+            </div>
+            <div id="snpLoading" style="display:none;text-align:center;padding:32px;color:var(--ink-400);">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i>
+                <div style="margin-top:8px;">Đang tải...</div>
+            </div>
+            <div id="snpStats" style="display:none;">
+                <div class="snp-stats-bar">
+                    <div class="snp-stat-card snp-stat-count">
+                        <div class="snp-stat-label">Tổng snapshot row</div>
+                        <div class="snp-stat-val" id="snpStatCount">0</div>
+                    </div>
+                    <div class="snp-stat-card snp-stat-file">
+                        <div class="snp-stat-label">File config</div>
+                        <div class="snp-stat-val" id="snpStatFile" style="font-size:13px;word-break:break-all;"></div>
+                    </div>
+                    <div class="snp-stat-card snp-stat-sheet">
+                        <div class="snp-stat-label">Sheet name</div>
+                        <div class="snp-stat-val" id="snpStatSheet"></div>
+                    </div>
+                </div>
+                <div class="snp-warn-box">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Thao tác <strong>xóa cứng</strong> sẽ xóa vĩnh viễn tất cả <strong id="snpWarnCount">0</strong> snapshot row của sheet này.
+                    Dữ liệu <strong>KHÔNG THỂ khôi phục</strong> sau khi xóa!
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ── END SNAPSHOT SECTION ─────────────────────────────────────── -->
+
     <div class="dc-layout">
 
         <!-- ── LEFT: Danh sách bảng ────────────────────────────────── -->
@@ -382,6 +449,86 @@
 .dc-modal-btn.ghost:hover { background:var(--bg-canvas); }
 .dc-modal-btn.danger { background:#dc2626; color:#fff; border-color:#dc2626; }
 .dc-modal-btn.danger:hover { filter:brightness(1.1); }
+
+/* ─── Snapshot Cleanup Section ────────────────────────────────────────────── */
+.snp-section {
+    border-bottom:2px solid var(--border);
+    background:var(--bg-canvas);
+    padding:20px 28px 22px;
+    flex-shrink:0;
+}
+.snp-section-head {
+    display:flex; align-items:center; gap:14px; margin-bottom:16px;
+}
+.snp-section-icon {
+    width:42px; height:42px; border-radius:11px;
+    background:linear-gradient(135deg,#7c3aed,#4f46e5);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+}
+.snp-section-title { font-size:15px; font-weight:800; color:var(--ink-900); }
+.snp-section-sub   { font-size:12px; color:var(--ink-500); margin-top:2px; }
+.snp-refresh-btn {
+    margin-left:auto; width:34px; height:34px; border-radius:8px;
+    border:1.5px solid var(--border); background:var(--bg-surface);
+    color:var(--ink-600); cursor:pointer; font-size:14px; transition:all .15s;
+    display:flex; align-items:center; justify-content:center;
+}
+.snp-refresh-btn:hover { border-color:var(--primary); color:var(--primary); }
+
+.snp-filter-bar {
+    display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;
+}
+.snp-filter-group { display:flex; flex-direction:column; gap:5px; }
+.snp-filter-label {
+    font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--ink-500);
+    display:flex; align-items:center; gap:5px;
+}
+.snp-select {
+    min-width:240px; border:1.5px solid var(--border); border-radius:8px;
+    padding:8px 12px; font-size:13px; font-family:inherit;
+    background:var(--bg-surface); color:var(--ink-900); outline:none;
+    transition:border-color .15s;
+}
+.snp-select:focus { border-color:var(--primary); }
+
+.snp-purge-all-btn {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:9px 18px; border-radius:9px; font-size:13px;
+    font-weight:700; cursor:pointer; border:2px solid #dc2626;
+    background:#FEF2F2; color:#dc2626; font-family:inherit;
+    transition:all .18s; white-space:nowrap;
+}
+.snp-purge-all-btn:hover:not(:disabled) { background:#dc2626; color:#fff; }
+.snp-purge-all-btn:disabled { opacity:.4; cursor:default; }
+
+.snp-placeholder {
+    padding:28px 0; text-align:center;
+}
+
+.snp-stats-bar {
+    display:flex; gap:14px; flex-wrap:wrap; margin-top:16px;
+}
+.snp-stat-card {
+    flex:1; min-width:160px; padding:14px 18px; border-radius:10px;
+    border:1.5px solid var(--border); background:var(--bg-surface);
+}
+.snp-stat-count { border-color:#ddd6fe; background:#f5f3ff; }
+.snp-stat-file  { border-color:var(--border); }
+.snp-stat-sheet { border-color:#bbf7d0; background:#f0fdf4; }
+.snp-stat-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-500); margin-bottom:6px; }
+.snp-stat-val   { font-size:22px; font-weight:800; color:var(--ink-900); }
+.snp-stat-count .snp-stat-val { color:#7c3aed; }
+.snp-stat-sheet .snp-stat-val { color:#16a34a; font-size:15px; }
+
+.snp-warn-box {
+    margin-top:14px; background:#FEF2F2; border:1.5px solid #FECACA;
+    border-radius:9px; padding:12px 16px; font-size:13px;
+    color:#991b1b; display:flex; align-items:center; gap:10px;
+    line-height:1.5;
+}
+.snp-warn-box i { font-size:16px; flex-shrink:0; color:#dc2626; }
 </style>
 
 <script>
@@ -762,6 +909,164 @@
             if (pb) pb.remove();
         }
     }
+
+}());
+</script>
+
+<script>
+// ─── EXCEL SNAPSHOT CLEANUP ─────────────────────────────────────────────────
+(function () {
+    'use strict';
+
+    // State
+    let snpData       = [];   // SnapshotFileSummary[]
+    let snpFileId     = '';
+    let snpSheetName  = '';
+    let snpRowCount   = 0;
+
+    const fileSelect  = document.getElementById('snpFileSelect');
+    const sheetSelect = document.getElementById('snpSheetSelect');
+    const purgeBtn    = document.getElementById('snpPurgeBtn');
+    const placeholder = document.getElementById('snpPlaceholder');
+    const loading     = document.getElementById('snpLoading');
+    const statsEl     = document.getElementById('snpStats');
+    const statCount   = document.getElementById('snpStatCount');
+    const statFile    = document.getElementById('snpStatFile');
+    const statSheet   = document.getElementById('snpStatSheet');
+    const warnCount   = document.getElementById('snpWarnCount');
+
+    // Load danh sách từ API
+    window.snpLoad = function () {
+        loading.style.display   = 'block';
+        placeholder.style.display = 'none';
+        statsEl.style.display   = 'none';
+        purgeBtn.disabled       = true;
+
+        fetch('/Settings/GetSnapshotSummaries')
+            .then(r => r.json())
+            .then(data => {
+                snpData = data;
+                loading.style.display = 'none';
+
+                // Giữ lại giá trị đang chọn nếu còn tồn tại
+                const prevFileId = fileSelect.value;
+
+                fileSelect.innerHTML = '<option value="">-- Chọn file --</option>';
+                data.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value       = f.excelFileId;
+                    opt.textContent = f.fileName;
+                    if (f.excelFileId === prevFileId) opt.selected = true;
+                    fileSelect.appendChild(opt);
+                });
+
+                snpOnFileChange();
+                placeholder.style.display = fileSelect.value ? 'none' : 'block';
+            })
+            .catch(e => {
+                loading.style.display = 'none';
+                placeholder.style.display = 'block';
+                console.error('snpLoad error', e);
+            });
+    };
+
+    window.snpOnFileChange = function () {
+        snpFileId    = fileSelect.value;
+        snpSheetName = '';
+        sheetSelect.innerHTML = '<option value="">-- Chọn sheet --</option>';
+        statsEl.style.display   = 'none';
+        purgeBtn.disabled       = true;
+
+        if (!snpFileId) {
+            placeholder.style.display = 'block';
+            return;
+        }
+        placeholder.style.display = 'none';
+
+        const file = snpData.find(f => f.excelFileId === snpFileId);
+        if (!file) return;
+
+        file.sheets.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value       = s.sheetName;
+            opt.textContent = `${s.sheetName}  (${s.rowCount.toLocaleString()} rows)`;
+            sheetSelect.appendChild(opt);
+        });
+    };
+
+    window.snpOnSheetChange = function () {
+        snpSheetName = sheetSelect.value;
+        if (!snpSheetName || !snpFileId) {
+            statsEl.style.display = 'none';
+            purgeBtn.disabled     = true;
+            placeholder.style.display = snpFileId ? 'none' : 'block';
+            return;
+        }
+
+        const file  = snpData.find(f => f.excelFileId === snpFileId);
+        const sheet = file?.sheets.find(s => s.sheetName === snpSheetName);
+        if (!sheet) return;
+
+        snpRowCount         = sheet.rowCount;
+        statCount.textContent = snpRowCount.toLocaleString();
+        statFile.textContent  = file.fileName;
+        statSheet.textContent = snpSheetName;
+        warnCount.textContent = snpRowCount.toLocaleString();
+
+        statsEl.style.display   = 'block';
+        purgeBtn.disabled       = snpRowCount === 0;
+        placeholder.style.display = 'none';
+    };
+
+    window.snpConfirmPurge = function () {
+        if (!snpFileId || !snpSheetName) return;
+
+        const file = snpData.find(f => f.excelFileId === snpFileId);
+
+        // Dùng lại dc confirm modal
+        document.getElementById('dcConfirmIcon').textContent  = '🗑️';
+        document.getElementById('dcConfirmTitle').textContent = `Xóa cứng snapshot: ${snpSheetName}`;
+        document.getElementById('dcConfirmSub').textContent   = `File: ${file?.fileName ?? snpFileId}`;
+        document.getElementById('dcConfirmWarn').textContent  =
+            `⚠️ Sẽ xóa vĩnh viễn TẤT CẢ ${snpRowCount.toLocaleString()} snapshot row của sheet [${snpSheetName}]. KHÔNG THỂ hoàn tác!`;
+        const okBtn = document.getElementById('dcConfirmOk');
+        okBtn.textContent = 'Xóa cứng';
+
+        // Gắn action
+        window.__snpPendingConfirm = true;
+
+        document.getElementById('dcConfirmModal').classList.add('open');
+    };
+
+    // Hook vào confirm modal OK – nhận diện bằng flag
+    const origOkBtn = document.getElementById('dcConfirmOk');
+    origOkBtn.addEventListener('click', async () => {
+        if (!window.__snpPendingConfirm) return;
+        window.__snpPendingConfirm = false;
+
+        try {
+            const r = await fetch('/Settings/PurgeSnapshotSheet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ excelFileId: snpFileId, sheetName: snpSheetName })
+            });
+            const d = await r.json();
+            if (d.success) {
+                if (window.toastr) toastr.success(d.message);
+                else alert(d.message);
+                snpLoad();  // reload để cập nhật badge
+            } else {
+                if (window.toastr) toastr.error(d.message || 'Lỗi');
+                else alert(d.message || 'Lỗi');
+            }
+        } catch (e) {
+            if (window.toastr) toastr.error('Lỗi kết nối: ' + e.message);
+            else alert('Lỗi: ' + e.message);
+        }
+    });
+
+    // Auto-load khi trang mở
+    snpLoad();
 
 }());
 </script>

@@ -137,6 +137,25 @@ namespace SNP_SubSystem.Controllers.Setting
             var (deleted, msg) = await _subSystemService.PurgeTableAsync(req.Table);
             return Ok(new { success = true, deleted, message = msg });
         }
+
+        /// <summary>API: Lấy danh sách ExcelFile + Sheet kèm số lượng snapshot row.</summary>
+        [HttpGet]
+        public async Task<IActionResult> GetSnapshotSummaries()
+        {
+            var result = await _subSystemService.GetExcelSnapshotSummariesAsync();
+            return Ok(result);
+        }
+
+        /// <summary>API: Xóa cứng toàn bộ ExcelSnapshotRow của một file + sheet.</summary>
+        [HttpPost]
+        public async Task<IActionResult> PurgeSnapshotSheet([FromBody] PurgeSnapshotRequest req)
+        {
+            if (req == null || req.ExcelFileId == Guid.Empty || string.IsNullOrWhiteSpace(req.SheetName))
+                return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+
+            var (deleted, msg) = await _subSystemService.PurgeSnapshotSheetAsync(req.ExcelFileId, req.SheetName);
+            return Ok(new { success = true, deleted, message = msg });
+        }
     }
 
     // ─── Request DTOs ────────────────────────────────────────────────────────
@@ -149,5 +168,11 @@ namespace SNP_SubSystem.Controllers.Setting
     public class PurgeTableRequest
     {
         public string Table { get; set; }
+    }
+
+    public class PurgeSnapshotRequest
+    {
+        public Guid   ExcelFileId { get; set; }
+        public string SheetName   { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Sub_Entities.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -201,6 +202,71 @@ namespace Sub_Services.Execute
             int affected = await cmd.ExecuteNonQueryAsync();
             return (affected, $"Đã xóa vĩnh viễn {affected} bản ghi khỏi [{tableName}].");
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  EXCEL SNAPSHOT CLEANUP
+        // ═══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Trả về danh sách ExcelFile kèm các sheet và số lượng snapshot row tương ứng.
+        /// </summary>
+        public async Task<List<SnapshotFileSummary>> GetExcelSnapshotSummariesAsync()
+        {
+            var files = await _context.ExcelFiles
+                .Where(f => f.Status != -2)
+                .OrderBy(f => f.FileName)
+                .Select(f => new { f.Id, f.FileName })
+                .ToListAsync();
+
+            var result = new List<SnapshotFileSummary>();
+
+            foreach (var file in files)
+            {
+                var sheets = await _context.ExcelSnapshotRows
+                    .Where(r => r.ExcelFileId == file.Id)
+                    .GroupBy(r => r.SheetName)
+                    .Select(g => new SnapshotSheetSummary
+                    {
+                        SheetName  = g.Key,
+                        RowCount   = g.Count()
+                    })
+                    .OrderBy(s => s.SheetName)
+                    .ToListAsync();
+
+                if (sheets.Any())
+                {
+                    result.Add(new SnapshotFileSummary
+                    {
+                        ExcelFileId = file.Id,
+                        FileName    = file.FileName,
+                        Sheets      = sheets
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Xóa cứng toàn bộ ExcelSnapshotRow của một ExcelFile + SheetName.
+        /// </summary>
+        public async Task<(int Deleted, string Message)> PurgeSnapshotSheetAsync(Guid excelFileId, string sheetName)
+        {
+            if (sheetName == null)
+                return (0, "Tên sheet không hợp lệ.");
+
+            var rows = await _context.ExcelSnapshotRows
+                .Where(r => r.ExcelFileId == excelFileId && r.SheetName == sheetName)
+                .ToListAsync();
+
+            if (rows.Count == 0)
+                return (0, "Không có snapshot nào để xóa.");
+
+            _context.ExcelSnapshotRows.RemoveRange(rows);
+            await _context.SaveChangesAsync();
+
+            return (rows.Count, $"Đã xóa vĩnh viễn {rows.Count} snapshot row của sheet [{sheetName}].");
+        }
     }
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -225,5 +291,18 @@ namespace Sub_Services.Execute
         public int                  TotalPages { get; set; }
         public List<string>         Columns    { get; set; } = new();
         public List<Dictionary<string, object>> Rows { get; set; } = new();
+    }
+
+    public class SnapshotFileSummary
+    {
+        public Guid                    ExcelFileId { get; set; }
+        public string                  FileName    { get; set; }
+        public List<SnapshotSheetSummary> Sheets   { get; set; } = new();
+    }
+
+    public class SnapshotSheetSummary
+    {
+        public string SheetName { get; set; }
+        public int    RowCount  { get; set; }
     }
 }

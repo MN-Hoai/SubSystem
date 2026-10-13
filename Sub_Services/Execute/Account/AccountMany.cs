@@ -151,10 +151,28 @@ namespace Sub_Services.Execute
                         return (false, "Không tìm thấy tài khoản.", null);
 
                     // Kiểm tra username trùng (ngoại trừ chính nó)
-                    var dup = await _context.Users
+                    var dupUsername = await _context.Users
                         .AnyAsync(u => u.Username == req.Username.Trim() && u.Id != req.Id.Value);
-                    if (dup)
+                    if (dupUsername)
                         return (false, $"Username '{req.Username}' đã tồn tại.", null);
+
+                    // Kiểm tra Msnv trùng (ngoại trừ chính nó)
+                    if (!string.IsNullOrWhiteSpace(req.Msnv))
+                    {
+                        var dupMsnv = await _context.Users
+                            .AnyAsync(u => u.Msnv == req.Msnv.Trim() && u.Id != req.Id.Value);
+                        if (dupMsnv)
+                            return (false, $"Mã số nhân viên '{req.Msnv}' đã tồn tại.", null);
+                    }
+
+                    // Kiểm tra Email trùng (ngoại trừ chính nó)
+                    if (!string.IsNullOrWhiteSpace(req.Email))
+                    {
+                        var dupEmail = await _context.Users
+                            .AnyAsync(u => u.Email == req.Email.Trim() && u.Id != req.Id.Value);
+                        if (dupEmail)
+                            return (false, $"Email '{req.Email}' đã tồn tại.", null);
+                    }
 
                     entity.Username   = req.Username.Trim();
                     entity.Msnv       = req.Msnv?.Trim();
@@ -180,9 +198,25 @@ namespace Sub_Services.Execute
                     if (string.IsNullOrWhiteSpace(req.Password))
                         return (false, "Mật khẩu không được để trống khi tạo mới.", null);
 
-                    var dup = await _context.Users.AnyAsync(u => u.Username == req.Username.Trim());
-                    if (dup)
+                    var dupUsername = await _context.Users.AnyAsync(u => u.Username == req.Username.Trim());
+                    if (dupUsername)
                         return (false, $"Username '{req.Username}' đã tồn tại.", null);
+
+                    // Kiểm tra Msnv trùng
+                    if (!string.IsNullOrWhiteSpace(req.Msnv))
+                    {
+                        var dupMsnv = await _context.Users.AnyAsync(u => u.Msnv == req.Msnv.Trim());
+                        if (dupMsnv)
+                            return (false, $"Mã số nhân viên '{req.Msnv}' đã tồn tại.", null);
+                    }
+
+                    // Kiểm tra Email trùng
+                    if (!string.IsNullOrWhiteSpace(req.Email))
+                    {
+                        var dupEmail = await _context.Users.AnyAsync(u => u.Email == req.Email.Trim());
+                        if (dupEmail)
+                            return (false, $"Email '{req.Email}' đã tồn tại.", null);
+                    }
 
                     var salt = GenerateHashCode();
 

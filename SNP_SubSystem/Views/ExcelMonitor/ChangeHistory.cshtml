@@ -708,6 +708,71 @@
     display: inline-block; padding: 3px 8px; background: var(--em-surface); border: 1px solid var(--em-border);
     border-radius: 4px; font-size: 12px; font-family: monospace; color: var(--em-text); margin: 2px;
 }
+
+/* Quick Info: dòng mã có thể bấm để xem chi tiết */
+.qi-hint { font-size: 12px; color: var(--em-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.qi-row { cursor: pointer; }
+.qi-row td { transition: background 0.12s, color 0.12s; }
+.qi-row:hover td { background: #EFF6FF !important; }
+.qi-row td:first-child::before {
+    content: '\203A'; display: inline-block; width: 10px; margin-right: 6px;
+    color: var(--em-muted-lt); font-weight: 700; transition: transform 0.15s, color 0.15s;
+}
+.qi-row.qi-row-open td { background: #DBEAFE !important; color: #1E3A8A; font-weight: 700; }
+.qi-row.qi-row-open td:first-child::before { transform: rotate(90deg); color: var(--em-accent); }
+
+.qi-detail-row > td {
+    padding: 0 !important; background: #F5F8FF !important; white-space: normal !important;
+    border-bottom: 2px solid #BFDBFE !important; border-right: none !important;
+}
+.qi-detail { padding: 14px 16px 16px; font-family: var(--em-font); animation: qiSlide 0.18s ease-out; width: 0; min-width: 100%; box-sizing: border-box; }
+@@keyframes qiSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.qi-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.qi-detail-meta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--em-muted); }
+.qi-detail-meta b { color: var(--em-text); }
+.qi-src { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.qi-src-live    { background: #D1FAE5; color: #065F46; }
+.qi-src-deleted { background: #FEE2E2; color: #991B1B; }
+.qi-src-log     { background: #FEF3C7; color: #92400E; }
+.qi-detail-tools { display: flex; gap: 12px; align-items: center; }
+.qi-detail-search {
+    border: 1px solid var(--em-border); border-radius: 6px; padding: 5px 10px; font-size: 12px;
+    width: 210px; outline: none; font-family: var(--em-font); transition: border-color 0.15s, box-shadow 0.15s;
+}
+.qi-detail-search:focus { border-color: var(--em-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+.qi-detail-toggle { font-size: 12px; color: var(--em-text-md); display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; margin: 0; }
+/* Bảng ngang: header ở trên, value ở dưới */
+.qi-tbl-wrap {
+    overflow-x: auto; border: 1px solid var(--em-border); border-radius: 6px; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.qi-detail .qi-dtbl { border-collapse: collapse; width: max-content; min-width: 100%; margin: 0; font-family: var(--em-font); }
+.qi-detail .qi-dtbl th,
+.qi-detail .qi-dtbl td {
+    width: auto; padding: 8px 12px; white-space: nowrap; text-align: left; vertical-align: middle;
+    border: none; border-right: 1px solid var(--em-border-lt, #EEF0F4);
+}
+.qi-detail .qi-dtbl th:last-child,
+.qi-detail .qi-dtbl td:last-child { border-right: none; }
+.qi-detail .qi-dtbl th {
+    background: var(--em-surface-2); color: var(--em-muted); font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--em-border);
+}
+.qi-detail .qi-dtbl td {
+    background: #fff; color: var(--em-text); font-size: 13px; font-weight: 600; font-family: var(--em-font);
+    max-width: 280px; overflow: hidden; text-overflow: ellipsis; border-bottom: none;
+}
+.qi-detail .qi-dtbl th.qi-th-ph   { font-style: italic; text-transform: none; font-weight: 600; opacity: 0.7; }
+.qi-detail .qi-dtbl td.qi-empty   { color: var(--em-muted-lt); font-weight: 400; text-align: center; }
+.qi-detail .qi-dtbl th.qi-key     { background: #DBEAFE; color: #1D4ED8; }
+.qi-detail .qi-dtbl td.qi-key     { background: #EFF6FF; color: #1E3A8A; font-family: monospace; }
+.qi-detail .qi-dtbl th.qi-grp     { background: #EDE9FE; color: #6D28D9; }
+.qi-detail .qi-dtbl td.qi-grp     { background: #F5F0FF; color: #5B21B6; }
+.qi-detail .qi-dtbl th.qi-hit,
+.qi-detail .qi-dtbl td.qi-hit     { box-shadow: inset 0 -2px 0 #F59E0B; }
+.qi-hide-empty .qi-col-empty, .qi-dtbl .qi-hide-search { display: none; }
+.qi-detail-loading, .qi-detail-error { padding: 16px; text-align: center; font-size: 13px; color: var(--em-muted); font-family: var(--em-font); }
+.qi-detail-error { color: #B91C1C; }
 </style>
 
 <!-- Quick Info Modal -->
@@ -735,6 +800,7 @@
 
         </div>
         <div class="em-modal-body" style="padding:20px; overflow-y:auto; flex:1; background:#F8F9FF;">
+            <div class="qi-hint"><i class="fa-regular fa-hand-pointer"></i> Bấm vào một mã để xem toàn bộ thông tin (header + giá trị) của dòng đó.</div>
             <div id="qiLoading" style="text-align:center; padding:40px; color:var(--em-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:10px; display:block;"></i> Đang tải dữ liệu...</div>
             <div id="qiTabAdded" class="qi-tab-content" style="display:none;"></div>
             <div id="qiTabDeleted" class="qi-tab-content" style="display:none;"></div>
@@ -787,20 +853,33 @@
 
     /* Quick Info Modal Logic */
     const qiRkCols = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RowKeyColumnNames));
+    const QI_FILE_ID = '@Model.File.Id';
+    const QI_SHEET   = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SheetName ?? ""));
+    const qiDetailCache = {};
     let qiDataLoaded = false;
-    
-    function buildRowKeyTable(rows) {
+
+    function escHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function qiRealGroup(g) { return (!g || g === '(Chưa phân tổ)') ? '' : g; }
+
+    // Thuộc tính data-* để dòng mã có thể bấm mở chi tiết
+    function qiRowAttrs(rowKey, group, deleted) {
+        return `class="qi-row" data-rk="${escHtml(rowKey)}" data-group="${escHtml(qiRealGroup(group))}" data-deleted="${deleted ? 1 : 0}" onclick="toggleQiRowDetail(this)" title="Bấm để xem toàn bộ thông tin mã"`;
+    }
+
+    function buildRowKeyTable(rows, opts = {}) {
         if (!rows || rows.length === 0) return '';
-        let thHtml = qiRkCols.map(col => `<th style="padding:6px 12px; border-bottom:1px solid var(--em-border); color:var(--em-text-md); font-weight:600; white-space:nowrap; border-right:1px solid var(--em-border); background:var(--em-surface);">${col}</th>`).join('');
+        let thHtml = qiRkCols.map(col => `<th style="padding:6px 12px; border-bottom:1px solid var(--em-border); color:var(--em-text-md); font-weight:600; white-space:nowrap; border-right:1px solid var(--em-border); background:var(--em-surface);">${escHtml(col)}</th>`).join('');
         
         let trHtml = '';
         rows.forEach(r => {
             let parts = r.split('|');
             let tdHtml = '';
             for(let i = 0; i < qiRkCols.length; i++) {
-                tdHtml += `<td style="padding:6px 12px; border-bottom:1px solid var(--em-border); white-space:nowrap; border-right:1px solid var(--em-border);">${parts[i] || ''}</td>`;
+                tdHtml += `<td style="padding:6px 12px; border-bottom:1px solid var(--em-border); white-space:nowrap; border-right:1px solid var(--em-border);">${escHtml(parts[i] || '')}</td>`;
             }
-            trHtml += `<tr>${tdHtml}</tr>`;
+            trHtml += `<tr ${qiRowAttrs(r, opts.group, opts.deleted)}>${tdHtml}</tr>`;
         });
         
         return `
@@ -816,7 +895,125 @@
             </div>
         `;
     }
-    
+
+    // ── Chi tiết 1 mã: toàn bộ header + value ─────────────────────────
+    async function toggleQiRowDetail(tr) {
+        const next = tr.nextElementSibling;
+        if (next && next.classList.contains('qi-detail-row')) {
+            next.remove();
+            tr.classList.remove('qi-row-open');
+            return;
+        }
+
+        const detail = document.createElement('tr');
+        detail.className = 'qi-detail-row';
+        detail.innerHTML = `<td colspan="${tr.children.length}"><div class="qi-detail-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông tin mã...</div></td>`;
+        tr.after(detail);
+        tr.classList.add('qi-row-open');
+
+        const { rk, group, deleted } = tr.dataset;
+        const cacheKey = `${group}||${rk}||${deleted}`;
+        const cell = detail.firstElementChild;
+        try {
+            let data = qiDetailCache[cacheKey];
+            if (!data) {
+                const qs = new URLSearchParams({ rowKey: rk, groupName: group, sheetName: QI_SHEET, deleted: deleted === '1' });
+                const resp = await fetch(`/excel-monitor/${QI_FILE_ID}/row-detail?${qs}`);
+                data = await resp.json();
+                if (data.success) qiDetailCache[cacheKey] = data;
+            }
+            cell.innerHTML = data.success
+                ? renderQiRowDetail(data)
+                : `<div class="qi-detail-error"><i class="fa-solid fa-circle-exclamation"></i> ${escHtml(data.message || 'Không tải được dữ liệu')}</div>`;
+        } catch (e) {
+            cell.innerHTML = `<div class="qi-detail-error"><i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối: ${escHtml(e.message)}</div>`;
+        }
+    }
+
+    // Định dạng lại giá trị thô từ ExcelDataReader cho dễ đọc (giá trị gốc vẫn có trong tooltip)
+    function qiFormatValue(v) {
+        const s = String(v ?? '').trim();
+        if (!s) return '';
+        const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{2}):(\d{2}) ?(AM|PM))?$/i);
+        if (m) {
+            if (m[3] === '1899') return ''; // ngày 0 của Excel = ô trống định dạng ngày
+            const date = `${m[2].padStart(2, '0')}/${m[1].padStart(2, '0')}/${m[3]}`;
+            if (!m[4] || (m[4] === '12' && m[5] === '00' && m[6] === '00' && m[7].toUpperCase() === 'AM')) return date;
+            let h = parseInt(m[4], 10) % 12;
+            if (m[7].toUpperCase() === 'PM') h += 12;
+            return `${date} ${String(h).padStart(2, '0')}:${m[5]}`;
+        }
+        if (/^-?\d+\.\d{5,}$/.test(s)) return String(+parseFloat(s).toFixed(4));
+        return s;
+    }
+
+    function renderQiRowDetail(d) {
+        const rkSet  = new Set(qiRkCols.map(c => String(c).toLowerCase()));
+        const grpCol = (d.groupColumn || '').toLowerCase();
+        const src = d.source === 'snapshot'    ? ['Dữ liệu hiện tại', 'qi-src-live']
+                  : d.source === 'ROW_DELETED' ? ['Dữ liệu tại thời điểm xóa', 'qi-src-deleted']
+                  :                              ['Theo lịch sử thay đổi', 'qi-src-log'];
+
+        let thHtml = '', tdHtml = '';
+        (d.columns || []).forEach(c => {
+            const lname   = c.name.toLowerCase();
+            const isKey   = rkSet.has(lname);
+            const isGroup = grpCol && lname === grpCol;
+            const isPh    = /^_Col\d+$/.test(c.name);
+            const display = qiFormatValue(c.value);
+            const empty   = display === '';
+            const cls = [isKey ? 'qi-key' : '', isGroup ? 'qi-grp' : '', empty ? 'qi-col-empty' : ''].join(' ');
+            thHtml += `<th class="${cls} ${isPh ? 'qi-th-ph' : ''}" title="${escHtml(c.name)}"
+                           data-search="${escHtml((c.name + ' ' + display + ' ' + c.value).toLowerCase())}">${escHtml(c.name.replace(/\n/g, ' '))}</th>`;
+            tdHtml += `<td class="${cls} ${empty ? 'qi-empty' : ''}" title="${escHtml(c.value)}">${empty ? '—' : escHtml(display)}</td>`;
+        });
+
+        const dataDate = d.dataDate ? new Date(d.dataDate).toLocaleString('vi-VN') : '';
+        return `
+            <div class="qi-detail">
+                <div class="qi-detail-head">
+                    <div class="qi-detail-meta">
+                        <span class="qi-src ${src[1]}">${src[0]}</span>
+                        ${d.sheetName ? `<span>Sheet <b>${escHtml(d.sheetName)}</b></span>` : ''}
+                        ${d.groupName ? `<span>Tổ <b>${escHtml(d.groupName)}</b></span>` : ''}
+                        ${d.excelRowNumber ? `<span>Dòng Excel <b>#${d.excelRowNumber}</b></span>` : ''}
+                        ${dataDate ? `<span>Thời điểm <b>${escHtml(dataDate)}</b></span>` : ''}
+                        <span><b>${(d.columns || []).length}</b> cột</span>
+                    </div>
+                    <div class="qi-detail-tools">
+                        <input type="search" class="qi-detail-search" placeholder="Tìm cột / giá trị..." oninput="filterQiCells(this)" />
+                        <label class="qi-detail-toggle"><input type="checkbox" onchange="toggleQiEmpty(this)" /> Ẩn cột trống</label>
+                    </div>
+                </div>
+                <div class="qi-tbl-wrap">
+                    <table class="qi-dtbl">
+                        <thead><tr>${thHtml}</tr></thead>
+                        <tbody><tr>${tdHtml}</tr></tbody>
+                    </table>
+                </div>
+            </div>`;
+    }
+
+    // Lọc theo tên cột / giá trị → ẩn cả cột (th + td cùng vị trí)
+    function filterQiCells(input) {
+        const q   = input.value.trim().toLowerCase();
+        const tbl = input.closest('.qi-detail').querySelector('.qi-dtbl');
+        const ths = tbl.querySelectorAll('thead th');
+        const tds = tbl.querySelectorAll('tbody td');
+        ths.forEach((th, i) => {
+            const match = !q || th.dataset.search.includes(q);
+            [th, tds[i]].forEach(el => {
+                if (!el) return;
+                el.classList.toggle('qi-hide-search', !match);
+                el.classList.toggle('qi-hit', !!q && match);
+            });
+        });
+    }
+
+    function toggleQiEmpty(cb) {
+        cb.closest('.qi-detail').querySelector('.qi-dtbl').classList.toggle('qi-hide-empty', cb.checked);
+    }
+
     function openQuickInfo() {
         document.getElementById('quickInfoModal').style.display = 'flex';
         
@@ -898,7 +1095,7 @@
         
         let html = '';
         addedList.forEach(g => {
-            let tableHtml = buildRowKeyTable(g.rows);
+            let tableHtml = buildRowKeyTable(g.rows, { group: g.groupName });
             html += `
                 <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                     <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">
@@ -922,7 +1119,7 @@
         
         let html = '';
         deletedList.forEach(g => {
-            let tableHtml = buildRowKeyTable(g.rows);
+            let tableHtml = buildRowKeyTable(g.rows, { group: g.groupName, deleted: true });
             html += `
                 <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                     <div style="background:#FFF1F2; padding:10px 16px; border-bottom:1px solid #FECDD3; font-weight:700; color:#991B1B;">
@@ -955,7 +1152,7 @@
         for (const oldGroup in byOldGroup) {
             let rowsHtml = '';
             byOldGroup[oldGroup].forEach(target => {
-                let tableHtml = buildRowKeyTable(target.rows);
+                let tableHtml = buildRowKeyTable(target.rows, { group: target.newGroupName });
                 rowsHtml += `
                     <tr>
                         <td style="font-weight:700; color:var(--em-accent); vertical-align:top; width:200px; border-right:1px solid var(--em-border); padding:12px;">
@@ -1012,7 +1209,7 @@
                 
                 trHtml += `
                     <tr>${tdOldHtml}</tr>
-                    <tr>${tdNewHtml}</tr>
+                    <tr ${qiRowAttrs(r.newKey || '', g.groupName, false)}>${tdNewHtml}</tr>
                 `;
             });
             
@@ -1046,7 +1243,7 @@
         
         let html = '';
         valueList.forEach(g => {
-            let tableHtml = buildRowKeyTable(g.rows);
+            let tableHtml = buildRowKeyTable(g.rows, { group: g.groupName });
             html += `
                 <div style="background:#fff; border:1px solid var(--em-border); border-radius:8px; margin-bottom:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                     <div style="background:var(--em-surface-2); padding:10px 16px; border-bottom:1px solid var(--em-border); font-weight:700; color:var(--em-text);">

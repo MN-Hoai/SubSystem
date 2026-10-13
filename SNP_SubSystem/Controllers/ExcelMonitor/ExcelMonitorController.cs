@@ -598,6 +598,105 @@ public class ExcelMonitorController : Controller
         return Json(new { success = true, added, groupChanged, rowkeyChanged, valueChanged, deleted });
     }
 
+    // ── RowDetail: Toàn bộ header + value của 1 mã (dùng cho Quick Info) ──
+    // Ưu tiên dữ liệu hiện tại trong Snapshot; nếu mã đã bị xóa / không còn trong snapshot
+    // thì lấy JSON từ ChangeLog gần nhất (ROW_DELETED → OldValue, còn lại → NewValue).
+    [HttpGet("{id}/row-detail")]
+    public async Task<IActionResult> GetRowDetail(
+        Guid id,
+        [FromQuery] string rowKey,
+        [FromQuery] string? groupName,
+        [FromQuery] string? sheetName,
+        [FromQuery] bool deleted = false)
+    {
+        if (string.IsNullOrEmpty(rowKey))
+            return Json(new { success = false, message = "Thiếu RowKey" });
+
+        string? json = null, foundSheet = null, foundGroup = null, source = null;
+        int? excelRowNumber = null;
+        DateTime? dataDate = null;
+
+        // 1. Snapshot hiện tại (bỏ qua nếu mã đã bị xóa)
+        if (!deleted)
+        {
+            var snapQuery = _db.ExcelSnapshotRows.AsNoTracking()
+                .Where(r => r.ExcelFileId == id && r.RowKey == rowKey);
+            if (!string.IsNullOrEmpty(sheetName))
+                snapQuery = snapQuery.Where(r => r.SheetName == sheetName);
+
+            var snaps = await snapQuery.OrderByDescending(r => r.CreateDate).Take(20).ToListAsync();
+            var snap  = snaps.FirstOrDefault(r => (r.GroupName ?? "") == (groupName ?? "")) ?? snaps.FirstOrDefault();
+            if (snap != null)
+            {
+                json = snap.DataJson; foundSheet = snap.SheetName; foundGroup = snap.GroupName;
+                excelRowNumber = snap.ExcelRowNumber; dataDate = snap.CreateDate; source = "snapshot";
+            }
+        }
+
+        // 2. Fallback: ChangeLog gần nhất có chứa JSON cả dòng
+        if (json == null)
+        {
+            var rowTypes = new[] { "ROW_ADDED", "ROW_DELETED", "GROUP_CHANGED", "ROWKEY_CHANGED" };
+            var logQuery = _db.ExcelChangeLogs.AsNoTracking()
+                .Where(c => c.ExcelFileId == id && rowTypes.Contains(c.ChangeType)
+                         && (c.RowKey == rowKey || c.OldRowKey == rowKey || c.NewRowKey == rowKey));
+            if (!string.IsNullOrEmpty(sheetName))
+                logQuery = logQuery.Where(c => c.SheetName == sheetName);
+
+            var logs = await logQuery.OrderByDescending(c => c.ChangeDate).ThenByDescending(c => c.Id)
+                                     .Take(20).ToListAsync();
+            var log  = logs.FirstOrDefault(c => (c.GroupName ?? "") == (groupName ?? "")
+                                             || (c.OldGroupName ?? "") == (groupName ?? ""))
+                       ?? logs.FirstOrDefault();
+            if (log != null)
+            {
+                json = log.ChangeType == "ROW_DELETED" || log.OldRowKey == rowKey ? log.OldValue : log.NewValue;
+                json ??= log.NewValue ?? log.OldValue;
+                foundSheet = log.SheetName; foundGroup = log.GroupName;
+                excelRowNumber = log.ExcelRowNumber; dataDate = log.ChangeDate; source = log.ChangeType;
+            }
+        }
+
+        if (string.IsNullOrEmpty(json))
+            return Json(new { success = false, message = "Không tìm thấy dữ liệu của mã này" });
+
+        // Giữ đúng thứ tự cột như header Excel → trả về mảng thay vì object
+        var columns = new List<object>();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            foreach (var p in doc.RootElement.EnumerateObject())
+            {
+                var val = p.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? p.Value.GetString()
+                    : p.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : p.Value.ToString();
+                columns.Add(new { name = p.Name, value = val ?? "" });
+            }
+        }
+        catch
+        {
+            return Json(new { success = false, message = "Dữ liệu JSON không hợp lệ" });
+        }
+
+        var groupColumn = await _db.ExcelSheetConfigs.AsNoTracking()
+            .Where(s => s.ExcelFileId == id && s.SheetName == foundSheet)
+            .Select(s => s.GroupColumn)
+            .FirstOrDefaultAsync();
+
+        return Json(new
+        {
+            success = true,
+            source,
+            sheetName = foundSheet,
+            groupName = foundGroup,
+            groupColumn,
+            rowKey,
+            excelRowNumber,
+            dataDate,
+            columns,
+        });
+    }
+
     // ── Helper: lấy tên các cột RowKey từ SheetConfig ────────────────────
     private static List<string> GetRowKeyNames(ExcelFile file, string? sheetName)
     {
